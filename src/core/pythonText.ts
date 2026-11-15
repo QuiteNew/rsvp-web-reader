@@ -8,6 +8,8 @@
 // holds Python's own lists, and pythonText.test.ts checks these helpers
 // against them character by character.
 
+import { CASEFOLD_EXCEPTIONS } from './pythonCasefoldTable';
+
 // Every character Python treats as whitespace: str.isspace(), str.split(),
 // str.strip() and \s in a regular expression all use this one list. Written
 // to go inside [...] in a regular expression.
@@ -25,11 +27,22 @@ export const PY_SPACE_NOT_NEWLINE = PY_SPACE.replace('\\n', '');
 // go inside or outside [...]. Needs the regular expression's u flag.
 export const PY_DIGIT = '\\p{Nd}';
 
+// Python's \w: a letter or a number in any script, or an underscore. Written
+// to go inside [...]. Needs the u flag.
+export const PY_WORD = '\\p{L}\\p{N}_';
+
+// Python's [^\W\d_]: a word character that is neither a decimal digit nor an
+// underscore. That leaves letters and the numbers that are not digits, such
+// as a fraction or a Roman numeral. Written to go inside [...].
+export const PY_WORD_NOT_DIGIT = '\\p{L}\\p{Nl}\\p{No}';
+
 const SPACE_RUN = new RegExp(`[${PY_SPACE}]+`, 'u');
 const LEADING_SPACE = new RegExp(`^[${PY_SPACE}]+`, 'u');
 const TRAILING_SPACE = new RegExp(`[${PY_SPACE}]+$`, 'u');
 const ONE_SPACE = new RegExp(`^[${PY_SPACE}]$`, 'u');
 const ONE_LETTER_OR_NUMBER = /^[\p{L}\p{N}]$/u;
+const ONE_LOWERCASE = /^\p{Lowercase}$/u;
+const CASEFOLD = new Map(Object.entries(CASEFOLD_EXCEPTIONS));
 
 /** Python's str.isspace() for one character. */
 export function isPySpace(character: string): boolean {
@@ -45,6 +58,31 @@ export function isPyAlnum(character: string): boolean {
   return ONE_LETTER_OR_NUMBER.test(character);
 }
 
+/**
+ * Python's str.islower() for one character. U+0295 is named because Python
+ * 3.13 calls it lowercase and newer Unicode versions, which browsers follow,
+ * do not.
+ */
+export function isPyLower(character: string): boolean {
+  return character === '\u0295' || ONE_LOWERCASE.test(character);
+}
+
+/**
+ * Python's str.casefold(): lower case made for comparing, not for showing.
+ * It is close to lower-casing each character on its own, and
+ * pythonCasefoldTable.ts lists where it is not: "ß" becomes "ss", a final
+ * sigma becomes an ordinary one, and so on. toLowerCase() on the whole text
+ * would be wrong too, because it treats a sigma at the end of a word
+ * differently.
+ */
+export function pyCasefold(text: string): string {
+  let folded = '';
+  for (const character of text) {
+    folded += CASEFOLD.get(character) ?? character.toLowerCase();
+  }
+  return folded;
+}
+
 /** Python's str.split() with no arguments: split on runs of whitespace. */
 export function pySplit(text: string): string[] {
   return text.split(SPACE_RUN).filter((piece) => piece !== '');
@@ -53,6 +91,21 @@ export function pySplit(text: string): string[] {
 /** Python's str.strip() with no arguments. */
 export function pyStrip(text: string): string {
   return text.replace(LEADING_SPACE, '').replace(TRAILING_SPACE, '');
+}
+
+/** Python's str.lstrip() with no arguments. */
+export function pyLstrip(text: string): string {
+  return text.replace(LEADING_SPACE, '');
+}
+
+/** Python's str.rstrip() with no arguments. */
+export function pyRstrip(text: string): string {
+  return text.replace(TRAILING_SPACE, '');
+}
+
+/** Python's " ".join(text.split()): every run of whitespace becomes one space. */
+export function pySqueeze(text: string): string {
+  return pySplit(text).join(' ');
 }
 
 /**

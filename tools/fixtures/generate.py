@@ -21,6 +21,10 @@ Rules this script keeps:
   letter, a digit or a space comes from Python's Unicode tables, and those
   change between Python versions.
 
+Besides the fixtures it writes src/core/pythonCasefoldTable.ts, the short
+list of characters where Python's str.casefold() and a plain lower-casing
+disagree. The port needs that list at run time, so it lives with the code.
+
 To add a module: write a build_<module>() function that returns
 {function name: [cases]}, and add it to MODULES at the bottom. A case is
 [[arguments], result], or [[arguments], None, "ValueError"] when the call
@@ -33,6 +37,7 @@ sys.dont_write_bytecode = True
 
 import argparse
 import json
+import random
 import re
 import subprocess
 import unicodedata
@@ -204,6 +209,107 @@ MARKS = [
 ]
 
 
+# Lines that start with a speaker label, and lines that only look like it.
+SPEAKER_LINES = [
+    "Interviewer: So how did it start?", "Speaker 2: In a garage.", "Q: Why?", "A: Because.",
+    "Dr. Smith: Good morning.", "O'Brien: Hello.", "O’Brien: Hello.", "Mary-Jane: Hi.",
+    "Jean Luc Le Bon: Bonjour.", "Иван: Привет.",
+    "INTERVIEWER: Hello.", "张三: 你好", "Speaker 2 : Hello.", "Speaker   2: Hello.",
+    "   Bob: indented.", "\tBob: after a tab.", "Bob:", "Bob:\tafter a tab.",
+    "and Bob: hi", "the answer is: yes", "speaker 1: hi", "Note:hello", "http://example.com is up",
+    "10:30 is when we met", "2nd: second place", "_x: hi", "Wait, Bob: hi", "Ready? Go: now",
+    "Really! Bob: no", "\"Bob\": quoted", "(Bob): in brackets", "[Bob] hello",
+    "One two three four five: too many words", "One two three four: hi", "Bob", ": nothing before it",
+    "plain words with no label", "A" * 30 + ": hi", "A" * 30 + "B: hi",
+    "A" * 14 + "        " + "B" * 15 + ": hi", "Bob: time is 10:30: late",
+    ">> And then what happened?", ">> JOHN: hi", ">>JOHN: hi", ">>> quoted reply", "a >> b", ">>", ">>\t Ann: hi",
+    # Capitals and small letters in other scripts, and letters with no case
+    "Émile: salut", "émile: salut", "Σωκράτης: ναι",
+    "σωκράτης: ναι", "ª: ordinal", "ʰx: modifier", "ʕ: glottal",
+    "ǅak: titlecase", "Ⅷ: roman numeral", "½: a fraction", "x́y: combining mark",
+    "\U0001F600: emoji", "Bob\U0001F600: emoji inside", "\U00010400x: Deseret capital", "\U00010428x: Deseret small",
+    "Straße: one", "STRASSE: two", "ΟΔΟΣ: three", "οδος: four",
+    "İstanbul: dotted capital", "Bob Smith: no-break space inside", "Bob : line separator after",
+    "Bob: no-break space after", "Bob:\x85next line after", "Bob:﻿byte order mark after", "Bob_1: underscore",
+    # Sixteen letters that each take two UTF-16 units: 16 characters to
+    # Python, 32 to a JavaScript string.
+    "\U00010400" * 16 + ": letters outside the basic plane", "\U00010400" * 31 + ": too long either way",
+    "B.o.b.: dots", "Bob-: hyphen at the end", "Bob.: dot at the end", "Bob': apostrophe at the end",
+]
+
+# Whole transcripts with speakers.
+SPEAKER_TEXTS = [
+    SPEAKER_TRANSCRIPT,
+    SPEAKER_TRANSCRIPT.replace("\n", "\r\n"),
+    "Intro words here.\nInterviewer: So?\n\nSpeaker 2: Yes, it did.\n",
+    "[00:01:02] Bob: hi there\n00:01:05 Ann: hello\n0:07\nBob: again",
+    "1\n00:00:01,000 --> 00:00:04,000\nBob: hi\n",
+    "Bob: one\nAnn: two\nBob: three",
+    "Bob: one\rAnn: two\rBob: three",
+    "one Bob: two\none\x85Bob: two\none\x0bBob: two\none\x0cBob: two\none\x1cBob: two",
+    "\n\n   \nBob: hi\n\t\n \nAnn: hey",
+    "Ann: a\nBob: b\nAnn : c\nCarl: d\nBob: e\nANN: f\n>> g",
+    "INTERVIEWER: a\nBob: b\nInterviewer: c\nBOB: d",
+    "Welcome.\nAnn: hi\nBob: hey\nNote: once only\nAnn: bye\nBob: see you",
+    "Interviewer: So, how did it start?\n[00:00:05] Speaker 2: In a garage.\n>> And then?",
+    "Dr. Smith: first\nSmith: second\nAnn: third\nDr. Smith: fourth\nSmith: fifth",
+    ">> one two\n>> three\nplain line\n>> JOHN: four\n>> JOHN: five\n>> six",
+    "Ann: one. Two, three!\nAnn: again\nBob: well-known step-by-step words; then more.\nAnn: bye",
+    "Straße: one\nSTRASSE: two\nstrasse: three\nStrasse: four",
+    "first line\n>>\nsecond line",
+]
+
+# A longer piece of ordinary prose, so chunking has sentences to work with.
+PROSE = (
+    "Reading one word at a time sounds strange, but it works. The eye stays in one place; "
+    "the words come to it. Some words are short, some are extraordinarily long, and a few are "
+    "hyphenated, like well-known or state-of-the-art. Does that matter? It does! A longer word "
+    "needs more time: that is what pacing is for. In a typical session you start slowly, speed up, "
+    "and settle. If you lose your place, skip back a little. That is all there is to it -- really."
+)
+
+# Pieces the random texts are built from: labels, changes, timestamps, odd
+# spaces and line endings, punctuation, other scripts and emoji. The same
+# idea as the random test in the desktop's tests/test_speakers.py.
+RANDOM_PIECES = [
+    "Bob:", "Ann:", "Speaker 2:", "Q:", "Dr. Smith:", "INTERVIEWER:", "Note:",
+    ">>", ">> JOHN:", ">>>", "word", "two words", "end.", "hi,", "10:30", "--",
+    "http://x.y", "[00:01:02]", "(1:23)", "00:02:45", "0:05",
+    "00:00:01,000 --> 00:00:04,000", "naïve", "Иван:",
+    "\U0001F600", " ", " ", "\x85", "\x0b", "\t", " ", "  ",
+    "extraordinarily", "well-known", "wait...", "really?", "yes;",
+    "\n", "\n", "\n", "\r\n", "\r", "\n\n",
+]
+
+
+def random_texts(count, seed):
+    """The same made-up texts on every run: the seed fixes them."""
+    rng = random.Random(seed)
+    return [
+        "".join(rng.choice(RANDOM_PIECES) + rng.choice(["", " ", "\n"]) for _ in range(rng.randint(0, 40)))
+        for _ in range(count)
+    ]
+
+
+CUSTOM_SPEAKERS = [
+    None,
+    {},
+    {"bob": "Bob", "ann": "Ann", "interviewer": "Host", "john": "John"},
+    {"dr. smith": "Smith", "smith": "Smith", "ann": "Ann", "note": "Note", "speaker 2": "Second"},
+]
+
+# Values a damaged save file could hold where a speaker list should be.
+DAMAGED_CUSTOM = [
+    None, {}, [], [["bob", "Bob"]], "bob", 7, True, 1.5,
+    {"bob": "Bob"}, {"Bob": "Bob"}, {" bob": "Bob"}, {"bob  smith": "B"}, {"bob smith": "  Bob   Smith  "},
+    {"": "Empty key"}, {"bob": ""}, {"bob": "   "}, {"bob": 5}, {"bob": None}, {"bob": ["Bob"]},
+    {"bob": "A" * 30}, {"bob": "A" * 31}, {"bob": "\U0001F600" * 30}, {"bob": "\U0001F600" * 31},
+    {"straße": "x"}, {"strasse": "x"}, {"οδος": "x"}, {"οδοσ": "x"},
+    {"ann": "Ann", "BAD": "x", "bob": "Bob", "carl": 3},
+    {"bob smith": "x"}, {"bob\tsmith": "x"}, {"constructor": "x", "toString": "y"},
+]
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -256,12 +362,22 @@ def build_charsets(core):
     be checked character by character."""
     space = re.compile(r"\s")
     digit = re.compile(r"\d")
+    word = re.compile(r"\w")
     return {
         "str_isspace": ranges(str.isspace),
         "re_space": ranges(lambda ch: space.fullmatch(ch) is not None),
         "re_digit": ranges(lambda ch: digit.fullmatch(ch) is not None),
         "str_isalnum": ranges(str.isalnum),
         "unassigned": ranges(lambda ch: unicodedata.category(ch) == "Cn"),
+        "re_word": ranges(lambda ch: word.fullmatch(ch) is not None),
+        "str_islower": ranges(str.islower),
+        # Not ranges: every character str.casefold() changes, with what it
+        # becomes. Surrogates are left out, they are not characters.
+        "str_casefold": [
+            [number, chr(number).casefold()]
+            for number in range(0x110000)
+            if not 0xD800 <= number <= 0xDFFF and chr(number).casefold() != chr(number)
+        ],
     }
 
 
@@ -368,6 +484,295 @@ def build_timing(core):
     }
 
 
+def hit_list(scan):
+    return [[hit.word_index, hit.key, hit.name, hit.marked] for hit in scan.hits]
+
+
+def row_list(rows):
+    return [[row.key, row.label, row.appearances, row.ticked, row.name] for row in rows]
+
+
+def build_speakers(core):
+    speakers = core.speakers
+    made_up = random_texts(200, 20261115)
+    texts = unique(SPEAKER_LINES + SPEAKER_TEXTS + TEXTS + made_up)
+    # Every text is scanned. The functions that take a speaker list as well
+    # get a smaller set, or the file would hold each text many times over.
+    with_lists = set(SPEAKER_LINES + SPEAKER_TEXTS + made_up[:25])
+    with_edits = set(SPEAKER_TEXTS + made_up[:8])
+    names = unique(
+        ["", " ", "  Speaker   TWO ", "STRASSE", "straße", "ΟΔΟΣ", "οδος",
+         "İstanbul", "I", "ı", "ﬁsh", "ẞ", "ᎠᎡ", "ꭰꭱ", "µ", "ſ",
+         "A B", "A\tB\nC", "\U00010400", "ǅ", "ͅ"]
+        + [hit.name for text in texts for hit in speakers.scan_speakers(text).hits]
+    )
+
+    scans, candidates, autos, turns, rows, saved, whole, lookups = [], [], [], [], [], [], [], []
+    row_names = []
+    for text in texts:
+        scan = speakers.scan_speakers(text)
+        scans.append([[text], {"word_count": scan.word_count, "hits": hit_list(scan)}])
+        found = speakers.speaker_candidates(scan)
+        if not scan.hits:
+            continue
+        candidates.append([[text], [[c.key, c.name, c.appearances] for c in found]])
+        autos.append([[text], speakers.auto_speakers(found)])
+        if text not in with_lists:
+            continue
+        for custom in CUSTOM_SPEAKERS:
+            speaker_of = custom if custom is not None else speakers.auto_speakers(found)
+            built = speakers.build_turns(scan, speaker_of)
+            turns.append([[text, custom], {"starts": list(built.starts), "speakers": list(built.speakers)}])
+            table = speakers.speaker_rows(text, custom)
+            rows.append([[text, custom], row_list(table)])
+            if text not in with_edits:
+                continue
+            lookups.append([
+                [list(built.starts), list(built.speakers)],
+                [[built.speaker_at(i), built.is_turn_start(i)] for i in range(-1, scan.word_count + 2)],
+            ])
+            whole.append([[text, custom], speakers.transcript_speakers(text, custom)])
+            # What the window would save: as shown, then with every row
+            # ticked, with none ticked, and with odd names typed in.
+            edits = [
+                table,
+                [dataclass_replace(row, ticked=True) for row in table],
+                [dataclass_replace(row, ticked=False) for row in table],
+                [dataclass_replace(row, ticked=True, name="  Same   Name  ") for row in table],
+                [dataclass_replace(row, name="") for row in table],
+                [dataclass_replace(row, name="N" * 29 + " tail") for row in table],
+                [dataclass_replace(row, name="\U0001F600" * 29 + "  \U0001F600\U0001F600") for row in table],
+            ]
+            for edited in edits:
+                saved.append([[row_list(edited)], speakers.speakers_to_save(edited)])
+                row_names.extend([[row_list([row])[0]], speakers.speaker_row_name(row)] for row in edited)
+
+    def keep_unique(cases):
+        seen, kept = set(), []
+        for case in cases:
+            key = json.dumps(case[0], sort_keys=True)
+            if key not in seen:
+                seen.add(key)
+                kept.append(case)
+        return kept
+
+    return {
+        "label_key": [call(speakers.label_key, name) for name in names],
+        "clean_custom_speakers": [call(speakers.clean_custom_speakers, value) for value in DAMAGED_CUSTOM],
+        "scan_speakers": scans,
+        "speaker_candidates": candidates,
+        "auto_speakers": autos,
+        "build_turns": turns,
+        "speaker_at_and_is_turn_start": keep_unique(lookups),
+        "speaker_rows": rows,
+        "speaker_row_name": keep_unique(row_names),
+        "speakers_to_save": keep_unique(saved),
+        "transcript_speakers": whole,
+    }
+
+
+def dataclass_replace(row, **changes):
+    import dataclasses
+    return dataclasses.replace(row, **changes)
+
+
+# --- The reader -------------------------------------------------------------
+#
+# ReaderSession keeps state, so one call and one answer is not enough. A
+# reader fixture is a scenario: the text and options a session is made with,
+# then a list of steps. After every step the script records what the session
+# shows.
+
+READER_OPTIONS = [
+    {},
+    {"wpm": 192},
+    {"wpm": 960, "length_pacing_enabled": True},
+    {"warm_up_enabled": True},
+    {"wpm": 250, "length_pacing_enabled": True, "warm_up_enabled": True, "start_index": 3},
+    {"chunk_enabled": True, "chunk_size": 2},
+    {"chunk_enabled": True, "chunk_size": 3, "warm_up_enabled": True},
+    {"chunk_enabled": True, "chunk_size": 5, "length_pacing_enabled": True, "start_index": 4},
+    {"chunk_enabled": True, "chunk_size": 2, "chunk_mode": "adaptive", "chunk_char_target": 15},
+    {"chunk_enabled": True, "chunk_mode": "adaptive", "chunk_char_target": 30, "start_index": 7},
+    {"chunk_enabled": True, "chunk_mode": "adaptive", "chunk_char_target": 60, "speaker_cues_enabled": True},
+    {"speaker_cues_enabled": True},
+    {"speaker_cues_enabled": True, "chunk_enabled": True, "chunk_size": 3, "length_pacing_enabled": True},
+    {"speaker_cues_enabled": True, "speaker_custom": {"dr. smith": "Smith", "smith": "Smith", "ann": "Ann", "bob": "Bob"}},
+    {"speaker_cues_enabled": True, "speaker_custom": {}},
+    {"speaker_cues_enabled": False, "speaker_custom": {"bob": "Bob"}},
+    {"start_index": -5},
+    {"start_index": 99999, "chunk_enabled": True, "chunk_size": 2},
+    {"chunk_enabled": True, "chunk_size": 1},
+    {"chunk_enabled": True, "chunk_size": 0},
+    {"chunk_enabled": False, "chunk_mode": "adaptive", "chunk_char_target": 15},
+    {"chunk_enabled": True, "chunk_size": 4, "chunk_mode": "something else"},
+    # 296 words a minute is 203 ms a word. Times 1.5 or 3.5 that ends in a
+    # half, so these catch a port that rounds halves the JavaScript way.
+    {"wpm": 296},
+    {"wpm": 296, "speaker_cues_enabled": True, "length_pacing_enabled": True},
+    {"wpm": 296, "chunk_enabled": True, "chunk_size": 3, "speaker_cues_enabled": True},
+]
+
+
+def light(session):
+    """What changes at every step."""
+    bounds = session.current_chunk_bounds()
+    return [
+        session.index, session.is_finished, session.current_delay_ms(), session.current_chunk_delay_ms(),
+        session.remaining_ms(), session.current_speaker, list(bounds) if bounds is not None else None,
+    ]
+
+
+def frame_list(frames):
+    return None if frames is None else [[f.before, f.focus, f.after] for f in frames]
+
+
+def detail(session, with_groups, with_texts=False):
+    """The rest of what a session shows. The chunk ranges and speaker turns
+    cover the whole text, so they are only recorded when they can have
+    changed (with_groups)."""
+    frame = session.current_frame()
+    answer = {
+        "frame": None if frame is None else [frame.before, frame.focus, frame.after],
+        "chunk": frame_list(session.current_chunk()),
+        "around": [list(part) if isinstance(part, list) else part for part in session.peripheral_context(2, 3)],
+        "around_chunk": [
+            list(part) if isinstance(part, list) else part for part in session.chunk_peripheral_context(2, 3)
+        ],
+        "around_none": [
+            list(part) if isinstance(part, list) else part for part in session.peripheral_context(-1, 0)
+        ],
+    }
+    # With one word per chunk both lists are as long as the text and say
+    # nothing new, so the file only notes that it was so. The test builds
+    # the lists it expects from the frames.
+    ranges_now = [list(pair) for pair in session.chunk_ranges()]
+    one_per_word = ranges_now == [[i, i + 1] for i in range(session.total_words)]
+    if with_groups:
+        answer["chunks"] = "one per word" if one_per_word else ranges_now
+    if with_texts:
+        answer["chunk_texts"] = (
+            "one per word" if one_per_word else [list(triple) for triple in session.chunk_texts()]
+        )
+    if with_groups:
+        answer["turn_starts"] = list(session.speaker_turns.starts)
+        answer["turn_speakers"] = list(session.speaker_turns.speakers)
+    return answer
+
+
+def reader_scripts(total):
+    """Three lists of steps. Each step is [method, arguments, record detail]."""
+    walk = [["advance", [], n in (0, 3)] for n in range(45)]
+    walk.append(["advance", [], True])
+    jump = [
+        ["seek", [3], False], ["seek", [-1], True], ["seek", [100000], False], ["seek", [-100000], False],
+        ["seek_to", [total // 2], True], ["advance", [], False], ["seek_to", [total], True], ["seek", [-2], False],
+        ["seek_to", [-5], False], ["seek_to", [total - 1], True], ["advance", [], False], ["advance", [], False],
+        ["seek", [0], False], ["reset", [], True], ["advance", [], False], ["seek", [1], False],
+    ]
+    settings = [
+        ["advance", [], False], ["advance", [], False], ["set_wpm", [192], False], ["advance", [], False],
+        ["set_length_pacing_enabled", [True], False], ["advance", [], False],
+        ["set_warm_up_enabled", [True], False], ["advance", [], False],
+        ["set_chunking", [True, 3, None, None], "groups"], ["advance", [], False],
+        ["set_chunking", [True, 2, "adaptive", 20], "groups"], ["advance", [], False],
+        ["set_chunking", [True, 4, "fixed", None], "groups"], ["seek", [-3], False],
+        ["set_chunking", [False, 2, None, None], "groups"], ["advance", [], False],
+        ["set_speaker_cues", [True, None], "groups"], ["advance", [], False], ["seek_to", [total // 3], False],
+        ["set_speaker_cues", [True, {"bob": "Bob", "ann": "Ann", "interviewer": "Host"}], "groups"],
+        ["set_chunking", [True, 3, None, 40], "groups"], ["advance", [], False],
+        ["set_speaker_cues", [False, None], "groups"], ["advance", [], False],
+        ["set_length_pacing_enabled", [False], False], ["set_warm_up_enabled", [False], False],
+        ["set_wpm", [960], False], ["reset", [], True], ["advance", [], False],
+    ]
+    return [walk, jump, settings]
+
+
+def build_reader(core):
+    reader = core.reader
+    main_texts = [
+        "", "Hello", "--", "-- ... !? ,;:", "Welcome to the show. Today we're talking about RSVP.",
+        PROSE, SPEAKER_TRANSCRIPT, SPEAKER_TEXTS[9], SPEAKER_TEXTS[13], SPEAKER_TEXTS[14], SPEAKER_TEXTS[15],
+        "I ❤️ reading \U0001F600 fast\U0001F680! \U0001F600\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600 a\U0001F600b \U0001F468‍\U0001F469‍\U0001F467 ok.",
+    ]
+    other_texts = [
+        "Привет, мир! Как дела? Καλημέρα, κόσμε!",
+        "supercalifragilisticexpialidocious pneumonoultramicroscopicsilicovolcanoconiosis a b c d e f g h",
+        "anti-dis-establish-ment-arian-ism " + "x" * 200 + " end.",
+        YOUTUBE_TRANSCRIPT, SRT_TRANSCRIPT, SPEAKER_TEXTS[1], SPEAKER_TEXTS[3], SPEAKER_TEXTS[7],
+        "See ([00:01:23], (1:23), 00:02:45, the notes)",
+        "no break ﻿bom next\u0085line \"don't\" $5.99 e.g. a/b",
+    ] + random_texts(5, 20261116)
+
+    scenarios = []
+    number = 0
+    for text_number, text in enumerate(main_texts + other_texts):
+        is_main = text_number < len(main_texts)
+        for option_number, options in enumerate(READER_OPTIONS):
+            # Every option set for the main texts, every fourth for the rest.
+            if not is_main and (option_number + text_number) % 4 != 0:
+                continue
+            session = reader.ReaderSession(text, **options)
+            script = reader_scripts(session.total_words)[number % 3]
+            number += 1
+            scenario = {
+                "text": text,
+                "options": options,
+                "total_words": session.total_words,
+                "start": [light(session), detail(session, True, with_texts=is_main)],
+                "steps": [],
+            }
+            if option_number == 0 or not is_main:
+                scenario["frames"] = frame_list(session.frames)
+            for method, arguments, record in script:
+                was_finished = session.is_finished
+                getattr(session, method)(*arguments)
+                scenario["steps"].append(
+                    [method, arguments, light(session), detail(session, record == "groups") if record else None]
+                )
+                # Walking on long after the end adds nothing.
+                if method == "advance" and was_finished and script[0][0] == "advance" and len(script) > 40:
+                    break
+            scenarios.append(scenario)
+
+    frames_cases = []
+    for text in unique(main_texts + other_texts):
+        session = reader.ReaderSession(text)
+        for size in (0, 1, 2, 3, 5):
+            for start in range(0, max(1, session.total_words), 7):
+                frames = session.frames[start:start + size]
+                frames_cases.append([[frame_list(frames)], list(reader.assemble_chunk_text(frames))])
+
+    return {"scenarios": scenarios, "assemble_chunk_text": frames_cases}
+
+
+def casefold_table():
+    """The source of src/core/pythonCasefoldTable.ts: the characters where
+    str.casefold() gives something other than lower-casing that character."""
+    def escape(text):
+        return "".join(
+            f"\\u{ord(ch):04x}" if ord(ch) <= 0xFFFF else f"\\u{{{ord(ch):x}}}" for ch in text
+        )
+
+    lines = [
+        "// Written by tools/fixtures/generate.py. Do not edit by hand.",
+        "//",
+        "// Python's str.casefold() is close to lower-casing each character, but",
+        "// not the same. This is every character where the two differ, with what",
+        f"// casefold() turns it into (Python {EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]}, Unicode {unicodedata.unidata_version}).",
+        "",
+        "export const CASEFOLD_EXCEPTIONS: Readonly<Record<string, string>> = {",
+    ]
+    for number in range(0x110000):
+        if 0xD800 <= number <= 0xDFFF:
+            continue
+        ch = chr(number)
+        if ch.casefold() != ch.lower():
+            lines.append(f"  '{escape(ch)}': '{escape(ch.casefold())}',")
+    lines.extend(["};", ""])
+    return "\n".join(lines)
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -375,6 +780,8 @@ MODULES = {
     "punctuation": build_punctuation,
     "orp": build_orp,
     "timing": build_timing,
+    "speakers": build_speakers,
+    "reader": build_reader,
 }
 
 
@@ -440,6 +847,8 @@ def main():
     import core.orp
     import core.parser
     import core.punctuation
+    import core.reader
+    import core.speakers
     import core.timing
     import core.tokenizer
 
@@ -459,6 +868,10 @@ def main():
         (out / f"{name}.json").write_text(text, encoding="ascii", newline="\n")
         total = sum(len(cases) for cases in functions.values())
         print(f"{name}.json: {total} cases, {len(text) // 1024} KB")
+
+    table = here.parents[2] / "src" / "core" / "pythonCasefoldTable.ts"
+    table.write_text(casefold_table(), encoding="ascii", newline="\n")
+    print(f"{table.name}: written")
 
 
 if __name__ == "__main__":

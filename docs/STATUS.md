@@ -3,20 +3,20 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-15, at the end of phase 1.
+Last updated: 2026-11-15, part way through phase 2.
 
 ## Phases
 
-| Phase | What                                   | State                                                       |
-| ----- | -------------------------------------- | ----------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Pushed. The owner still has to confirm CI and the live page |
-| 1     | Golden fixtures and the core pipeline  | Built. Waiting for the owner's check                        |
-| 2     | The reading session and a first screen | Not started                                                 |
-| 3     | Saved data                             | Not started                                                 |
-| 4     | The reading experience                 | Not started                                                 |
-| 5     | Importing files                        | Not started. Undecided on purpose                           |
-| 6     | Comfort and the rest                   | Not started                                                 |
-| 7     | Offline and polish                     | Not started                                                 |
+| Phase | What                                   | State                                                                                                                                    |
+| ----- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                         |
+| 2     | The reading session and a first screen | Part done: `speakers` and `reader` are ported. The engine loop and the screen are not started                                            |
+| 3     | Saved data                             | Not started                                                                                                                              |
+| 4     | The reading experience                 | Not started                                                                                                                              |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                        |
+| 6     | Comfort and the rest                   | Not started                                                                                                                              |
+| 7     | Offline and polish                     | Not started                                                                                                                              |
 
 ## Phase 0: what was checked, and where
 
@@ -92,6 +92,70 @@ Known difference that is accepted: `isPyAlnum` and `PY_DIGIT` use the
 browser's Unicode tables. For characters added to Unicode after version 15.1
 a browser can answer differently from Python 3.13. The character test skips
 those.
+
+## Phase 2 so far: speakers and reader
+
+`reader.py` imports `speakers.py`, so both were ported together, on
+2026-11-15, from the same desktop commit. The owner's instruction: port
+`reader.py` exactly from the code and its tests, no design notes, and where a
+note and the code disagree, the code wins.
+
+| Module     | Port                   | Fixture cases                                                          |
+| ---------- | ---------------------- | ---------------------------------------------------------------------- |
+| `speakers` | `src/core/speakers.ts` | 2,153 calls over 11 functions                                          |
+| `reader`   | `src/core/reader.ts`   | 394 scenarios with 7,334 steps, and 355 calls of `assemble_chunk_text` |
+
+A reader fixture is a scenario, because `ReaderSession` keeps state: a text
+and options, then steps (advance, seek, change a setting), with everything
+the session shows recorded after each step. The scenarios cover 25 sets of
+options (speed, length pacing, warm-up, fixed and adaptive chunking, speaker
+cues on automatic and on a custom list, odd start positions) over 27 texts.
+
+`npm run check` passes with 256 tests in the scratch copy (Node 22).
+
+Broken on purpose in two rounds, 57 breaks in all, one at a time, among
+them: a chunk crossing a sentence end or a speaker's turn, the chunk limits
+changed, seek and the start position not snapping to a chunk, the warm-up
+ramp not ageing or not resetting, length pacing added to the pause instead of
+taking the larger, the speaker pause left out, a label allowed to start with
+a small letter, Auto needing a different number of appearances, `casefold`
+replaced by `toLowerCase`, and lengths counted in UTF-16 units.
+
+Three breaks failed nothing at first, and each one showed a hole in the
+fixtures that is now closed:
+
+- A label's length counted in UTF-16 units. No label had letters from
+  outside the basic plane. Inputs were added.
+- `Math.round` in place of `pyRound` for a word's pause, and for the time
+  remaining. No scenario had a speed where a pause lands on a half. Three
+  sets of options at 296 words a minute (203 ms a word) were added.
+
+Two breaks cannot fail any test, because the code they remove can never
+matter with the desktop's current values. They are listed so nobody hunts
+for them again:
+
+- The speaker pause replacing a word's own pause instead of taking the
+  larger. The speaker pause is 3.5 and no other pause is above 2.5.
+- Dropping the check that the speaker scan and the reader count the same
+  number of words. The two always count the same.
+
+Still to do in phase 2:
+
+- **Port the desktop tests** for these two modules into `speakers.test.ts`
+  and `reader.test.ts`: `test_speakers.py`, `test_reader.py`,
+  `test_chunking.py`, `test_seeking.py`, `test_reader_speaker_cues.py`,
+  `test_whole_transcript_speakers.py` and the core parts of
+  `test_edge_cases.py`. About 250 tests. Only a few examples are ported so
+  far. The fixtures already prove the behaviour, so this is the second line
+  of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
+  known to work.
+- The layer contracts as types, the engine loop, the first screen, and
+  Playwright.
+
+Things the port had to add to `pythonText.ts` for these modules:
+`pyCasefold` (with `pythonCasefoldTable.ts`, written by the fixture script),
+`isPyLower`, `PY_WORD`, `PY_WORD_NOT_DIGIT`, `pyLstrip`, `pyRstrip` and
+`pySqueeze`.
 
 ## Decisions
 

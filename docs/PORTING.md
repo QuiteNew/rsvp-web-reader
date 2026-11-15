@@ -59,30 +59,49 @@ anything into it. See section 7 of [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 All of these are in `src/core/pythonText.ts`, and each is checked against
 Python's own lists in `fixtures/core/charsets.json`.
 
-| Python                          | In the port                               | Why not the JavaScript look-alike                     |
-| ------------------------------- | ----------------------------------------- | ----------------------------------------------------- |
-| `round(x)`                      | `pyRound(x)`                              | `Math.round` sends every half up. Python goes to even |
-| `len(text)`                     | `pyLength(text)`                          | `.length` counts an emoji as two                      |
-| `text[i]`, `text[a:b]`          | `characters(text)`, then index            | Indexing a string can cut an emoji in half            |
-| `text.split()`                  | `pySplit(text)`                           | `\s` in JavaScript is a different list of spaces      |
-| `text.strip()`                  | `pyStrip(text)`                           | `trim()` uses that different list too                 |
-| `ch.isspace()`                  | `isPySpace(ch)`                           | Same reason                                           |
-| `ch.isalnum()`                  | `isPyAlnum(ch)`                           | There is no built-in for it                           |
-| `\s` in a regular expression    | `[${PY_SPACE}]`                           | Same list problem                                     |
-| `\d` in a regular expression    | `${PY_DIGIT}` with the `u` flag           | `\d` in JavaScript is 0 to 9 only                     |
-| `^` and `$` with `re.MULTILINE` | `(?<=^\|\n)` and `(?=\n\|$)`, no `m` flag | JavaScript's also stop at `\r`, U+2028 and U+2029     |
-| `raise ValueError`              | `throw new RangeError(...)`               | The fixture helper expects a `RangeError`             |
-| a tuple or a dataclass          | an object with `readonly` fields          | Named fields read better than positions               |
-| `divmod(a, b)` on whole numbers | `Math.floor(a / b)` and `a % b`           | Only equal for numbers that are not negative          |
+| Python                                  | In the port                               | Why not the JavaScript look-alike                                                      |
+| --------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------------------- |
+| `round(x)`                              | `pyRound(x)`                              | `Math.round` sends every half up. Python goes to even                                  |
+| `len(text)`                             | `pyLength(text)`                          | `.length` counts an emoji as two                                                       |
+| `text[i]`, `text[a:b]`                  | `characters(text)`, then index            | Indexing a string can cut an emoji in half                                             |
+| `text.split()`                          | `pySplit(text)`                           | `\s` in JavaScript is a different list of spaces                                       |
+| `text.strip()`                          | `pyStrip(text)`                           | `trim()` uses that different list too                                                  |
+| `ch.isspace()`                          | `isPySpace(ch)`                           | Same reason                                                                            |
+| `ch.isalnum()`                          | `isPyAlnum(ch)`                           | There is no built-in for it                                                            |
+| `\s` in a regular expression            | `[${PY_SPACE}]`                           | Same list problem                                                                      |
+| `\d` in a regular expression            | `${PY_DIGIT}` with the `u` flag           | `\d` in JavaScript is 0 to 9 only                                                      |
+| `^` and `$` with `re.MULTILINE`         | `(?<=^\|\n)` and `(?=\n\|$)`, no `m` flag | JavaScript's also stop at `\r`, U+2028 and U+2029                                      |
+| `text.casefold()`                       | `pyCasefold(text)`                        | `toLowerCase()` differs for about 300 characters, and for a sigma at the end of a word |
+| `ch.islower()`                          | `isPyLower(ch)`                           | There is no built-in for it                                                            |
+| `text.lstrip()`, `text.rstrip()`        | `pyLstrip(text)`, `pyRstrip(text)`        | The list of spaces again                                                               |
+| `" ".join(text.split())`                | `pySqueeze(text)`                         | The list of spaces again                                                               |
+| `\w` in a regular expression            | `[${PY_WORD}]` with the `u` flag          | `\w` in JavaScript is ASCII only                                                       |
+| `[^\W\d_]` in a regular expression      | `[${PY_WORD_NOT_DIGIT}]`                  | There is no short form for it                                                          |
+| `pattern.match(text)`                   | a `^` at the start, then `exec`           | `match` in Python only looks at the start of the text                                  |
+| a `dict` used as a lookup               | a `Map`                                   | A plain object has names of its own, such as `constructor`                             |
+| `isinstance(value, dict)` on saved data | a plain object or a `Map`, not an array   | In JavaScript an array is an object too                                                |
+| `None` as a default argument            | `null`, with `= null` as the default      | So that leaving it out and passing `null` mean the same                                |
+| `raise ValueError`                      | `throw new RangeError(...)`               | The fixture helper expects a `RangeError`                                              |
+| a tuple or a dataclass                  | an object with `readonly` fields          | Named fields read better than positions                                                |
+| `divmod(a, b)` on whole numbers         | `Math.floor(a / b)` and `a % b`           | Only equal for numbers that are not negative                                           |
 
-Not met yet, so check them when they first come up: `str.lower()` and
-`casefold()` (JavaScript's `toLowerCase()` differs for a few characters),
-`str.title()`, `str.isalpha()`, `str.isdigit()`, sorting text, `//` and `%` on
+Not met yet, so check them when they first come up: `str.lower()` on a whole
+text, `str.title()`, `str.isalpha()`, `str.isdigit()`, sorting text, `//` and `%` on
 negative numbers, and the order of keys in a dictionary.
 
 Never use `Intl.Segmenter` to count characters. It counts what a person sees
 as one character, which is a third answer, different from both Python's and
 JavaScript's.
+
+## A class that keeps state
+
+One call and one answer is not enough for a class such as `ReaderSession`.
+Its fixtures are scenarios: what the object is made with, then a list of
+steps, and after every step everything the object shows. `build_reader()` in
+the fixture script and `reader.test.ts` are the example. Two functions in
+the script, `light()` and `detail()`, decide what is recorded, and the test
+has the same two. Record the cheap things after every step and the large
+ones only where they can have changed, or the file grows fast.
 
 ## The fixture files
 

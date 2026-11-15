@@ -2,9 +2,13 @@ import { describe, expect, test } from 'vitest';
 import { loadFixture } from '../testing/fixtures';
 import {
   PY_DIGIT,
+  PY_WORD,
+  PY_WORD_NOT_DIGIT,
   characters,
   isPyAlnum,
+  isPyLower,
   isPySpace,
+  pyCasefold,
   pyLength,
   pyRound,
   pySplit,
@@ -60,6 +64,57 @@ describe('against every character Python knows', () => {
 
   test('isPyAlnum agrees with str.isalnum()', () => {
     expect(disagreements('str_isalnum', isPyAlnum)).toEqual([]);
+  });
+
+  test('PY_WORD agrees with \\w in a Python regular expression', () => {
+    const word = new RegExp(`^[${PY_WORD}]$`, 'u');
+    expect(disagreements('re_word', (character) => word.test(character))).toEqual([]);
+  });
+
+  test('PY_WORD_NOT_DIGIT is \\w without the digits and the underscore', () => {
+    const word = new RegExp(`^[${PY_WORD}]$`, 'u');
+    const digit = new RegExp(`^${PY_DIGIT}$`, 'u');
+    const narrow = new RegExp(`^[${PY_WORD_NOT_DIGIT}]$`, 'u');
+    const wrong: string[] = [];
+    for (let number = 0; number <= LAST_CHARACTER; number += 1) {
+      const character = String.fromCodePoint(number);
+      const expected = word.test(character) && !digit.test(character) && character !== '_';
+      if (narrow.test(character) !== expected) wrong.push(number.toString(16));
+    }
+    expect(wrong).toEqual([]);
+  });
+
+  test('isPyLower agrees with str.islower()', () => {
+    expect(disagreements('str_islower', isPyLower)).toEqual([]);
+  });
+
+  test('pyCasefold agrees with str.casefold()', () => {
+    const changes = new Map(
+      charsets['str_casefold'] as unknown as readonly (readonly [number, string])[],
+    );
+    const wrong: string[] = [];
+    for (let number = 0; number <= LAST_CHARACTER; number += 1) {
+      if (unassigned[number] || (number >= 0xd800 && number <= 0xdfff)) continue;
+      const character = String.fromCodePoint(number);
+      if (pyCasefold(character) !== (changes.get(number) ?? character)) {
+        wrong.push(`U+${number.toString(16).toUpperCase().padStart(4, '0')}`);
+      }
+    }
+    expect(changes.size).toBeGreaterThan(1000);
+    expect(wrong).toEqual([]);
+  });
+});
+
+describe('pyCasefold', () => {
+  test('a sharp s becomes two letters', () => {
+    expect(pyCasefold('Straße')).toBe('strasse');
+  });
+
+  test('a sigma at the end of a word becomes an ordinary sigma', () => {
+    // toLowerCase() on the whole word gives the final form, "οδος".
+    expect('ΟΔΟΣ'.toLowerCase()).toBe('οδος');
+    expect(pyCasefold('ΟΔΟΣ')).toBe('οδοσ');
+    expect(pyCasefold('οδος')).toBe('οδοσ');
   });
 });
 
