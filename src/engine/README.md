@@ -5,6 +5,10 @@ The reading loop: the clock and the timer, built on `core`.
 - May import from `core` only.
 - No React. The UI subscribes to the engine, the engine does not know the UI.
 
-`contract.ts` holds the types the engine promises to the UI. The class that
-implements them is the next job of phase 2. See
-[docs/handoff/phase-2-rest.md](../../docs/handoff/phase-2-rest.md).
+What is here:
+
+- `contract.ts`: the types the engine promises to the UI.
+- `readerEngine.ts`: `ReaderLoop`, the class behind those types.
+- `browserClock.ts`: the real clock and tab visibility, for the browser.
+
+Tests move time by hand with the fake clock in `src/testing/fakeClock.ts`.

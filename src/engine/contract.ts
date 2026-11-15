@@ -5,7 +5,7 @@
 // never advances the session itself. It calls the methods here and draws
 // whatever the snapshot says.
 //
-// This file is types only. The class that implements them comes next, in
+// This file is types only. The class that implements them is ReaderLoop in
 // src/engine/readerEngine.ts. The rules written in the comments are taken
 // from the desktop app's gui/components/reader_display.py, which is the
 // reference for how the loop behaves.
@@ -158,8 +158,11 @@ export interface ReaderEngine {
   // null when there is no live word: empty or finished.
   bookmarkTarget(): BookmarkTarget | null;
 
-  // Changes that reach into the session. Each one makes a new snapshot,
-  // and a running timer is set again for the new delay.
+  // Changes that reach into the session. Each one makes a new snapshot.
+  // A new speed or pacing choice starts with the next word, and the word
+  // on screen keeps the time it was given. A change to chunking or speaker
+  // cues groups the words again, so the chunk on screen gets its full time
+  // from now.
   setWpm(wpm: number): void;
   setLengthPacingEnabled(enabled: boolean): void;
   setWarmUpEnabled(enabled: boolean): void;

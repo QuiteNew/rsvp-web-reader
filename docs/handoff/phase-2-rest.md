@@ -1,7 +1,8 @@
 # Phase 2, the rest: desktop tests, the engine and the first screen
 
-Done already: `speakers` and `reader` are ported and match their fixtures.
-Left: three jobs, in this order. Each is one or two commits.
+Done already: `speakers` and `reader` are ported and match their fixtures,
+and the engine loop (job 2) is built and tested. Left: jobs 1 and 3. Each
+is one or two commits.
 
 ## 1. Port the desktop tests for speakers and reader
 
@@ -35,7 +36,14 @@ Rules:
 - If a ported test fails, the port is wrong or the test was misread. Do
   not change the port to pass without checking the Python.
 
-## 2. The engine
+## 2. The engine (done on 2026-11-15)
+
+Built as `ReaderLoop` in `src/engine/readerEngine.ts`, with 68 tests and 29
+deliberate breaks. See "Phase 2: the engine loop" in
+[STATUS.md](../STATUS.md). What follows is the spec it was built from, kept
+for the reasons behind it. Two things in it are still open: the desktop
+tests that drive the loop are not ported one by one, and `browserClock.ts`
+has not run in a browser.
 
 One class, `ReaderEngine` in `src/engine/readerEngine.ts`, that implements
 the interface in `src/engine/contract.ts`. Its behaviour is the loop in the
@@ -61,8 +69,8 @@ What the browser adds, which the desktop loop does not have:
 - **Hidden tab.** When the tab is hidden while playing, clear the timer,
   close the active time span and set `isHeldForHiddenTab`. When it is shown
   again, give the current word its full delay again and go on. Resume
-  rewind does not apply here, because the reader did not press pause. That
-  last point is a recommendation: put it to the owner before building.
+  rewind does not apply here, because the reader did not press pause. The
+  owner agreed to this.
 - **Snapshots.** Build a new `ReaderSnapshot` only when something changed,
   and return the same object from `getSnapshot()` until then.
 

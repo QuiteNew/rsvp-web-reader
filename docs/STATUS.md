@@ -8,16 +8,16 @@ written.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                               |
-| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                            |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                    |
-| 2     | The reading session and a first screen | Part done: `speakers` and `reader` are ported and pushed. The desktop tests, the engine loop and the screen are not started. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
-| 3     | Saved data                             | Not started                                                                                                                                                                         |
-| 4     | The reading experience                 | Not started                                                                                                                                                                         |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                   |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                         |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                         |
+| Phase | What                                   | State                                                                                                                                                                                               |
+| ----- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                            |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                    |
+| 2     | The reading session and a first screen | Part done: `speakers`, `reader` and the engine loop are in. The desktop tests for the two core modules and the first screen are not started. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
+| 3     | Saved data                             | Not started                                                                                                                                                                                         |
+| 4     | The reading experience                 | Not started                                                                                                                                                                                         |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                   |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                         |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                         |
 
 ## Phase 0: what was checked, and where
 
@@ -150,7 +150,7 @@ Still to do in phase 2:
   far. The fixtures already prove the behaviour, so this is the second line
   of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
   known to work.
-- The engine loop, the first screen, and Playwright.
+- The first screen, and Playwright.
 
 The full list, with the order and the checks, is in
 [handoff/phase-2-rest.md](handoff/phase-2-rest.md).
@@ -159,6 +159,44 @@ Things the port had to add to `pythonText.ts` for these modules:
 `pyCasefold` (with `pythonCasefoldTable.ts`, written by the fixture script),
 `isPyLower`, `PY_WORD`, `PY_WORD_NOT_DIGIT`, `pyLstrip`, `pyRstrip` and
 `pySqueeze`.
+
+## Phase 2: the engine loop
+
+`src/engine/readerEngine.ts` holds `ReaderLoop`, the class behind the
+`ReaderEngine` contract. It follows the loop in the desktop
+`gui/components/reader_display.py`, method by method, without the drawing.
+`src/engine/browserClock.ts` is the real clock and tab visibility, and
+`src/testing/fakeClock.ts` is the clock a test moves by hand.
+
+There are no golden fixtures here. The desktop loop lives in a window class
+and cannot be run without the window, so the proof is 68 tests on a fake
+clock, written from reading the desktop code. `npm run check` passes with
+324 tests in the scratch copy (Node 22). Nothing was run in a real browser
+yet: `browserClock.ts` has no test, and gets its first run with the first
+screen.
+
+Added for the browser, and not in the desktop loop:
+
+- A late timer is made up for. The next word's time counts from when the
+  last one should have ended. A timer that is later than the whole next
+  word starts again from now, so missed words are not raced through.
+- A hidden tab holds reading. When it is shown again the word gets its
+  full time, and reading goes on. Resume rewind does not apply.
+
+Broken on purpose, 29 ways, one at a time. 26 failed a test straight away.
+Two showed holes that are now closed with new tests: a tab hidden for less
+than a word's time, and a pause toggle after the last word. One can never
+fail: leaving out the strip of a bookmark's snippet, because the words
+around a live word never start or end with a space. The strip is kept, to
+match the desktop line.
+
+Differences from the desktop loop, both on purpose:
+
+- `load()` reports the stats of the session it replaces. On the desktop
+  the caller stops the old session first.
+- An empty text counts no reading time. The desktop loop opens its time
+  span on load even when there are no words, and closes it only on stop.
+  Whether the desktop app can reach that state at all was not checked.
 
 ## The handoff package
 
@@ -172,7 +210,7 @@ Written on 2026-11-15, so the work can go on without guessing:
 - The layer contracts as real types: `src/core/models.ts` (the saved
   shapes), `src/engine/contract.ts` (what the engine promises to the UI)
   and `src/store/contract.ts` (what the store promises to the UI). They
-  are types only, with nothing behind them yet. `npm run check` type-checks
+  were types only when written. The engine contract has its class now. `npm run check` type-checks
   them. The rules in their comments were read from the desktop code
   (`reader_display.py`, `transcript_store.py`, `storage.py`,
   `data_bundle.py`, `settings_store.py`), not run against it. The fixtures
@@ -181,8 +219,8 @@ Written on 2026-11-15, so the work can go on without guessing:
 One thing in the contracts is a choice and not a port: the store layer
 only saves and loads, and the rules for changing a library move into
 `src/core` as pure functions, so they can have golden fixtures like the
-rest. The desktop keeps both in `TranscriptStore`. The owner has not
-confirmed this yet.
+rest. The desktop keeps both in `TranscriptStore`. The owner agreed to this
+on 2026-11-15.
 
 ## Decisions
 
@@ -198,6 +236,8 @@ confirmed this yet.
 | `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                     |
 | Playwright                         | Starts in phase 2, when there is a real screen                                                                                                |
 | Release guard (tag equals version) | Phase 7                                                                                                                                       |
+| Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                               |
+| Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                      |
 | Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                      |
 
 ## Versions in use
