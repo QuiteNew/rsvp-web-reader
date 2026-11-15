@@ -3,29 +3,31 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-15, during phase 0.
+Last updated: 2026-11-15, at the end of phase 1.
 
 ## Phases
 
-| Phase | What                                   | State                                |
-| ----- | -------------------------------------- | ------------------------------------ |
-| 0     | Scaffold, CI, deploy                   | Built. Waiting for the owner's check |
-| 1     | Golden fixtures and the core pipeline  | Not started                          |
-| 2     | The reading session and a first screen | Not started                          |
-| 3     | Saved data                             | Not started                          |
-| 4     | The reading experience                 | Not started                          |
-| 5     | Importing files                        | Not started. Undecided on purpose    |
-| 6     | Comfort and the rest                   | Not started                          |
-| 7     | Offline and polish                     | Not started                          |
+| Phase | What                                   | State                                                       |
+| ----- | -------------------------------------- | ----------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Pushed. The owner still has to confirm CI and the live page |
+| 1     | Golden fixtures and the core pipeline  | Built. Waiting for the owner's check                        |
+| 2     | The reading session and a first screen | Not started                                                 |
+| 3     | Saved data                             | Not started                                                 |
+| 4     | The reading experience                 | Not started                                                 |
+| 5     | Importing files                        | Not started. Undecided on purpose                           |
+| 6     | Comfort and the rest                   | Not started                                                 |
+| 7     | Offline and polish                     | Not started                                                 |
 
 ## Phase 0: what was checked, and where
 
-Run in a Linux scratch copy with Node 22.23 and npm 10.9, on 2026-11-15:
+Run in a Linux scratch copy with Node 22.23 and npm 10.9, and again by the
+owner on Windows with Node 24.15 and npm 11.12, on 2026-11-15:
 
-- `npm run check` passes: ESLint, Prettier, TypeScript, 6 Vitest tests, and a
-  production build.
+- `npm run check` passes: ESLint, Prettier, TypeScript, the Vitest tests, and
+  a production build.
 - The built `index.html` asks for its files under `/rsvp-web-reader/`.
-- Broken on purpose, each one failed as it should and was put back:
+- Broken on purpose in the scratch copy, each one failed as it should and was
+  put back:
   - `src/core` importing from `src/ui` (ESLint).
   - `src/core` importing React (ESLint).
   - `src/core` using `document` and `setTimeout` (ESLint, and TypeScript
@@ -33,12 +35,63 @@ Run in a Linux scratch copy with Node 22.23 and npm 10.9, on 2026-11-15:
   - `src/engine` importing from `src/store` (ESLint).
   - `APP_VERSION` different from the version in `package.json` (Vitest).
 
-Not checked there, so the owner's machine and CI are the first real run:
+Not confirmed yet:
 
-- Node 24 and npm 11 on Windows.
-- The CI workflow and the GitHub Pages deploy. The action versions (checkout
-  v7, setup-node v7, upload-pages-artifact v5, deploy-pages v5) are the newest
-  tags, but their inputs were not read from their docs.
+- That the CI run is green and the page loads at
+  https://quitenew.github.io/rsvp-web-reader/. The assistant cannot open
+  either, so the owner checks. The action versions (checkout v7, setup-node
+  v7, upload-pages-artifact v5, deploy-pages v5) are the newest tags, but
+  their inputs were not read from their docs.
+
+Loose ends:
+
+- `npm ci` reports 7 moderate findings from `npm audit`. Not looked at yet.
+- Dependabot opened its first pull request right after the push. Nothing in
+  it has been reviewed. Do not merge it without running `npm run check`.
+
+## Phase 1: what was ported, and how it was checked
+
+Fixtures were generated on 2026-11-15 with Python 3.13 (Unicode 15.1) from
+desktop commit `8112ff1`, version 4.1.1. The script ran twice with identical
+output, and the desktop clone had no changes and no `__pycache__` afterwards.
+
+| Module            | Port                      | Fixture cases                     | Tests ported from     |
+| ----------------- | ------------------------- | --------------------------------- | --------------------- |
+| Python text rules | `src/core/pythonText.ts`  | every character Python 3.13 knows | none, new             |
+| `tokenizer`       | `src/core/tokenizer.ts`   | 133                               | `test_tokenizer.py`   |
+| `orp`             | `src/core/orp.ts`         | 979                               | `test_orp.py`         |
+| `punctuation`     | `src/core/punctuation.ts` | 465                               | `test_punctuation.py` |
+| `timing`          | `src/core/timing.ts`      | 5,929                             | `test_timing.py`      |
+| `parser`          | `src/core/parser.ts`      | 408                               | `test_parser.py`      |
+
+`npm run check` passes with 206 tests, in the scratch copy (Node 22).
+
+Broken on purpose, one at a time. Every one made at least one test fail:
+
+- `pyRound` replaced by `Math.round`.
+- Characters counted in UTF-16 units.
+- Letters and numbers limited to ASCII.
+- Digits limited to 0 to 9.
+- JavaScript's own `\s` in place of Python's list of spaces.
+- The end-of-line check also stopping at a carriage return.
+- Each of the five tidy steps in `stripTimestamps` dropped.
+- An ORP band boundary moved from 5 to 6.
+- The question mark taken out of the sentence marks.
+- The hyphen bonus changed from 4 to 3.
+- The long word multiplier changed from 1.45 to 1.5.
+- The minutes in `formatDuration` left unpadded.
+
+One of these found a hole. Dropping the "separator before a closing
+bracket" step failed nothing at first, because no input had a timestamp
+directly before a closing bracket with a separator in front, such as
+`(done, [0:30])`. Four such inputs were added to the fixture script. The
+desktop tests in `test_parser.py` have no such case either. That is for the
+desktop project to decide on, and nothing was changed there.
+
+Known difference that is accepted: `isPyAlnum` and `PY_DIGIT` use the
+browser's Unicode tables. For characters added to Unicode after version 15.1
+a browser can answer differently from Python 3.13. The character test skips
+those.
 
 ## Decisions
 
@@ -65,7 +118,8 @@ Library for React 16.3.3. Node 24 in CI (`.nvmrc`).
 
 ## Traps found while reading the desktop code
 
-These are not in the brief. Each needs fixture cases in phase 1.
+These are not in the brief. Phase 1 handles all of them in
+`src/core/pythonText.ts`, and [PORTING.md](PORTING.md) has the full table.
 
 - **Rounding.** Python's `round()` rounds a half to the nearest even number,
   `Math.round` rounds it up. `wpm_to_delay_ms(192)` is 312 in Python. Core
