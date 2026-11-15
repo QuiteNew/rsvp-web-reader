@@ -1,0 +1,25 @@
+# Once a month, one pull request per group when something has a new version.
+# Nothing is merged on its own: each one runs CI and is merged or closed by
+# hand.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      npm-packages:
+        patterns: ['*']
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet. Take this out
+      # once it does.
+      - dependency-name: typescript
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      actions:
+        patterns: ['*']
