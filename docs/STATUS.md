@@ -3,20 +3,21 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-15, part way through phase 2.
+Last updated: 2026-11-15, part way through phase 2, with the handoff package
+written.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                    |
-| ----- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                         |
-| 2     | The reading session and a first screen | Part done: `speakers` and `reader` are ported. The engine loop and the screen are not started                                            |
-| 3     | Saved data                             | Not started                                                                                                                              |
-| 4     | The reading experience                 | Not started                                                                                                                              |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                        |
-| 6     | Comfort and the rest                   | Not started                                                                                                                              |
-| 7     | Offline and polish                     | Not started                                                                                                                              |
+| Phase | What                                   | State                                                                                                                                                                               |
+| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                            |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                    |
+| 2     | The reading session and a first screen | Part done: `speakers` and `reader` are ported and pushed. The desktop tests, the engine loop and the screen are not started. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
+| 3     | Saved data                             | Not started                                                                                                                                                                         |
+| 4     | The reading experience                 | Not started                                                                                                                                                                         |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                   |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                         |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                         |
 
 ## Phase 0: what was checked, and where
 
@@ -149,13 +150,39 @@ Still to do in phase 2:
   far. The fixtures already prove the behaviour, so this is the second line
   of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
   known to work.
-- The layer contracts as types, the engine loop, the first screen, and
-  Playwright.
+- The engine loop, the first screen, and Playwright.
+
+The full list, with the order and the checks, is in
+[handoff/phase-2-rest.md](handoff/phase-2-rest.md).
 
 Things the port had to add to `pythonText.ts` for these modules:
 `pyCasefold` (with `pythonCasefoldTable.ts`, written by the fixture script),
 `isPyLower`, `PY_WORD`, `PY_WORD_NOT_DIGIT`, `pyLstrip`, `pyRstrip` and
 `pySqueeze`.
+
+## The handoff package
+
+Written on 2026-11-15, so the work can go on without guessing:
+
+- [handoff/README.md](handoff/README.md): where to start, the pattern to
+  copy, and the points about working with the owner that came up in
+  practice.
+- One spec per phase that is not finished: the rest of phase 2, and phases
+  3 to 7.
+- The layer contracts as real types: `src/core/models.ts` (the saved
+  shapes), `src/engine/contract.ts` (what the engine promises to the UI)
+  and `src/store/contract.ts` (what the store promises to the UI). They
+  are types only, with nothing behind them yet. `npm run check` type-checks
+  them. The rules in their comments were read from the desktop code
+  (`reader_display.py`, `transcript_store.py`, `storage.py`,
+  `data_bundle.py`, `settings_store.py`), not run against it. The fixtures
+  of phases 2 and 3 are what will prove them.
+
+One thing in the contracts is a choice and not a port: the store layer
+only saves and loads, and the rules for changing a library move into
+`src/core` as pure functions, so they can have golden fixtures like the
+rest. The desktop keeps both in `TranscriptStore`. The owner has not
+confirmed this yet.
 
 ## Decisions
 
