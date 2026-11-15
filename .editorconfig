@@ -1,0 +1,20 @@
+# Editor settings shared by everyone who opens the project.
+# VS Code needs the "EditorConfig for VS Code" extension to read this file.
+# The settings that matter most are also in .vscode/settings.json, which
+# VS Code reads on its own.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Two spaces at the end of a line mean a line break in Markdown.
+[*.md]
+trim_trailing_whitespace = false
+
+[*.py]
+indent_size = 4

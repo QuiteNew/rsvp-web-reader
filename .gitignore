@@ -1,0 +1,27 @@
+# Installed packages
+node_modules/
+
+# Build output
+dist/
+*.tsbuildinfo
+
+# Test output
+coverage/
+playwright-report/
+test-results/
+
+# Local settings that should not be shared
+*.local
+.env
+.env.*
+
+# Python leftovers from the fixture script
+__pycache__/
+*.pyc
+
+# Logs
+*.log
+
+# Operating system files
+.DS_Store
+Thumbs.db
