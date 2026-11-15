@@ -1,0 +1,15 @@
+.page {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 4rem 1.5rem;
+}
+
+.title {
+  font-size: 2rem;
+  margin: 0 0 1rem;
+}
+
+.small {
+  font-size: 0.875rem;
+  opacity: 0.75;
+}

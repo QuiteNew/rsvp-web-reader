@@ -1,0 +1,13 @@
+dist
+coverage
+node_modules
+package-lock.json
+playwright-report
+test-results
+
+# Copied from the desktop project, kept as written.
+WEB_PORT_BRIEF.md
+reference
+
+# Golden fixtures are written by a script, not by hand.
+fixtures

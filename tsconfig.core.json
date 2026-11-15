@@ -1,0 +1,28 @@
+{
+  // src/core is checked a second time on its own, without the browser's
+  // types and without Node's. If core code touches document, window,
+  // setTimeout or localStorage, this check fails. Test files are left out
+  // because the test runner brings Node's types with it. They are checked
+  // by tsconfig.app.json.
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.core.tsbuildinfo",
+    "target": "es2023",
+    "lib": ["ES2023"],
+    "types": [],
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "skipLibCheck": true,
+    "verbatimModuleSyntax": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src/core"],
+  "exclude": ["src/core/**/*.test.ts"]
+}
