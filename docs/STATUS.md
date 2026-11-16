@@ -3,22 +3,22 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-16. Phase 2 is done. Phase 3 (saving) is under way:
-[handoff/phase-3-progress.md](handoff/phase-3-progress.md) says which step
-is next.
+Last updated: 2026-11-16. Phase 2 is done. In phase 3 saving works end to
+end. [handoff/phase-3-progress.md](handoff/phase-3-progress.md) says what
+is left of it.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                       |
-| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                    |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                            |
-| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout on a library that is not saved yet |
-| 3     | Saved data                             | Started. Steps 1 to 3 of 9 are done. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                         |
-| 4     | The reading experience                 | Not started                                                                                                                                                 |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                           |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                 |
-| 7     | Offline and polish                     | Not started                                                                                                                                                 |
+| Phase | What                                   | State                                                                                                                                                                                                                              |
+| ----- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                           |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                   |
+| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                           |
+| 3     | Saved data                             | Saving works: the library is kept in the browser, with export and import. Left: the settings as real settings, the normalizer, and the desktop tests for the store. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md) |
+| 4     | The reading experience                 | Not started                                                                                                                                                                                                                        |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                                  |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                        |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                        |
 
 ## Phase 0: what was checked, and where
 
@@ -281,6 +281,10 @@ Not used: Playwright's clock control. The tests are short enough in real
 time, and real time is what they are there to check.
 
 ## The desktop layout, before saving (2026-11-16)
+
+Since this was written, saving was built: the in-memory stand-in named
+below is gone and `src/store/libraryStore.ts` took its place. See
+[handoff/phase-3-progress.md](handoff/phase-3-progress.md).
 
 The owner tried the first screen, said it works, and asked for the look of
 the desktop app next: the transcript list on the left, organised in Spaces,

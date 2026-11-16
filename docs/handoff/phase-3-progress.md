@@ -16,21 +16,21 @@ picked up by whoever comes next without guessing. The spec is
 
 ## Steps
 
-| #   | What                                                                  | State   |
-| --- | --------------------------------------------------------------------- | ------- |
-| 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done    |
-| 2   | `storageFormat`: the port of `parse_data` and the write side          | Done    |
-| 3   | `bundle`: reading and writing an export file, the five messages       | Done    |
-| 4   | `library`: every `TranscriptStore` method as a pure function          | Next    |
-| 5   | `settings`: defaults, ranges, clamping, `_known_settings`             | Waiting |
-| 6   | The store over a `Persistence`, with one in memory for tests          | Waiting |
-| 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Waiting |
-| 8   | The UI on the real store, export and import in Settings               | Waiting |
-| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Waiting |
+| #   | What                                                                  | State  |
+| --- | --------------------------------------------------------------------- | ------ |
+| 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done   |
+| 2   | `storageFormat`: the port of `parse_data` and the write side          | Done   |
+| 3   | `bundle`: reading and writing an export file, the five messages       | Done   |
+| 4   | `library`: every `TranscriptStore` method as a pure function          | Done   |
+| 5   | `settings`: defaults, ranges, clamping, `_known_settings`             | Partly |
+| 6   | The store over a `Persistence`, with one in memory for tests          | Done   |
+| 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Done   |
+| 8   | The UI on the real store, export and import in Settings               | Done   |
+| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Next   |
 
-Still needed from the owner before step 8: a real export file from the
-desktop app, and any design notes on saved data, Spaces, bookmarks or the
-bundle. Steps 2 to 7 can be done from the desktop code alone.
+Saving works end to end as of step 8. What is left of phase 3 is the rest
+of step 5 (the settings as real settings) and step 9 (the normalizer),
+plus the desktop tests listed at the end of this file.
 
 ## Step 1, done on 2026-11-16
 
@@ -113,3 +113,102 @@ Known differences from the desktop, all in refusing a bad file:
 Not done in this step: the desktop tests `test_data_bundle.py` and
 `test_export_import_in_app.py`. Port the first with step 6, when the store
 exists. The second drives the app and belongs to step 8.
+
+## Steps 4, 6, 7 and 8, done on 2026-11-16
+
+Step 4, the rules:
+
+- `src/core/library.ts` has every `TranscriptStore` method as a pure
+  function from a `Library` to the next one. A function with nothing to
+  change gives back the very library it was given.
+- Fixture `library.json`: 17 scripts of calls played on the real desktop
+  store in a temporary folder, with the answer and the whole state after
+  each call. The test fails if a ported method is in no script.
+- `addBookmark` takes the time as an argument. The store stamps it the
+  way Python's `isoformat()` writes UTC (`pythonUtcNow`).
+
+Steps 6 and 7, the store:
+
+- `src/store/libraryStore.ts`: `SavedLibraryStore`, the `LibraryStore` of
+  the contract over a `Persistence`. `load()` reads once. Changes save at
+  once, position and speed at most once a second, `flush()` writes what is
+  waiting. Writes go one at a time and only the newest waiting one is
+  written. A failed write is reported by `saveProblem()`.
+- `src/store/indexedDbLibrary.ts`: the real `Persistence`, written against
+  IndexedDB directly, no library. A record that cannot be read is copied
+  to the `damaged` store first, once per content.
+- `src/store/memoryPersistence.ts` for tests, `storageHealth.ts` for
+  `navigator.storage.persist()`.
+- `src/store/memoryLibrary.ts` and its test are gone. The stand-in is no
+  longer needed.
+
+Step 8, the page:
+
+- `main.tsx` makes the one store and hands it to `App`. `App` shows
+  "Opening your library" until it is read, a notice for a damaged save and
+  for a failed write, and flushes on `visibilitychange`, on `pagehide`,
+  when reading stops and when another transcript is opened.
+- Settings has "Your data": export to a file, import with Replace or Add.
+- `e2e/saving.spec.ts` checks the real thing in a browser: a reload keeps
+  everything, a damaged record is put aside once, and an export file
+  brings back what was deleted.
+
+Where the web differs from the desktop, on purpose:
+
+- A held-back position is written when its second is up, without waiting
+  for the next change. The desktop waits. A tab can close with no warning.
+- After an import the page is not reloaded. The store tells the page, and
+  the page closes what was open. The desktop has to restart.
+- A saved library with no Spaces, or an open Space past the end, is tidied
+  on load the way an import is. The desktop would crash on the first.
+- The notice texts for a damaged save, a failed write and a browser that
+  will not save are new. The desktop's wording was not looked up.
+- Damaged settings text is put aside in `localStorage` under
+  `rsvp-web-reader.settings.damaged`, not in IndexedDB as the spec said.
+
+Step 5 so far: `src/store/savedSettings.ts` keeps the settings of an
+imported file as they came and gives them back on export, so a desktop
+export loses nothing on a round trip. Nothing reads them as settings yet.
+Left for step 5: port `core/settings_store.py` (defaults, ranges, clamping,
+`_known_settings`, the profiles rule in Replace), build the `SettingsStore`
+of the contract, and move `WPM_RANGE` there.
+
+Not checked yet:
+
+- Firefox and WebKit. The browser tests ran in Chrome only in the
+  workspace. The owner's machine and CI run all three.
+- A web export opened in the real desktop app.
+- Two tabs open at once. The last one to save wins.
+
+Desktop tests still to port, now that there is a store: `test_storage.py`,
+`test_models.py`, `test_damaged_files.py`, `test_data_bundle.py`, the store
+parts of `test_transcript_speaker_list.py` (19) and `test_chunking.py`
+(25), and the settings halves of `test_transcript_sort.py`,
+`test_reopen_last_transcript.py` and `test_wpm_keys.py` with step 5.
+
+## Coming back where you left off, done on 2026-11-16
+
+Asked for by the owner after trying the saving, and it is what the desktop
+does (`_reopen_last_transcript` in `gui/app.py`, `core/reopen.py`):
+
+- The transcript that is open is remembered in the saved settings under
+  the desktop's own name, `last_transcript_id`. Nothing open is `null`.
+- A transcript keeps whether it was left in the reader or as text
+  (`isStopped`) and whether it was paused (`isPaused`). Start sets
+  `isStopped` false, Stop sets it true, the pause button saves `isPaused`.
+- After a reload that transcript is open again. Left in the reader, it
+  comes back in the reader on the same word, always paused, and the pause
+  is saved. Left as text, it comes back as text. Its Space is opened if
+  another one was.
+- The same holds when a transcript is picked in the list: one that was
+  left in the reader opens in the reader, paused.
+- `reopen_last_transcript: false` in the saved settings switches it off.
+  There is no switch for it on the page yet. That comes with step 5.
+
+Where the web differs from the desktop here:
+
+- A transcript made on the page starts with `isStopped` true, so it shows
+  as text until Start is pressed. The desktop's default is false.
+- Leaving a transcript (a new Space, a switch of Space) forgets it as the
+  last one. The desktop keeps a transcript open across a switch of Space.
+- After an import nothing is open, whatever the file's settings say.

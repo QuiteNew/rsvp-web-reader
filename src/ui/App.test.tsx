@@ -1,10 +1,21 @@
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { StrictMode } from 'react';
-import { describe, expect, test } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { APP_VERSION } from '../core/appInfo';
 import { FakeClock, FakeVisibility } from '../testing/fakeClock';
+import { buildBundle, bundleText } from '../core/bundle';
+import { EMPTY_LIBRARY, TRANSCRIPT_DEFAULTS, type Library } from '../core/models';
+import { SavedLibraryStore } from '../store/libraryStore';
+import { MemoryPersistence } from '../store/memoryPersistence';
+import { SETTINGS_KEY } from '../store/schema';
 import { App } from './App';
+
+// The page remembers the open transcript in localStorage. Each test starts
+// with none.
+afterEach(() => {
+  window.localStorage.clear();
+});
 
 // At 300 words a minute a plain word shows for 200 ms.
 const WORD_MS = 200;
@@ -12,13 +23,17 @@ const WORD_MS = 200;
 interface Page {
   readonly clock: FakeClock;
   readonly visibility: FakeVisibility;
+  readonly store: SavedLibraryStore;
+  readonly persistence: MemoryPersistence<Library>;
 }
 
-function renderPage(): Page {
+function renderPage(library: Library = EMPTY_LIBRARY): Page {
   const clock = new FakeClock();
   const visibility = new FakeVisibility();
-  render(<App clock={clock} visibility={visibility} />);
-  return { clock, visibility };
+  const persistence = new MemoryPersistence<Library>();
+  const store = SavedLibraryStore.ready(persistence, library);
+  render(<App store={store} clock={clock} visibility={visibility} />);
+  return { clock, visibility, store, persistence };
 }
 
 function press(name: string): void {
@@ -399,8 +414,9 @@ describe('stopping and coming back', () => {
     expect(screen.getByText('300 WPM')).toBeVisible();
     press('Notes');
     expect(screen.getByText('600 WPM')).toBeVisible();
-    press('Start reading');
+    // It was left in the reader, so it comes back there, paused.
     expect(word()).toBe('two');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
   });
 
   test('opening another transcript stops the reading', () => {
@@ -419,7 +435,11 @@ describe('under React strict mode', () => {
     const visibility = new FakeVisibility();
     render(
       <StrictMode>
-        <App clock={clock} visibility={visibility} />
+        <App
+          store={SavedLibraryStore.ready(new MemoryPersistence<Library>())}
+          clock={clock}
+          visibility={visibility}
+        />
       </StrictMode>,
     );
     addTranscript('Notes');
@@ -430,5 +450,417 @@ describe('under React strict mode', () => {
       clock.advance(WORD_MS);
     });
     expect(word()).toBe('two');
+  });
+});
+
+const SAVED: Library = {
+  nextId: 3,
+  currentSpaceIndex: 0,
+  spaces: ['General', 'Work'],
+  transcripts: [
+    {
+      ...TRANSCRIPT_DEFAULTS,
+      id: 1,
+      title: 'Kept',
+      space: 'General',
+      rawText: 'one two three',
+      isStopped: true,
+    },
+    { ...TRANSCRIPT_DEFAULTS, id: 2, title: 'At work', space: 'Work', isStopped: true },
+  ],
+};
+
+describe('saving', () => {
+  test('the page waits for the saved library before showing anything to change', async () => {
+    const store = new SavedLibraryStore(
+      new MemoryPersistence<Library>({ kind: 'ok', value: SAVED }),
+    );
+    render(<App store={store} />);
+    expect(screen.getByRole('status').textContent).toContain('Opening your library');
+    expect(screen.queryByRole('button', { name: 'Add transcript' })).toBeNull();
+    expect(await screen.findByRole('button', { name: 'Kept' })).toBeTruthy();
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  test('a saved library is shown as it was left', () => {
+    renderPage(SAVED);
+    press('Kept');
+    expect((screen.getByLabelText('Transcript text') as HTMLTextAreaElement).value).toBe(
+      'one two three',
+    );
+  });
+
+  test('adding a transcript and typing its text are written', async () => {
+    const { store, persistence } = renderPage();
+    press('Add transcript');
+    answerDialog('Lecture');
+    fireEvent.change(screen.getByLabelText('Transcript text'), { target: { value: 'some words' } });
+    await act(() => store.flush());
+    expect(persistence.writes.at(-1)?.transcripts).toMatchObject([
+      { id: 1, title: 'Lecture', rawText: 'some words' },
+    ]);
+  });
+
+  test('stopping writes the word that was reached', async () => {
+    const { store, persistence, clock } = renderPage(SAVED);
+    press('Kept');
+    press('Start reading');
+    act(() => {
+      clock.advance(WORD_MS);
+    });
+    press('Stop reading');
+    await act(() => store.flush());
+    expect(persistence.writes.at(-1)?.transcripts[0]?.position).toBe(1);
+  });
+
+  test('hiding the page writes what was waiting', async () => {
+    const { store, persistence } = renderPage(SAVED);
+    store.setPosition(1, 1);
+    store.setPosition(1, 2); // held back, less than a second after the first
+    await act(() => store.flush());
+    const writes = persistence.writes.length;
+    store.setPosition(1, 3);
+    expect(persistence.writes).toHaveLength(writes);
+    await act(async () => {
+      window.dispatchEvent(new Event('pagehide'));
+      await Promise.resolve();
+    });
+    expect(persistence.writes.at(-1)?.transcripts[0]?.position).toBe(3);
+  });
+
+  test('a damaged save is announced once and can be dismissed', async () => {
+    const store = new SavedLibraryStore(
+      new MemoryPersistence<Library>({
+        kind: 'damaged',
+        keptAs: 'library.damaged-20261116-101500',
+      }),
+    );
+    render(<App store={store} />);
+    const notice = await screen.findByRole('alert');
+    expect(notice.textContent).toContain('library.damaged-20261116-101500');
+    fireEvent.click(within(notice).getByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('a browser that will not save says so and still works', async () => {
+    const store = new SavedLibraryStore({
+      read: () => Promise.reject(new Error('blocked')),
+      write: () => Promise.reject(new Error('blocked')),
+    });
+    render(<App store={store} />);
+    expect((await screen.findByRole('alert')).textContent).toContain('not letting the app save');
+    press('Add transcript');
+    answerDialog('Lecture');
+    expect(screen.getByRole('button', { name: 'Lecture' })).toBeTruthy();
+  });
+
+  test('the browser is asked to keep the data when the first transcript is added', () => {
+    const requestPersistence = vi.fn(() => Promise.resolve('granted' as const));
+    render(
+      <App
+        store={SavedLibraryStore.ready(new MemoryPersistence<Library>())}
+        health={{ requestPersistence }}
+      />,
+    );
+    expect(requestPersistence).not.toHaveBeenCalled();
+    press('Add transcript');
+    answerDialog('Lecture');
+    expect(requestPersistence).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('export and import', () => {
+  afterEach(() => {
+    window.localStorage.clear();
+    vi.restoreAllMocks();
+  });
+
+  function chooseFile(text: string): void {
+    const file = new File([text], 'export.json', { type: 'application/json' });
+    fireEvent.change(screen.getByLabelText('Import from a file'), { target: { files: [file] } });
+  }
+
+  const THEIRS: Library = {
+    nextId: 2,
+    currentSpaceIndex: 0,
+    spaces: ['General', 'Books'],
+    transcripts: [{ ...TRANSCRIPT_DEFAULTS, id: 1, title: 'Novel', space: 'Books', position: 7 }],
+  };
+  const THEIR_FILE = bundleText(buildBundle(THEIRS, { default_wpm: 450, data_directory: 'C:\\x' }));
+
+  test('Settings says where the data lives', () => {
+    renderPage();
+    press('Settings');
+    const dialog = screen.getByRole('dialog', { name: 'Settings' });
+    expect(dialog.textContent).toContain('saved in this browser, on this device only');
+  });
+
+  test('export hands over a bundle the app can read back', () => {
+    const created = vi.fn((blob: Blob) => {
+      void blob;
+      return 'blob:export';
+    });
+    URL.createObjectURL = created;
+    URL.revokeObjectURL = vi.fn();
+    const clicked = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ default_wpm: 450 }));
+    renderPage(SAVED);
+    press('Settings');
+    press('Export to a file');
+    expect(clicked).toHaveBeenCalledTimes(1);
+    expect(created).toHaveBeenCalledTimes(1);
+  });
+
+  test('a file that is not an export shows the desktop message and changes nothing', async () => {
+    const { store } = renderPage(SAVED);
+    press('Settings');
+    chooseFile('not json');
+    expect((await screen.findByRole('alert')).textContent).toBe(
+      "That file isn't valid JSON, so it can't be an RSVP Reader export.",
+    );
+    expect(store.getSnapshot()).toBe(SAVED);
+  });
+
+  test('Replace takes the file in place of what was here, and its settings', async () => {
+    const { store, persistence } = renderPage(SAVED);
+    press('Settings');
+    chooseFile(THEIR_FILE);
+    const group = await screen.findByRole('group', { name: 'Import' });
+    expect(group.textContent).toContain('1 transcript in 2 Spaces');
+    fireEvent.click(within(group).getByRole('button', { name: 'Replace everything' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(store.getSnapshot()).toEqual(THEIRS);
+    await act(() => store.flush());
+    expect(persistence.writes.at(-1)).toEqual(THEIRS);
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
+      default_wpm: 450,
+    });
+  });
+
+  test('Add keeps what was here, gives new ids and leaves the settings', async () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ default_wpm: 300 }));
+    const { store } = renderPage(SAVED);
+    press('Settings');
+    chooseFile(THEIR_FILE);
+    const group = await screen.findByRole('group', { name: 'Import' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Add to what is here' }));
+    const library = store.getSnapshot();
+    expect(library.spaces).toEqual(['General', 'Work', 'Books']);
+    expect(library.transcripts.map((t) => [t.id, t.title])).toEqual([
+      [1, 'Kept'],
+      [2, 'At work'],
+      [3, 'Novel'],
+    ]);
+    expect(library.transcripts[2]?.position).toBe(7);
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
+      default_wpm: 300,
+    });
+  });
+
+  test('Cancel leaves everything as it was', async () => {
+    const { store } = renderPage(SAVED);
+    press('Settings');
+    chooseFile(THEIR_FILE);
+    const group = await screen.findByRole('group', { name: 'Import' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('group', { name: 'Import' })).toBeNull();
+    expect(store.getSnapshot()).toBe(SAVED);
+  });
+});
+
+// A reload, as far as the page can tell: the old page goes away, and a new
+// one opens on what was saved, with the same localStorage.
+describe('coming back after a reload', () => {
+  const TEXT = 'one two three four five';
+
+  async function reload(page: Page, unmount: () => void): Promise<Page> {
+    await act(() => page.store.flush());
+    unmount();
+    const saved = page.persistence.writes.at(-1);
+    const persistence = new MemoryPersistence<Library>(
+      saved === undefined ? { kind: 'missing' } : { kind: 'ok', value: saved },
+    );
+    const store = new SavedLibraryStore(persistence);
+    const clock = new FakeClock();
+    const visibility = new FakeVisibility();
+    render(<App store={store} clock={clock} visibility={visibility} />);
+    await screen.findByRole('heading', { level: 2 });
+    return { clock, visibility, store, persistence };
+  }
+
+  function firstPage(library: Library = EMPTY_LIBRARY) {
+    const clock = new FakeClock();
+    const visibility = new FakeVisibility();
+    const persistence = new MemoryPersistence<Library>();
+    const store = SavedLibraryStore.ready(persistence, library);
+    const { unmount } = render(<App store={store} clock={clock} visibility={visibility} />);
+    return { page: { clock, visibility, store, persistence }, unmount };
+  }
+
+  function addAndType(title: string, text: string): void {
+    press('Add transcript');
+    answerDialog(title);
+    fireEvent.change(screen.getByLabelText('Transcript text'), { target: { value: text } });
+  }
+
+  test('a transcript left playing comes back in the reader, paused on the same word', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Start reading');
+    act(() => {
+      page.clock.advance(2 * WORD_MS);
+    });
+    expect(word()).toBe('three');
+
+    const after = await reload(page, unmount);
+    expect(word()).toBe('three');
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Lecture');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
+    // Paused: time passes and the word stays.
+    act(() => {
+      after.clock.advance(10 * WORD_MS);
+    });
+    expect(word()).toBe('three');
+    expect(after.store.getSnapshot().transcripts[0]).toMatchObject({ isPaused: true, position: 2 });
+    // And Play carries on from there.
+    press('Play');
+    act(() => {
+      after.clock.advance(WORD_MS);
+    });
+    expect(word()).toBe('four');
+  });
+
+  test('a transcript left paused comes back paused on the same word', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Start reading');
+    act(() => {
+      page.clock.advance(WORD_MS);
+    });
+    press('Pause');
+    await reload(page, unmount);
+    expect(word()).toBe('two');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
+  });
+
+  test('a transcript left as text comes back as text', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    await reload(page, unmount);
+    expect((screen.getByLabelText('Transcript text') as HTMLTextAreaElement).value).toBe(TEXT);
+    expect(screen.queryByTestId('word')).toBeNull();
+  });
+
+  test('a transcript that was stopped comes back as text, and Start picks up its word', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Start reading');
+    act(() => {
+      page.clock.advance(2 * WORD_MS);
+    });
+    press('Stop reading');
+    await reload(page, unmount);
+    expect(screen.getByLabelText('Transcript text')).toBeTruthy();
+    press('Start reading');
+    expect(word()).toBe('three');
+  });
+
+  test('the transcript comes back in its own Space', async () => {
+    const { page, unmount } = firstPage();
+    press('New Space');
+    answerDialog('Work');
+    addAndType('At work', TEXT);
+    press('Start reading');
+    await reload(page, unmount);
+    expect(word()).toBe('one');
+    expect(screen.getByRole('button', { name: 'At work' }).getAttribute('aria-current')).toBe(
+      'true',
+    );
+  });
+
+  test('with nothing open, nothing is opened', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('New Space'); // leaves the open transcript
+    answerDialog('Work');
+    await reload(page, unmount);
+    expect(screen.getByRole('heading', { level: 1 }).textContent).not.toBe('Lecture');
+    expect(screen.queryByLabelText('Transcript text')).toBeNull();
+  });
+
+  test('a deleted transcript is not opened', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Delete Lecture');
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+    await reload(page, unmount);
+    expect(screen.queryByLabelText('Transcript text')).toBeNull();
+  });
+
+  test('nothing is opened when the saved settings switch it off', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Start reading');
+    const settings = JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '{}') as object;
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ ...settings, reopen_last_transcript: false }),
+    );
+    await reload(page, unmount);
+    expect(screen.queryByTestId('word')).toBeNull();
+    expect(screen.queryByLabelText('Transcript text')).toBeNull();
+  });
+
+  test('picking a transcript that was left in the reader opens it there, paused', () => {
+    const { page } = firstPage();
+    addAndType('First', TEXT);
+    press('Start reading');
+    act(() => {
+      page.clock.advance(2 * WORD_MS);
+    });
+    addAndType('Second', 'other words');
+    press('First');
+    expect(word()).toBe('three');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeTruthy();
+    act(() => {
+      page.clock.advance(5 * WORD_MS);
+    });
+    expect(word()).toBe('three');
+  });
+
+  test('in StrictMode the reader is loaded once and stays paused', async () => {
+    const saved: Library = {
+      ...EMPTY_LIBRARY,
+      nextId: 2,
+      transcripts: [
+        {
+          ...TRANSCRIPT_DEFAULTS,
+          id: 1,
+          title: 'Lecture',
+          space: 'General',
+          rawText: TEXT,
+          position: 3,
+        },
+      ],
+    };
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ last_transcript_id: 1 }));
+    const clock = new FakeClock();
+    render(
+      <StrictMode>
+        <App
+          store={
+            new SavedLibraryStore(new MemoryPersistence<Library>({ kind: 'ok', value: saved }))
+          }
+          clock={clock}
+          visibility={new FakeVisibility()}
+        />
+      </StrictMode>,
+    );
+    await screen.findByTestId('word');
+    expect(word()).toBe('four');
+    act(() => {
+      clock.advance(5 * WORD_MS);
+    });
+    expect(word()).toBe('four');
   });
 });

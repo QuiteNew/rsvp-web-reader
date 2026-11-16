@@ -1,14 +1,14 @@
 import { useState } from 'react';
 
 import type { Library } from '../core/models';
-import type { LibraryShell } from '../store/memoryLibrary';
+import type { LibraryStore } from '../store/contract';
 import { Dialog } from './Dialog';
 import styles from './Dialog.module.css';
 import { PencilIcon } from './Icons';
 
 interface SpacesDialogProps {
   readonly library: Library;
-  readonly store: LibraryShell;
+  readonly store: Pick<LibraryStore, 'renameSpace' | 'deleteSpace'>;
   readonly onClose: () => void;
   // Called with the Space that was picked, before the dialog closes.
   readonly onSwitch: (name: string) => void;

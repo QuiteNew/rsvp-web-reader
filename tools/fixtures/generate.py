@@ -1048,6 +1048,129 @@ def build_bundle(core):
     }
 
 
+def build_library(core):
+    """The TranscriptStore methods, as scripts: a list of calls made one
+    after another on a store that starts empty, with what each call gave
+    back and the whole state after it."""
+    import tempfile
+    from dataclasses import asdict
+    from core.transcript_store import TranscriptStore
+
+    def state_of(store):
+        state = store.export_state()
+        for transcript in state["transcripts"]:
+            for bookmark in transcript["bookmarks"]:
+                # The time a bookmark was made is "now". The port is handed
+                # this same text.
+                bookmark["created_at"] = "NOW"
+        return state
+
+    def answer(value):
+        return asdict(value) if hasattr(value, "__dataclass_fields__") else value
+
+    def play(script):
+        # The store saves into its folder. It gets a temporary one, far from
+        # the desktop repository and from the real data folder.
+        with tempfile.TemporaryDirectory() as folder:
+            store = TranscriptStore(data_directory=folder)
+            steps = []
+            for name, *arguments in script:
+                given = getattr(store, name)(*arguments)
+                steps.append([answer(given), state_of(store)])
+            return steps
+
+    by_hand = [
+        [
+            ["add_space", "Work"], ["add_space", "  Books  "], ["add_space", "Work"], ["add_space", "   "],
+            ["add_space", ""], ["add_space", "work"], ["switch_to_space", "General"],
+            ["switch_to_space", "Nowhere"], ["add_transcript", "One", "General"],
+            ["add_transcript", "Two", "Work", 450, "#000000", "#111111", "#222222", 40, True, 3, "adaptive", 45],
+            ["add_transcript", "Three", "Nowhere"], ["rename_space", "Work", "Office"],
+            ["rename_space", "Office", "Office"], ["rename_space", "Office", " Books "],
+            ["rename_space", "Office", "  "], ["rename_space", "Gone", "X"], ["rename_space", "General", " Home "],
+            ["delete_space", "Office"], ["delete_space", "Books"], ["delete_space", "Gone"],
+            ["switch_to_space", "work"], ["delete_space", "work"], ["delete_space", "Home"],
+            ["set_transcript_space", 1, "Office"], ["set_transcript_space", 1, "Gone"],
+            ["set_transcript_space", 99, "Office"], ["delete_space", "Home"], ["delete_space", "Office"],
+            ["delete_transcript", 3], ["delete_transcript", 99], ["delete_transcript", 1],
+            ["delete_transcript", 2], ["delete_space", "Office"],
+        ],
+        [
+            ["add_transcript", "T", "General"], ["set_transcript_title", 1, "New title"],
+            ["set_transcript_title", 9, "x"], ["set_transcript_text", 1, "Ann: hi\nBob: yo"],
+            ["set_transcript_draft_text", 1, "a draft"], ["set_transcript_position", 1, 5],
+            ["set_transcript_position", 1, 5], ["set_transcript_wpm", 1, 450], ["set_transcript_paused", 1, True],
+            ["set_transcript_stopped", 1, True], ["set_transcript_font_size", 1, 48],
+            ["set_transcript_normalization", 1, "before", "after"], ["set_transcript_normalization", 1, "", ""],
+            ["set_transcript_chunking", 1, True, 4], ["set_transcript_chunking", 1, True, 3, "adaptive", 40],
+            ["set_transcript_chunking", 1, False, 2], ["set_transcript_chunking", 1, True, 5, None, 20],
+            ["set_transcript_chunking", 9, True, 5],
+            ["set_transcript_speakers", 1, {"ann": " Ann ", "Bad Key": "X", "bob": ""}],
+            ["set_transcript_speakers", 1, {}], ["set_transcript_speakers", 1, None],
+            ["set_transcript_speakers", 1, "damaged"], ["set_transcript_speakers", 9, {"ann": "Ann"}],
+        ],
+        [
+            ["add_transcript", "A", "General"], ["add_transcript", "B", "General"],
+            ["resync_default_reading_colors", "#101010", "#202020", "#303030"],
+            ["set_transcript_font_color", 1, "#101010"], ["set_transcript_font_color", 1, "#ABCDEF"],
+            ["set_transcript_highlight_color", 1, "#202020"], ["set_transcript_background_color", 2, "#FFFFFF"],
+            ["set_transcript_background_color", 2, "#FFFFFF"],
+            ["resync_default_reading_colors", "#111111", "#222222", "#333333"],
+            ["resync_default_reading_colors", "#111111", "#222222", "#333333"],
+            ["set_transcript_highlight_color", 1, "#999999"], ["set_transcript_font_color", 9, "#000000"],
+            ["resync_default_reading_colors", "#FFFFFF", "#E74C3C", "#1E1E1E"],
+        ],
+        [
+            ["add_transcript", "A", "General"], ["add_bookmark", 1, 10, "ten"], ["add_bookmark", 1, 3, "three"],
+            ["add_bookmark", 1, 10, "again"], ["add_bookmark", 1, 7], ["add_bookmark", 9, 1, "x"],
+            ["set_bookmark_label", 1, 3, "start"], ["set_bookmark_label", 1, 3, "start"],
+            ["set_bookmark_label", 1, 4, "none"], ["set_bookmark_label", 1, 3, ""],
+            ["set_bookmark_label", 9, 3, "x"], ["remove_bookmark", 1, 7], ["remove_bookmark", 1, 7],
+            ["remove_bookmark", 9, 3], ["add_bookmark", 1, 0, ""], ["remove_bookmark", 1, 10],
+        ],
+        [
+            ["add_transcript", "A", "General"], ["add_session_stats", 1, 0, 0], ["add_session_stats", 1, 12, 2.9],
+            ["add_session_stats", 1, 100, 3], ["add_session_stats", 1, 5, 3.5], ["add_session_stats", 1, 5, 4.5],
+            ["add_session_stats", 1, 1, 2.5], ["add_session_stats", 1, 7, 61.49], ["add_session_stats", 9, 7, 60],
+        ],
+    ]
+
+    rng = random.Random(7)
+    names = ["General", "Work", " Books ", "", "work", "Gone"]
+
+    def random_call():
+        kind = rng.randrange(12)
+        if kind == 0:
+            return ["add_space", rng.choice(names)]
+        if kind == 1:
+            return ["switch_to_space", rng.choice(names)]
+        if kind == 2:
+            return ["rename_space", rng.choice(names), rng.choice(names + ["Home", "Office"])]
+        if kind == 3:
+            return ["delete_space", rng.choice(names + ["Home", "Office", "Books"])]
+        if kind in (4, 5):
+            return ["add_transcript", rng.choice(["One", "Two", ""]), rng.choice(["General", "Work", "Books"])]
+        if kind == 6:
+            return ["delete_transcript", rng.randint(1, 6)]
+        if kind == 7:
+            return ["set_transcript_space", rng.randint(1, 6), rng.choice(names + ["Books"])]
+        if kind == 8:
+            return ["set_transcript_position", rng.randint(1, 6), rng.randint(0, 50)]
+        if kind == 9:
+            return ["add_bookmark", rng.randint(1, 6), rng.randint(0, 5), rng.choice(["", "words"])]
+        if kind == 10:
+            return ["remove_bookmark", rng.randint(1, 6), rng.randint(0, 5)]
+        return ["set_transcript_wpm", rng.randint(1, 6), rng.choice([100, 300, 1000])]
+
+    scripts = by_hand + [[random_call() for _ in range(30)] for _ in range(12)]
+    return {
+        "play": [call(play, script) for script in scripts],
+        "constants": [
+            [["MIN_ACTIVE_SECONDS_TO_COUNT_AS_READ"], TranscriptStore.MIN_ACTIVE_SECONDS_TO_COUNT_AS_READ],
+        ],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1101,6 +1224,7 @@ MODULES = {
     "case": build_case,
     "storage": build_storage,
     "bundle": build_bundle,
+    "library": build_library,
 }
 
 

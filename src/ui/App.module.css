@@ -362,3 +362,24 @@
     min-height: 4rem;
   }
 }
+
+/* A line across the top of the main side: the library is opening, a save
+   went wrong, or a damaged save was put aside. */
+.notice {
+  margin: 0;
+  padding: 0.6rem 1rem;
+  background: var(--taupe);
+  border-bottom: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.dismiss {
+  margin-left: 0.5rem;
+  padding: 0.1rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--paper);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
