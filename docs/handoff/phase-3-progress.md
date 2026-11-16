@@ -19,8 +19,8 @@ picked up by whoever comes next without guessing. The spec is
 | #   | What                                                                  | State   |
 | --- | --------------------------------------------------------------------- | ------- |
 | 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done    |
-| 2   | `storageFormat`: the port of `parse_data` and the write side          | Next    |
-| 3   | `bundle`: reading and writing an export file, the five messages       | Waiting |
+| 2   | `storageFormat`: the port of `parse_data` and the write side          | Done    |
+| 3   | `bundle`: reading and writing an export file, the five messages       | Next    |
 | 4   | `library`: every `TranscriptStore` method as a pure function          | Waiting |
 | 5   | `settings`: defaults, ranges, clamping, `_known_settings`             | Waiting |
 | 6   | The store over a `Persistence`, with one in memory for tests          | Waiting |
@@ -59,3 +59,27 @@ Found on the way, and fixed:
   character against the new `case.json` fixture.
 - Not covered by a table: which characters count as "cased" for the sigma
   at the end of a Greek word. That still comes from the browser.
+
+## Step 2, done on 2026-11-16
+
+- `src/core/storageFormat.ts`: `parseData` (the port of `parse_data`),
+  `toSavedData` (what `save_state` and `export_state` write, as an object)
+  and `LIVE_SAVE_INTERVAL_SECONDS`. Fixture `storage.json`, 62 cases, about
+  half readable and half not.
+- `parseData` does not change what it is given. The desktop's does.
+- Values are not checked, as on the desktop, so a `Library` from
+  `parseData` can hold a speed of "fast" or a Space index of -3. The type
+  is a promise the data may break. Whether the web app cleans such data
+  is still the owner's call, see "Export and import rules" in the spec.
+- Python walks more than lists: `"transcripts": ""` or `{}` reads as no
+  transcripts, and the same for `bookmarks`. Ported as it is.
+- Not ported yet: turning the object into text. `save_state` uses
+  `json.dumps(data, indent=2)`, which also writes every non-ASCII
+  character as a `\u` escape. `JSON.stringify(data, null, 2)` does not.
+  Both read back the same, so it only matters if a file has to match the
+  desktop's byte for byte. Decide in step 3.
+- Not ported yet: `keep_damaged_copy` and `read_state`. They work on files
+  and belong to step 7, with the rules in the spec under "Stored data".
+- The desktop tests for this (`test_storage.py`, `test_models.py`,
+  `test_damaged_files.py`) are not ported yet. Do them with step 6, when
+  there is a store to run the save and load ones against.

@@ -871,6 +871,93 @@ def build_transcript_sort(core):
     }
 
 
+def build_storage(core):
+    import copy
+    from dataclasses import asdict
+    import core.storage
+    from core.models import Transcript
+
+    def parse_data(data):
+        # parse_data() changes what it is given, so it gets a copy and the
+        # fixture keeps the input as it was.
+        state = core.storage.parse_data(copy.deepcopy(data))
+        if state is None:
+            return None
+        return {**state, "transcripts": [asdict(t) for t in state["transcripts"]]}
+
+    def data(transcripts, **changes):
+        base = {"next_id": 5, "current_space_index": 0, "spaces": ["General", "Work"], "transcripts": transcripts}
+        base.update(changes)
+        return base
+
+    def without(mapping, *keys):
+        return {k: v for k, v in mapping.items() if k not in keys}
+
+    small = {"id": 1, "title": "T", "space": "General"}
+    full = asdict(Transcript(
+        id=2, title="Full é \U0001F600", space="Work", raw_text="Ann: hi\nBob: yo", wpm=450, position=7,
+        font_color="#111111", highlight_color="#222222", background_color="#333333", font_size=40,
+        is_paused=True, draft_text="draft", is_stopped=True, font_color_is_default=False,
+        highlight_color_is_default=True, background_color_is_default=False, times_read=3,
+        total_words_read=1200, total_time_spent_seconds=345, pre_normalize_text="before",
+        normalized_text="after", chunking_enabled=True, chunk_size=4, chunk_mode="adaptive",
+        chunk_char_target=42, speaker_custom={"ann": "Ann", "bob": "Robert"},
+    ))
+    full["bookmarks"] = [
+        {"index": 3, "snippet": "hi there", "created_at": "2026-01-02T03:04:05", "label": "start"},
+        {"index": 9},
+    ]
+    old = {
+        "id": 1, "title": "Doc", "space": "General", "raw_text": "hello world", "wpm": 300, "position": 0,
+        "font_color": "#FFFFFF", "highlight_color": "#E74C3C", "background_color": "#1E1E1E",
+        "font_size": 32, "is_paused": False, "draft_text": "", "is_stopped": False,
+    }
+
+    inputs = [
+        data([]), data([small]), data([full]), data([small, full]), data([old]),
+        # Unknown keys are dropped, on the file, a transcript and a bookmark.
+        data([{**small, "from_the_future": 1}], also_new=True),
+        data([{**small, "bookmarks": [{"index": 1, "colour": "red"}]}]),
+        # The three colour flags: missing means false, present is kept.
+        data([{**small, "font_color_is_default": True}]),
+        data([{**small, "highlight_color_is_default": False, "background_color_is_default": True}]),
+        # Bookmarks in odd shapes.
+        data([{**small, "bookmarks": []}]), data([{**small, "bookmarks": None}]),
+        data([{**small, "bookmarks": ""}]), data([{**small, "bookmarks": "ab"}]),
+        data([{**small, "bookmarks": {}}]), data([{**small, "bookmarks": {"a": 1}}]),
+        data([{**small, "bookmarks": [5]}]), data([{**small, "bookmarks": [{}]}]),
+        data([{**small, "bookmarks": [{"snippet": "no index"}]}]), data([{**small, "bookmarks": 7}]),
+        data([{**small, "bookmarks": [None]}]), data([{**small, "bookmarks": [[1]]}]),
+        # The speaker list is cleaned.
+        data([{**small, "speaker_custom": None}]), data([{**small, "speaker_custom": {}}]),
+        data([{**small, "speaker_custom": {"ann": "  Ann ", "Bad": "X", "bob": 7}}]),
+        data([{**small, "speaker_custom": ["ann"]}]), data([{**small, "speaker_custom": "Ann"}]),
+        # A transcript that is not whole, or not an object.
+        data([without(small, "id")]), data([without(small, "title")]), data([without(small, "space")]),
+        data([{}]), data([5]), data([None]), data(["text"]), data([[small]]), data([small, 5]),
+        # The list of transcripts in odd shapes.
+        data(None), data(""), data("ab"), data({}), data({"a": small}), data(5), data(True),
+        # Missing keys at the top.
+        without(data([small]), "next_id"), without(data([small]), "current_space_index"),
+        without(data([small]), "spaces"), without(data([small]), "transcripts"), {},
+        # Not an object at all.
+        None, [], [small], "text", 5, True,
+        # Values are not checked. See docs/handoff/phase-3.md.
+        data([small], next_id="x", current_space_index=-3, spaces="abc"),
+        data([small], next_id=None, current_space_index=None, spaces=None),
+        data([small], spaces=[]), data([small], current_space_index=99),
+        data([{**small, "wpm": "fast", "position": None, "title": 5, "id": "one", "space": "Nowhere"}]),
+        data([{**small, "bookmarks": [{"index": "no", "label": 5}]}]),
+        data([{**small, "chunk_mode": "sideways", "chunk_size": 99, "is_paused": "yes"}]),
+        data([{**small, "wpm": 300.5, "font_size": 1e3}]),
+        data([small, small]),
+    ]
+    return {
+        "parse_data": [call(parse_data, value) for value in inputs],
+        "constants": [[["LIVE_SAVE_INTERVAL_SECONDS"], core.storage.LIVE_SAVE_INTERVAL_SECONDS]],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -922,6 +1009,7 @@ MODULES = {
     "transcript_sort": build_transcript_sort,
     "reopen": build_reopen,
     "case": build_case,
+    "storage": build_storage,
 }
 
 
