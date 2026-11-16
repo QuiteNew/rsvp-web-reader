@@ -16,8 +16,8 @@ that uses them. One commit per step.
 | #   | What                                                                  | State   |
 | --- | --------------------------------------------------------------------- | ------- |
 | 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done    |
-| 2   | `settings_search` (36 lines), the same way                            | Next    |
-| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Waiting |
+| 2   | `settings_search` (36 lines), the same way                            | Done    |
+| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Next    |
 | 4   | Guide marks and the focus letter offset                               | Waiting |
 | 5   | The surrounding-words line (a new snapshot field in the engine)       | Waiting |
 | 6   | The scrubber, with bookmark ticks                                     | Waiting |
@@ -63,3 +63,19 @@ Found on the way, and fixed in this commit:
   the run. The clock now stands still while those tests are recorded, so
   the file is stable. 11 `save_state` cases that differed only by their
   time stamp merged (130 became 119). Nothing else changed.
+
+## Step 2, settings search, done on 2026-11-16
+
+- `src/core/settingsSearch.ts`: `queryWords` and `matches`. Fixture
+  `settings_search.json`, 2027 cases (57 queries, 1970 matches). The
+  desktop's `tests/test_settings_search.py` (13 tests) is replayed in
+  `settingsSearch.test.ts`.
+- Python's `casefold()` and `split()` are used through `pyCasefold` and
+  `pySplit`, so "ß" finds "ss" and a no-break space splits words like
+  Python. `toLowerCase()` fails the fixture, checked by changing the port.
+- `record_desktop_tests()` now also records the optional arguments a test
+  names (`keywords="guide marks"`), as a fourth item of the call. Calls
+  without any are written as before, so `colors.json` and the other
+  fixtures came out byte for byte the same.
+- Not done here: the search box itself. That is step 11, which will call
+  `matches` with each setting's name, keywords and description.

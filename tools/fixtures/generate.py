@@ -1843,9 +1843,14 @@ def record_desktop_tests(test_file, module, shapes):
             def watched(name):
                 real = getattr(module, name)
 
-                def run(*arguments):
-                    result = real(*arguments)
-                    calls.append([name, list(arguments), shapes[name](result)])
+                def run(*arguments, **keywords):
+                    result = real(*arguments, **keywords)
+                    # Tests often name the optional arguments. They are
+                    # written down as a fourth item, only when there are some.
+                    call_record = [name, list(arguments), shapes[name](result)]
+                    if keywords:
+                        call_record.append(keywords)
+                    calls.append(call_record)
                     return result
                 return run
 
@@ -1901,6 +1906,45 @@ def build_colors(core):
     }
 
 
+def build_settings_search(core):
+    import core.settings_search as search
+
+    rng = random.Random(5)
+    queries = [
+        "", "   ", "\t\n", "speed", "SPEED", "Speed", "  guide   MARK\tcolour ", "guid", "ark", "colour mark",
+        "mark speed", "zebra", "markcolour", "half", "ease half", "crosshair", "horizontal crosshair",
+        "straße", "STRASSE", "ss", "ß", "σ", "Σ", "ς", "ΟΔΟΣ", "ΟΔΟς", "İ", "i̇", "i", "ı", "I",
+        "fi", "ﬁ", "\u00a0", "a\u00a0b", "a\u2003b", "a\x1cb", "a\x85b", "a\u200bb", "a\u180eb",
+        "\ufeffspeed", "speed\u3000mark", "e\u0301", "\u00e9", "É", "ǅ", "ǆ", "Ǆ", "ᾈ", "ᾀ",
+        "😀", "a😀", "wpm", "words per minute", "per minute words", "font size", "size font",
+    ]
+    names = [
+        "Speed", "SPEED", "Mark colour", "Show horizontal guide lines", "Ease in", "Straße", "STRASSE",
+        "ΟΔΟΣ", "Οδος", "İstanbul", "istanbul", "Ǆ size", "ﬁne print", "", "Font size", "Words per minute",
+        "Mark", "a\u00a0b", "caf\u00e9", "cafe\u0301", "Emoji 😀",
+    ]
+    keywords = ["", "guide marks", "crosshair highlight", "crosshair", "colour", "warm up", "wpm", "ς σ", "Colour"]
+    descriptions = [
+        "", "Starts each session at about half speed.", "Starts slower.", "Words per minute, from 100 to 1000.",
+        "The size of the letters.", "ΑΣ", "Straße",
+    ]
+    cases = []
+    for query in queries:
+        for name in names[:10]:
+            cases.append(call(search.matches, query, name, "", "", False))
+    for _ in range(1400):
+        cases.append(call(
+            search.matches, rng.choice(queries), rng.choice(names), rng.choice(keywords),
+            rng.choice(descriptions), rng.random() < 0.5,
+        ))
+    return {
+        "query_words": [call(search.query_words, query) for query in queries],
+        "matches": cases,
+        "desktop_tests": record_desktop_tests(
+            "test_settings_search.py", search, {"matches": lambda value: value, "query_words": list}),
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1951,6 +1995,7 @@ MODULES = {
     "wpm_step": build_wpm_step,
     "transcript_sort": build_transcript_sort,
     "reopen": build_reopen,
+    "settings_search": build_settings_search,
     "case": build_case,
     "storage": build_storage,
     "bundle": build_bundle,
