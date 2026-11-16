@@ -73,6 +73,120 @@ and never let them use their default folder.
 - Ask the browser to keep the data (`navigator.storage.persist()`), and say
   in the app that the data lives in this browser only.
 
+## Stored data
+
+The names and record types are real code already: `src/store/schema.ts`
+for the browser side and `src/core/savedShapes.ts` for the desktop's file
+shapes. Build against them.
+
+| Where                                     | Key       | Holds                                              |
+| ----------------------------------------- | --------- | -------------------------------------------------- |
+| IndexedDB `rsvp-web-reader`, `library`    | `current` | One `LibraryRecord`: `{ format, savedAt, data }`   |
+| IndexedDB `rsvp-web-reader`, `damaged`    | see below | `DamagedRecord`, one per value that was unreadable |
+| `localStorage` `rsvp-web-reader.settings` | -         | The settings as JSON text                          |
+
+- `data` in the record is the desktop's `data.json` shape, snake_case and
+  all. So one function, the port of `parse_data`, reads the saved library
+  and the `data` part of a bundle, as on the desktop. Nothing else needs a
+  second set of reading rules.
+- Reading: no record is 'missing'. A record whose `format` is not 1, or
+  whose `data` the port of `parse_data` refuses, is 'damaged'.
+- A damaged value is copied to `damaged` before anything is written. The
+  key is `library.damaged-YYYYMMDD-HHMMSS` (local time, like the desktop),
+  with `-2`, `-3` when taken. If an earlier copy holds the same content,
+  no new copy is made and that key is given back. Making the copy must
+  never throw: on failure `keptAs` is null and the app still starts.
+- Damaged settings: the text goes to the same `damaged` store with a
+  `settings.` key, because `localStorage` is small.
+- Writing: one `put` in one transaction. Never read then write in two
+  transactions.
+- Two tabs: not handled on the desktop, so there is no rule to port. The
+  simplest safe choice is a `BroadcastChannel` message after each save
+  that makes other tabs show "changed in another tab, reload". Ask the
+  owner before building more than that.
+
+## Versioning
+
+Three numbers, each with one job:
+
+| Number                  | Now | Raise it when                                              |
+| ----------------------- | --- | ---------------------------------------------------------- |
+| `DATABASE_VERSION`      | 1   | An object store is added or removed. Add an upgrade step.  |
+| `LIBRARY_RECORD_FORMAT` | 1   | Old code can no longer read the record. Write a migration. |
+| `bundle_format`         | 1   | Never on the web side. It follows the desktop's number.    |
+
+A new field raises none of them. The desktop's rule is the rule here: a
+missing key gets its default and an unknown key is dropped, on transcripts,
+bookmarks and settings. Two things follow, and both are true on the desktop
+as well:
+
+- An older version of the app that opens newer data and saves it loses the
+  newer fields. With an installed PWA an old cached version can do that.
+  Phase 7 should make the app update before it writes.
+- A migration is only needed for a change of meaning, never for a new key.
+
+## Export and import rules
+
+Read from `core/data_bundle.py`, `TranscriptStore` and `SettingsStore`.
+The fixtures must prove each one.
+
+Export:
+
+- The file is `{ "bundle_format": 1, "data": ..., "settings": ... }`,
+  written as JSON with an indent of 2. The desktop suggests the name
+  `rsvp-reader-export.json`.
+- `data` is the whole library in the saved shape. Keep every field of
+  `SavedTranscript` in the web model even when no screen uses it yet, so a
+  desktop file that goes in and out loses nothing.
+- `settings` must be an object, or the desktop refuses the file. Never
+  write `data_directory`.
+- Whether the desktop reads a web export cleanly is not checked yet. That
+  is the "writing bundles" extra the owner still has to confirm.
+
+Reading a file, in this order, each with its message word for word:
+
+1. Not JSON: "That file isn't valid JSON, so it can't be an RSVP Reader export."
+2. Not an object, or no `bundle_format`: "That file doesn't look like an RSVP Reader export bundle."
+3. `bundle_format` is not 1: "This bundle was made by a different version of RSVP Reader (format N, this app reads format 1) and can't be imported here."
+4. `data` or `settings` is not an object: "That file is missing data this app expects in an export bundle."
+5. The port of `parse_data` refuses `data`: "The transcript data in that file is malformed and can't be imported."
+
+Replace:
+
+- Spaces become the file's list, or `["General"]` when that list is empty.
+- The current Space index is the smaller of the file's index and the last
+  Space. A negative index is not corrected here.
+- Transcripts and `next_id` are taken as they are.
+- Settings are replaced by the file's, unknown keys dropped. Profiles are
+  the exception: a file without a `profiles` key keeps the ones here.
+
+Expand:
+
+- Each Space name in the file that is not here yet is added at the end, in
+  the file's order. Names are compared exactly, case included.
+- Every transcript in the file is added after the ones here, with a new id
+  counted up from this library's `next_id`. Everything else on it stays,
+  its Space, position and bookmarks included.
+- The current Space and the settings are left alone.
+
+After an import the desktop closes, because nothing there reloads. On the
+web, reload the page after the save has finished. It is the same idea and
+the least code.
+
+Three things in `parse_data` that look like gaps. They were checked by
+running it on 2026-11-16. Port them as they are, put them in the fixtures,
+and do not fix them without the owner:
+
+- `next_id`, `current_space_index` and `spaces` are not checked at all. A
+  string or a negative number passes.
+- Field values are not checked either. `"wpm": "fast"` and a bookmark with
+  `"index": "no"` pass.
+- A transcript whose Space is not in `spaces` passes.
+
+The web UI must not crash on such a library. Decide with the owner whether
+the web port cleans these on load, which would be a difference from the
+desktop, or shows them as they are.
+
 ### UI
 
 The sidebar: Spaces (add, rename, delete, switch), the transcript list with

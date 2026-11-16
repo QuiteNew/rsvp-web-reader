@@ -3,21 +3,21 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-16. Phase 2 is built and the owner has tried it. The
-page now has the desktop app's layout, on a library that is not saved yet.
+Last updated: 2026-11-16. Phase 2 is done. Phase 3 (saving) is next and is
+not started. Its spec, the saved shapes and the storage schema are written.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                           |
-| ----- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                        |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                |
-| 2     | The reading session and a first screen | Built, waiting for the owner to try it and confirm. Still open inside it: the desktop tests for `speakers` and `reader`. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
-| 3     | Saved data                             | Not started                                                                                                                                                                     |
-| 4     | The reading experience                 | Not started                                                                                                                                                                     |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                               |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                     |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                     |
+| Phase | What                                   | State                                                                                                                                                       |
+| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                    |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                            |
+| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout on a library that is not saved yet |
+| 3     | Saved data                             | Not started                                                                                                                                                 |
+| 4     | The reading experience                 | Not started                                                                                                                                                 |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                           |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                 |
+| 7     | Offline and polish                     | Not started                                                                                                                                                 |
 
 ## Phase 0: what was checked, and where
 
@@ -352,6 +352,16 @@ Written on 2026-11-15, so the work can go on without guessing:
   (`reader_display.py`, `transcript_store.py`, `storage.py`,
   `data_bundle.py`, `settings_store.py`), not run against it. The fixtures
   of phases 2 and 3 are what will prove them.
+
+Added on 2026-11-16, before phase 3:
+
+- `src/core/savedShapes.ts`: the desktop's file shapes (data.json and the
+  bundle) as types, with its snake_case names.
+- `src/store/schema.ts`: the IndexedDB database, its stores and keys, the
+  record types and the two version numbers.
+- In [handoff/phase-3.md](handoff/phase-3.md): "Stored data",
+  "Versioning" and "Export and import rules", with three gaps in the
+  desktop's `parse_data` that were checked by running it.
 
 One thing in the contracts is a choice and not a port: the store layer
 only saves and loads, and the rules for changing a library move into
