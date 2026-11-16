@@ -142,14 +142,18 @@ for them again:
 
 Still to do in phase 2:
 
-- **Port the desktop tests** for these two modules into `speakers.test.ts`
-  and `reader.test.ts`: `test_speakers.py`, `test_reader.py`,
-  `test_chunking.py`, `test_seeking.py`, `test_reader_speaker_cues.py`,
-  `test_whole_transcript_speakers.py` and the core parts of
-  `test_edge_cases.py`. About 250 tests. Only a few examples are ported so
-  far. The fixtures already prove the behaviour, so this is the second line
-  of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
-  known to work.
+- **Port the desktop tests** for these two modules. The fixtures already
+  prove the behaviour, so this is the second line of defence that
+  [PORTING.md](PORTING.md) asks for, not a gap in what is known to work.
+  - Done (2026-11-16): the speakers half, in
+    `src/core/speakers.desktop.test.ts`. It holds `test_speakers.py`,
+    `test_speaker_rows.py`, `test_whole_transcript_speakers.py` and the
+    cleaner tests of `test_transcript_speaker_list.py`, each under its
+    Python name. The store tests of that last file wait for phase 3.
+  - Left: the reader half, into `src/core/reader.desktop.test.ts` the same
+    way: `test_reader.py`, `test_chunking.py`,
+    `test_reader_speaker_cues.py`, `test_context_ribbon.py` and the core
+    parts of `test_seeking.py` and `test_edge_cases.py`. About 200 tests.
 
 The full list, with the order and the checks, is in
 [handoff/phase-2-rest.md](handoff/phase-2-rest.md).

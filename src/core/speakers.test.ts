@@ -106,70 +106,7 @@ describe('against the Python fixtures', () => {
   });
 });
 
-// A few of the desktop tests in tests/test_speakers.py, as examples that
-// read on their own. The rest of that file is still to be ported, see
-// docs/STATUS.md.
-
-function names(text: string): (string | null)[] {
-  return scanSpeakers(text).hits.map((hit) => (hit.name !== '' ? hit.name : null));
-}
-
-test.each([
-  ['Interviewer: So how did it start?', 'Interviewer'],
-  ['Speaker 2: In a garage.', 'Speaker 2'],
-  ['Dr. Smith: Good morning.', 'Dr. Smith'],
-  ['O’Brien: Hello.', 'O’Brien'],
-  ['Иван: Привет.', 'Иван'],
-  ['张三: 你好', '张三'], // a script with no capitals
-  ['Speaker 2 : Hello.', 'Speaker 2'],
-  ['   Bob: indented.', 'Bob'],
-  ['Bob:', 'Bob'],
-])('a_label_at_the_start_of_a_line_is_found: %s', (line, name) => {
-  expect(names(line)).toEqual([name]);
-});
-
-test.each([
-  'and Bob: hi', // starts with a small letter
-  'speaker 1: hi', // an all-lowercase label is not found
-  'Note:hello', // no space after the colon
-  'http://example.com is up', // a web address
-  '10:30 is when we met', // a time of day
-  '_x: hi', // starts with an underscore
-  'Wait, Bob: hi', // a comma inside
-  '[Bob] hello', // the bracket form is not supported
-  'One two three four five: too many words',
-])('these_are_not_labels: %s', (line) => {
-  expect(names(line)).toEqual([]);
-});
-
-test('a_label_after_a_double_arrow_is_used_and_remembers_the_arrow', () => {
-  expect(scanSpeakers('>> JOHN: hi').hits).toEqual([
-    { wordIndex: 0, key: 'john', name: 'JOHN', marked: true },
-  ]);
-});
-
-test('three_arrows_are_not_a_change', () => {
-  expect(scanSpeakers('>>> quoted reply').hits).toEqual([]);
-});
-
-test('label_keys_ignore_case_and_extra_spaces', () => {
-  expect(labelKey('  Speaker   TWO ')).toBe('speaker two');
-  expect(labelKey('STRASSE')).toBe(labelKey('straße'));
-});
-
-test('from_text_to_turns_with_auto', () => {
-  const text = 'Welcome.\nAnn: hi\nBob: hey\nNote: once only\nAnn: bye\nBob: see you';
-  const scan = scanSpeakers(text);
-  const turns = buildTurns(scan, autoSpeakers(speakerCandidates(scan)));
-  expect(turns.starts).toEqual([1, 3, 8, 10]);
-  expect(turns.speakers).toEqual(['Ann', 'Bob', 'Ann', 'Bob']);
-});
-
-test('who_is_speaking_at_each_word', () => {
-  const turns = new SpeakerTurns([2, 5, 9], ['ann', 'bob', 'ann']);
-  const who = Array.from({ length: 11 }, (_, word) => turns.speakerAt(word));
-  expect(who).toEqual([null, null, 'ann', 'ann', 'ann', 'bob', 'bob', 'bob', 'bob', 'ann', 'ann']);
-});
+// The desktop project's own tests are ported in speakers.desktop.test.ts.
 
 // Not in the Python tests: a saved list is a plain object in JavaScript,
 // and a plain object has names of its own that are not entries.

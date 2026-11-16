@@ -12,29 +12,35 @@ The fixtures prove the behaviour. The ported tests are the second check
 that [PORTING.md](../PORTING.md) asks for, and they keep the reasons the
 desktop project wrote down next to each odd case.
 
-| Desktop file                            | Tests | Goes into          |
-| --------------------------------------- | ----- | ------------------ |
-| `test_speakers.py`                      | 39    | `speakers.test.ts` |
-| `test_speaker_rows.py`                  | 23    | `speakers.test.ts` |
-| `test_transcript_speaker_list.py`       | 30    | `speakers.test.ts` |
-| `test_whole_transcript_speakers.py`     | 10    | `speakers.test.ts` |
-| `test_reader.py`                        | 83    | `reader.test.ts`   |
-| `test_chunking.py`                      | 58    | `reader.test.ts`   |
-| `test_reader_speaker_cues.py`           | 44    | `reader.test.ts`   |
-| `test_context_ribbon.py`                | 7     | `reader.test.ts`   |
-| `test_seeking.py`, `test_edge_cases.py` | some  | see below          |
+The speakers half is done (2026-11-16) and lives in
+`src/core/speakers.desktop.test.ts`. Do the reader half the same way, in
+`src/core/reader.desktop.test.ts`, with one `describe` per desktop file.
+
+| Desktop file                            | Tests | State                          |
+| --------------------------------------- | ----- | ------------------------------ |
+| `test_speakers.py`                      | 39    | done                           |
+| `test_speaker_rows.py`                  | 23    | done                           |
+| `test_transcript_speaker_list.py`       | 30    | cleaner done, store in phase 3 |
+| `test_whole_transcript_speakers.py`     | 10    | done                           |
+| `test_reader.py`                        | 83    | to do                          |
+| `test_chunking.py`                      | 58    | to do                          |
+| `test_reader_speaker_cues.py`           | 44    | to do                          |
+| `test_context_ribbon.py`                | 7     | to do                          |
+| `test_seeking.py`, `test_edge_cases.py` | some  | to do, see below               |
 
 Rules:
 
-- Keep the Python test names, in camelCase, and the comment that explains
+- Keep the Python test names as they are, without `test_`, so a test can be
+  found in the desktop repo by its name. Keep the comment that explains
   the case.
 - A test that drives a window is not ported here. In `test_seeking.py` and
   `test_edge_cases.py` take only the tests that call `ReaderSession` or a
   `core` function directly. Tests that drive `ReaderDisplay` describe the
   loop and belong to the engine tests in job 2.
-- `test_transcript_speaker_list.py` and `test_speaker_cues_wiring.py` may
-  use `TranscriptStore`. Port the parts that only need `speakers`, and list
-  the rest in the phase 3 spec when you find them.
+- A Python dict is compared as a plain object, and a random test uses a
+  small seeded generator, because Python's `random` cannot be repeated.
+- `test_transcript_speaker_list.py`: the store setter, loading `data.json`
+  and export and import are left for phase 3, see its spec.
 - If a ported test fails, the port is wrong or the test was misread. Do
   not change the port to pass without checking the Python.
 

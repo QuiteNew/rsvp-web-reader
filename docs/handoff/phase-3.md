@@ -92,6 +92,13 @@ The desktop tests that say how these behave: `test_transcript_store.py`,
 `test_transcript_list_current.py`, `test_sidebar_rows.py`,
 `test_normalizer.py`, `test_normalize_in_app.py`.
 
+## Desktop tests left over from phase 2
+
+`tests/test_transcript_speaker_list.py` has 19 tests that need the store or
+the storage format: "The store setter", "Loading data.json" and "Export and
+import". Port them with the store, next to the rules they check. Its
+cleaner tests are already in `src/core/speakers.desktop.test.ts`.
+
 ## Done when
 
 - The owner's desktop export loads in the web app with every transcript,
