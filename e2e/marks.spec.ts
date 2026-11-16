@@ -54,3 +54,27 @@ test('the horizontal lines are wide, and cross the ends of the marks', async ({ 
   // The tick is centred on the top end of the upper mark.
   expect(Math.abs(tick.y + tick.height / 2 - above.y)).toBeLessThan(1.5);
 });
+
+test('the surrounding words sit under the marks, with the middle word under the letter', async ({
+  page,
+}) => {
+  await startReading(page);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('Show the surrounding words').check();
+  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('button', { name: 'Pause' }).click();
+  const line = page.getByTestId('context');
+  await expect(line).toBeVisible();
+  const parts = line.locator('span');
+  const middle = await parts.nth(1).boundingBox();
+  const left = await parts.nth(0).boundingBox();
+  const right = await parts.nth(2).boundingBox();
+  const letter = await page.getByTestId('word').locator('span').nth(1).boundingBox();
+  if (!middle || !letter || !left || !right) throw new Error('something is not on the page');
+  // Below the word, and centred under its focus letter.
+  expect(middle.y).toBeGreaterThan(letter.y + letter.height);
+  expect(Math.abs(middle.x + middle.width / 2 - (letter.x + letter.width / 2))).toBeLessThan(1.5);
+  // The other words run away from it, on either side.
+  expect(left.x + left.width).toBeLessThanOrEqual(middle.x);
+  expect(right.x).toBeGreaterThanOrEqual(middle.x + middle.width);
+});

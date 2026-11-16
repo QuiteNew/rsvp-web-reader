@@ -6,6 +6,8 @@ import type { Library, Settings, Transcript } from '../core/models';
 import { pyRound } from '../core/pythonText';
 import { ReaderSession } from '../core/reader';
 import { transcriptToReopen } from '../core/reopen';
+import { blendColors } from '../core/colors';
+import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
 import {
   GUIDE_MARK_LENGTH_PERCENT_RANGE,
@@ -29,6 +31,18 @@ import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
+
+// The colour of the surrounding-words line: the font colour dimmed toward
+// the background. A transcript with a colour that cannot be blended (the
+// saved file was edited by hand) gets its plain font colour.
+function dimmed(transcript: Transcript | null): string {
+  if (transcript === null) return 'inherit';
+  try {
+    return blendColors(transcript.fontColor, transcript.backgroundColor, PERIPHERAL_CONTEXT_DIM);
+  } catch {
+    return transcript.fontColor;
+  }
+}
 
 // The speed slider's ends and its step, the desktop app's.
 const [WPM_MIN, WPM_MAX] = WPM_RANGE;
@@ -111,6 +125,12 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   // does this only when it starts. The page changes at once, so its reading
   // colours do too.
   const isDark = useTheme(preferences.appearanceMode);
+
+  // The surrounding-words line is built by the engine only when it is on.
+  const showContext = preferences.peripheralContextEnabled;
+  useEffect(() => {
+    engine.setPeripheralContext(showContext);
+  }, [engine, showContext]);
   const lightDefaults = {
     font: preferences.defaultFontColor,
     highlight: preferences.defaultHighlightColor,
@@ -393,6 +413,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 chunk={snapshot.chunk}
                 fontSize={selected?.fontSize ?? 40}
                 offsetPx={preferences.highlightOffsetPx}
+                context={snapshot.context}
+                contextColor={dimmed(selected)}
                 marks={{
                   visible: snapshot.status === 'playing',
                   horizontal: preferences.guideMarkHorizontalEnabled,
@@ -607,6 +629,20 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
             System follows your browser's own light or dark choice. Reading colours you picked by
             hand stay as they are.
+          </p>
+          <label className={dialogStyles.note}>
+            <input
+              type="checkbox"
+              checked={preferences.peripheralContextEnabled}
+              onChange={(event) => {
+                settings.set('peripheralContextEnabled', event.target.checked);
+              }}
+            />{' '}
+            Show the surrounding words
+          </label>
+          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
+            A dim line under the word with the word before it and the two after it, so the corner of
+            your eye keeps the thread.
           </p>
           <fieldset className={dialogStyles.group}>
             <legend>Guide marks</legend>

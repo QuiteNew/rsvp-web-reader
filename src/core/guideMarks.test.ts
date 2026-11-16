@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { guideMarkHorizontalLength, guideMarkLength } from './guideMarks';
+import { guideMarkHorizontalLength, guideMarkLength, peripheralContextSize } from './guideMarks';
 
 // The expected numbers were worked out by hand from the desktop's
 // _guide_mark_length() and _guide_mark_horizontal_length().
@@ -29,5 +29,15 @@ describe('guideMarkHorizontalLength', () => {
   test('is never under 20 px', () => {
     expect(guideMarkHorizontalLength(80)).toBe(20);
     expect(guideMarkHorizontalLength(0)).toBe(20);
+  });
+});
+
+describe('peripheralContextSize', () => {
+  test('is half the font size, rounded as Python does, and at least 8', () => {
+    expect(peripheralContextSize(40)).toBe(20);
+    expect(peripheralContextSize(33)).toBe(16); // 16.5
+    expect(peripheralContextSize(35)).toBe(18); // 17.5
+    expect(peripheralContextSize(16)).toBe(8);
+    expect(peripheralContextSize(10)).toBe(8);
   });
 });

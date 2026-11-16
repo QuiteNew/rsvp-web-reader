@@ -78,3 +78,31 @@
   top: calc(50% + var(--half) + 6px - var(--offset, 0px) + var(--mark-length));
   transform: translate(-50%, -50%);
 }
+
+/* The surrounding-words line, below the lowest point a guide mark reaches
+   (whether or not the marks are showing) and 8 px under it. The middle word
+   is centred under the focus letter, the others run away from it. */
+.context {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(50% + var(--half) + 6px - var(--offset, 0px) + var(--mark-length) + 8px);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  font-size: var(--context-size);
+  color: var(--context-color);
+  white-space: pre;
+  overflow-x: clip;
+  pointer-events: none;
+}
+
+.contextBefore {
+  padding-right: 10px;
+  text-align: right;
+}
+
+.contextAfter {
+  padding-left: 10px;
+  text-align: left;
+}

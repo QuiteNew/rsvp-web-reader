@@ -8,7 +8,7 @@
 // holds while the tab is hidden.
 
 import { pyRound, pyStrip } from '../core/pythonText';
-import { assembleChunkText, type ReaderSession } from '../core/reader';
+import { assembleChunkText, type PeripheralContext, type ReaderSession } from '../core/reader';
 import type { ChunkMode } from '../core/models';
 import type {
   BookmarkTarget,
@@ -38,6 +38,7 @@ const EMPTY_SNAPSHOT: ReaderSnapshot = {
   chunk: null,
   chunkBounds: null,
   speaker: null,
+  context: null,
   remainingMs: 0,
   percent: 0,
   wpm: 0,
@@ -67,6 +68,10 @@ export class ReaderLoop implements ReaderEngine {
   private activeMs = 0;
   // When the open stretch of reading time began, or null between them.
   private activeSince: number | null = null;
+
+  // The surrounding-words line: off, one word before and two after, as on
+  // the desktop. Kept across sessions.
+  private peripheral = { enabled: false, before: 1, after: 2 };
 
   private snapshot: ReaderSnapshot = EMPTY_SNAPSHOT;
 
@@ -208,6 +213,11 @@ export class ReaderLoop implements ReaderEngine {
     this.isPaused = true;
     session.seekTo(index);
     this.reportPosition();
+    this.changed();
+  }
+
+  setPeripheralContext(enabled: boolean, before = 1, after = 2): void {
+    this.peripheral = { enabled, before: Math.max(0, before), after: Math.max(0, after) };
     this.changed();
   }
 
@@ -382,6 +392,12 @@ export class ReaderLoop implements ReaderEngine {
     return this.isPaused ? 'paused' : 'playing';
   }
 
+  private buildContext(session: ReaderSession): PeripheralContext | null {
+    if (!this.peripheral.enabled) return null;
+    const context = session.chunkPeripheralContext(this.peripheral.before, this.peripheral.after);
+    return context.current === null ? null : context;
+  }
+
   private buildSnapshot(): ReaderSnapshot {
     const session = this.session;
     if (session === null) return EMPTY_SNAPSHOT;
@@ -395,6 +411,7 @@ export class ReaderLoop implements ReaderEngine {
       chunk: chunk === null ? null : assembleChunkText(chunk),
       chunkBounds: session.currentChunkBounds(),
       speaker: session.currentSpeaker,
+      context: this.buildContext(session),
       remainingMs: session.remainingMs(),
       percent: Math.max(0, Math.min(100, percent)),
       wpm: session.wpm,

@@ -11,7 +11,7 @@
 // reference for how the loop behaves.
 
 import type { ChunkMode } from '../core/models';
-import type { ChunkRange, ChunkText, ReaderSession } from '../core/reader';
+import type { ChunkRange, ChunkText, PeripheralContext, ReaderSession } from '../core/reader';
 
 // The engine never calls setTimeout or performance.now() itself. It gets
 // them through this, so a test can hand in a clock it moves by hand.
@@ -58,6 +58,11 @@ export interface ReaderSnapshot {
   // The speaker of the current word, when speaker cues are on and the
   // transcript has speakers. Otherwise null.
   readonly speaker: string | null;
+  // The words around the chunk, for the surrounding-words line: some before
+  // it, its first word, and some after it. Only built when the line is
+  // switched on (setPeripheralContext). null when it is off, when empty and
+  // when finished.
+  readonly context: PeripheralContext | null;
   // Estimated time left at the current speed, in milliseconds.
   readonly remainingMs: number;
   // How far through, 0 to 100, rounded the way Python rounds. 100 once
@@ -169,4 +174,8 @@ export interface ReaderEngine {
   setChunking(enabled: boolean, size: number, mode?: ChunkMode, charTarget?: number): void;
   setSpeakerCues(enabled: boolean, custom?: ReadonlyMap<string, string> | null): void;
   setBehaviour(behaviour: Partial<EngineBehaviour>): void;
+  // Turns the surrounding-words line on or off and says how many words go
+  // on each side. Counts below 0 are taken as 0. It works with no session
+  // loaded and is kept for the next one.
+  setPeripheralContext(enabled: boolean, before?: number, after?: number): void;
 }

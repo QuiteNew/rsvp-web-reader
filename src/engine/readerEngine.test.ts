@@ -130,6 +130,66 @@ describe('snapshots', () => {
   });
 });
 
+describe('the surrounding-words line', () => {
+  test('it is off until asked for, and the snapshot has none', () => {
+    const rig = loaded();
+    expect(rig.engine.getSnapshot().context).toBeNull();
+  });
+
+  test('on, it carries one word before and two after, as on the desktop', () => {
+    const rig = loaded();
+    rig.engine.setPeripheralContext(true);
+    rig.clock.advance(WORD_MS);
+    expect(rig.engine.getSnapshot().context).toEqual({
+      before: ['one'],
+      current: 'two',
+      after: ['three', 'four'],
+    });
+  });
+
+  test('the counts can be set, and a count below zero is zero', () => {
+    const rig = loaded();
+    rig.engine.setPeripheralContext(true, 2, -1);
+    rig.engine.jumpTo(2);
+    expect(rig.engine.getSnapshot().context).toEqual({
+      before: ['one', 'two'],
+      current: 'three',
+      after: [],
+    });
+  });
+
+  test('around a chunk it is the words before its first and after its last', () => {
+    const rig = makeRig();
+    rig.engine.load(new ReaderSession('a b c d e f g', { chunkEnabled: true, chunkSize: 2 }));
+    rig.engine.setPeripheralContext(true, 1, 2);
+    rig.engine.jumpTo(2);
+    expect(rig.engine.getSnapshot().context).toEqual({
+      before: ['b'],
+      current: 'c',
+      after: ['e', 'f'],
+    });
+  });
+
+  test('it can be set before a session is loaded and is kept for it', () => {
+    const rig = makeRig();
+    rig.engine.setPeripheralContext(true);
+    rig.engine.load(new ReaderSession(FIVE_WORDS, {}));
+    expect(rig.engine.getSnapshot().context?.current).toBe('one');
+  });
+
+  test('it is switched off again, and gone when finished', () => {
+    const rig = loaded();
+    rig.engine.setPeripheralContext(true);
+    expect(rig.engine.getSnapshot().context).not.toBeNull();
+    rig.engine.setPeripheralContext(false);
+    expect(rig.engine.getSnapshot().context).toBeNull();
+    rig.engine.setPeripheralContext(true);
+    rig.engine.jumpTo(5);
+    expect(rig.engine.getSnapshot().status).toBe('finished');
+    expect(rig.engine.getSnapshot().context).toBeNull();
+  });
+});
+
 describe('playing', () => {
   test('load shows the first word and starts playing', () => {
     const rig = loaded();

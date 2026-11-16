@@ -19,8 +19,8 @@ that uses them. One commit per step.
 | 2   | `settings_search` (36 lines), the same way                            | Done    |
 | 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done    |
 | 4   | Guide marks and the focus letter offset                               | Done    |
-| 5   | The surrounding-words line (a new snapshot field in the engine)       | Next    |
-| 6   | The scrubber, with bookmark ticks                                     | Waiting |
+| 5   | The surrounding-words line (a new snapshot field in the engine)       | Done    |
+| 6   | The scrubber, with bookmark ticks                                     | Next    |
 | 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting |
 | 8   | Chunking: per transcript, and the defaults for new ones               | Waiting |
 | 9   | Keyboard shortcuts                                                    | Waiting |
@@ -163,3 +163,30 @@ Committed together with step 3b.
   letter and are centred on it, go when paused, and the long ticks cross
   the mark ends. All 18 e2e tests passed three times in Chrome. Firefox
   and WebKit were not run here.
+
+## Step 5, the surrounding-words line, done on 2026-11-16
+
+- Engine: `ReaderSnapshot.context` (a `PeripheralContext` or null) and
+  `ReaderEngine.setPeripheralContext(enabled, before = 1, after = 2)`.
+  The words are built only when the line is on, from the session's
+  `chunkPeripheralContext`, which was ported in phase 2. The setting is kept
+  across sessions and can be set before one is loaded. 6 engine tests.
+- With chunking on, the line is about the whole chunk: words before its
+  first word, and after its last. The middle word is the chunk's first
+  word. That is how the desktop does it (`current` of
+  `chunk_peripheral_context`), so it is kept.
+- The page draws it under the lowest point a guide mark can reach, even
+  when the marks are hidden (paused), 8 px below that. Half the font size
+  (at least 8 px), the font colour dimmed 55 percent toward the
+  background with `blendColors`. 10 px between the middle word and each
+  side. The numbers are in `src/core/guideMarks.ts`. Same as the guide
+  marks: copied from `reader_display.py` by hand, no fixture.
+- Settings: "Show the surrounding words" (the setting
+  `peripheral_context_enabled` already existed). The counts 1 and 2 are
+  not settable, as on the desktop's Settings window (it passes only the
+  switch).
+- Hidden on a screen reader (`aria-hidden`): it repeats words that are
+  already in the text.
+- Tests: 5 App tests, 1 new browser test (below the word, middle word
+  under the focus letter, the others on either side). All 19 e2e tests
+  passed three times in Chrome only.

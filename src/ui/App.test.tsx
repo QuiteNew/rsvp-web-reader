@@ -5,6 +5,7 @@ import { afterEach, describe, expect, test, vi } from 'vitest';
 import { APP_VERSION } from '../core/appInfo';
 import { FakeClock, FakeVisibility } from '../testing/fakeClock';
 import { buildBundle, bundleText } from '../core/bundle';
+import { blendColors } from '../core/colors';
 import { EMPTY_LIBRARY, TRANSCRIPT_DEFAULTS, type Library } from '../core/models';
 import { DEFAULT_SAVED_SETTINGS } from '../core/settings';
 import { SavedLibraryStore } from '../store/libraryStore';
@@ -1195,5 +1196,65 @@ describe('the guide marks', () => {
       store.setFontSize(id, 64);
     });
     expect(screen.getByTestId('word').parentElement?.style.getPropertyValue('--size')).toBe('64px');
+  });
+});
+
+describe('the surrounding-words line', () => {
+  function startReading() {
+    renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+  }
+
+  function switchOn(): void {
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Show the surrounding words'));
+    press('Close');
+  }
+
+  test('it is off until switched on', () => {
+    startReading();
+    expect(screen.queryByTestId('context')).toBeNull();
+  });
+
+  test('on, it shows the word, and the words after it, and stays when paused', () => {
+    startReading();
+    switchOn();
+    const line = screen.getByTestId('context');
+    expect(Array.from(line.children).map((part) => part.textContent)).toEqual(['', 'a', 'b c']);
+    press('Pause');
+    expect(screen.getByTestId('context')).toBeInTheDocument();
+  });
+
+  test('it moves on with the word', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3 }));
+    startReading();
+    switchOn();
+    press('Pause');
+    press('Forward 3 words');
+    expect(word()).toBe('d');
+    const parts = Array.from(screen.getByTestId('context').children).map(
+      (part) => part.textContent,
+    );
+    expect(parts).toEqual(['c', 'd', 'e f']);
+  });
+
+  test('it is the font colour dimmed toward the background', () => {
+    startReading();
+    switchOn();
+    const display = screen.getByTestId('word').parentElement;
+    expect(display?.style.getPropertyValue('--context-color')).toBe(
+      blendColors('#3B2E27', '#F6EFE3', 0.55),
+    );
+  });
+
+  test('switching it off takes it away', () => {
+    startReading();
+    switchOn();
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Show the surrounding words'));
+    press('Close');
+    expect(screen.queryByTestId('context')).toBeNull();
   });
 });

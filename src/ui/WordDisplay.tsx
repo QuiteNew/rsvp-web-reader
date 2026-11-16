@@ -1,7 +1,7 @@
 import type { CSSProperties } from 'react';
 
-import type { ChunkText } from '../core/reader';
-import { guideMarkLength } from '../core/guideMarks';
+import type { ChunkText, PeripheralContext } from '../core/reader';
+import { guideMarkLength, peripheralContextSize } from '../core/guideMarks';
 import styles from './WordDisplay.module.css';
 
 export interface GuideMarks {
@@ -20,6 +20,9 @@ interface WordDisplayProps {
   // The focus letter only, moved up (positive) or down (negative), in px.
   readonly offsetPx: number;
   readonly marks: GuideMarks;
+  // The surrounding-words line and its dimmed colour. null shows none.
+  readonly context: PeripheralContext | null;
+  readonly contextColor: string;
 }
 
 // The flashing word. The focus letter sits in the middle column of a grid
@@ -34,7 +37,14 @@ interface WordDisplayProps {
 //
 // This is not a live region on purpose. A screen reader must not be made
 // to read words out one by one at reading speed.
-export function WordDisplay({ chunk, fontSize, offsetPx, marks }: WordDisplayProps) {
+export function WordDisplay({
+  chunk,
+  fontSize,
+  offsetPx,
+  marks,
+  context,
+  contextColor,
+}: WordDisplayProps) {
   const hasFocus = (chunk?.focus ?? '') !== '';
   const style = {
     '--size': `${fontSize}px`,
@@ -43,6 +53,8 @@ export function WordDisplay({ chunk, fontSize, offsetPx, marks }: WordDisplayPro
     '--mark-thickness': `${marks.thicknessPx}px`,
     '--mark-length': `${guideMarkLength(fontSize, marks.lengthPercent)}px`,
     '--mark-color': marks.color,
+    '--context-size': `${peripheralContextSize(fontSize)}px`,
+    '--context-color': contextColor,
   } as CSSProperties;
   return (
     <div className={styles.display} style={style}>
@@ -51,6 +63,13 @@ export function WordDisplay({ chunk, fontSize, offsetPx, marks }: WordDisplayPro
         <span className={styles.focus}>{chunk?.focus ?? ''}</span>
         <span className={styles.after}>{chunk?.after ?? ''}</span>
       </div>
+      {context?.current != null && (
+        <div className={styles.context} data-testid="context" aria-hidden="true">
+          <span className={styles.contextBefore}>{context.before.join(' ')}</span>
+          <span>{context.current}</span>
+          <span className={styles.contextAfter}>{context.after.join(' ')}</span>
+        </div>
+      )}
       {marks.visible && (
         <div className={styles.marks} data-testid="guide-marks" aria-hidden="true">
           <span className={`${styles.mark} ${styles.above}`} />
