@@ -66,6 +66,10 @@ points that came up in practice.
 - Ask for the desktop design notes when a feature's phase starts. They go
   in `reference/desktop-design/`. For `reader` the owner said: no notes,
   and where a note and the code disagree, the code wins.
+- The assistant's workspace has Google Chrome but cannot download
+  Playwright's browsers. To run the browser tests there, use a throwaway
+  config that sets `channel: 'chrome'`, and do not commit it. Firefox and
+  WebKit run on the owner's machine and in CI.
 - Say what was run and what was not. Look up current versions before
   adding a dependency, and pin them exactly in `package.json`.
 

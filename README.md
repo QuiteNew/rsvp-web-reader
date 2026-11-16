@@ -29,6 +29,15 @@ npm run dev       # start the dev server, then open the address it prints
 npm run check     # lint, formatting, types, tests and a production build
 ```
 
+The browser tests run the built site in Chromium, Firefox and WebKit. They
+are separate from `npm run check` because they need the browsers, which are
+a one-time download of a few hundred megabytes:
+
+```bash
+npx playwright install   # once, and again after Playwright is updated
+npm run e2e              # builds the site, then runs the browser tests
+```
+
 The single steps behind `npm run check`:
 
 | Command                | What it does                                 |

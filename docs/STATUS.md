@@ -8,16 +8,16 @@ handoff package is written.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                                                                    |
-| ----- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                 |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                         |
-| 2     | The reading session and a first screen | Built, waiting for the owner to try it and confirm. Still open inside it: the desktop tests for `speakers` and `reader`, and Playwright in the repository and CI. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
-| 3     | Saved data                             | Not started                                                                                                                                                                                                              |
-| 4     | The reading experience                 | Not started                                                                                                                                                                                                              |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                        |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                              |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                                                              |
+| Phase | What                                   | State                                                                                                                                                                           |
+| ----- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                        |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                |
+| 2     | The reading session and a first screen | Built, waiting for the owner to try it and confirm. Still open inside it: the desktop tests for `speakers` and `reader`. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
+| 3     | Saved data                             | Not started                                                                                                                                                                     |
+| 4     | The reading experience                 | Not started                                                                                                                                                                     |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                               |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                     |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                     |
 
 ## Phase 0: what was checked, and where
 
@@ -150,7 +150,6 @@ Still to do in phase 2:
   far. The fixtures already prove the behaviour, so this is the second line
   of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
   known to work.
-- Playwright in the repository and in CI.
 
 The full list, with the order and the checks, is in
 [handoff/phase-2-rest.md](handoff/phase-2-rest.md).
@@ -224,8 +223,8 @@ Checked:
   page asked for nothing from another address.
 
 Not checked: Firefox and Safari, a real phone, and the owner's own machine.
-That one-off Chrome run is not a test in the repository. Playwright there
-and in CI is still to do.
+That one-off Chrome run is not a test in the repository. The browser tests
+below are.
 
 Known gaps, all belonging to later phases:
 
@@ -236,6 +235,37 @@ Known gaps, all belonging to later phases:
   phase 7.
 - The focus letter colour is the desktop default, `#D98A3D` on `#F6EFE3`.
   Its contrast is low. Colours and themes are phase 4.
+
+## Phase 2: the browser tests
+
+Playwright 1.65.1 (`@playwright/test`, the newest on 2026-11-16), with
+`playwright.config.ts` and `e2e/smoke.spec.ts`. `npm run e2e` builds the
+site, serves it with `vite preview` under `/rsvp-web-reader/`, and runs five
+tests in Chromium, Firefox and WebKit:
+
+- The page loads under its base path.
+- Paste, start, the words advance, pause holds, play goes on.
+- Reading runs to the end, and Restart starts again.
+- The focus letter stays on one spot for a 1-letter, a 15-letter and a
+  3-letter word, and that spot is the middle of the row.
+- The site asks for nothing from another address.
+
+They run on the browser's real clock, so they also cover
+`src/engine/browserClock.ts`.
+
+What was run: all five pass in the assistant's workspace in the installed
+Google Chrome, 25 runs in a row with no failure. Breaking the grid of the
+word on purpose failed the focus letter test. **Firefox and WebKit were not
+run**, because the workspace cannot download Playwright's browsers. Their
+first run is the owner's `npm run e2e` or the CI job. Treat a failure there
+as news, not as a flaky test.
+
+CI has a second job, `e2e`, and the deploy now waits for both jobs. It
+installs the browsers on every run, which takes a minute or two. Caching
+them is possible later if it gets annoying.
+
+Not used: Playwright's clock control. The tests are short enough in real
+time, and real time is what they are there to check.
 
 ## The handoff package
 
