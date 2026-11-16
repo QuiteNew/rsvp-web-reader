@@ -14,6 +14,7 @@ import {
   DEFAULT_SAVED_SETTINGS,
   loadSavedSettings,
   replaceFromBundle,
+  resyncGuideMarkColorDefault,
   setGuideMarkColor,
   settingsView,
   withChanges,
@@ -86,6 +87,11 @@ export class SavedSettingsStore implements SettingsStore {
   /** A guide mark colour picked by hand. It stops following the theme. */
   setGuideMarkColor(color: string): void {
     this.become(setGuideMarkColor(this.settings, color));
+  }
+
+  /** Give the guide marks the theme's colour, if they still follow the theme. */
+  resyncGuideMarkColorDefault(color: string): void {
+    this.become(resyncGuideMarkColorDefault(this.settings, color));
   }
 
   /** An import in Replace mode: the file's settings in place of these. */

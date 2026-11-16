@@ -163,6 +163,8 @@ export interface SettingsStore {
   update(changes: Partial<Settings>): void;
   // A guide mark colour picked by hand. It stops following the theme.
   setGuideMarkColor(color: string): void;
+  // Gives the guide marks the theme's colour, unless a colour was picked by hand.
+  resyncGuideMarkColorDefault(color: string): void;
   // Used by a bundle import in Replace mode. Takes the "settings" part of
   // the file as it is. Profiles already here are kept when the file has none.
   replaceFromBundle(settings: SavedSettings): void;

@@ -1,5 +1,7 @@
 /* Page-wide basics: the fonts and the colours of the desktop app's light
-   theme (LIGHT_PALETTE in its gui/theme.py). Dark comes later. */
+   theme (LIGHT_PALETTE in its gui/theme.py). The dark block further down
+   has the colours of its DARK_PALETTE. A test checks both against
+   src/core/theme.ts. */
 
 /* The same two fonts the desktop app ships, both under the SIL Open Font
    License. Their licence texts are next to them in ./fonts. */
@@ -32,6 +34,7 @@
   --card: #f8f1e6;
   --card-current: #f3dfc6;
   --text-box: #fafafa;
+  --on-blue: #fff;
 
   --font-heading: 'Fredoka', system-ui, sans-serif;
   --font-body: 'Quicksand', system-ui, sans-serif;
@@ -42,6 +45,30 @@
   line-height: 1.5;
   color: var(--ink);
   background: var(--paper);
+}
+
+/* The dark theme: the page sets data-theme="dark" on the html element, for
+   Dark, or for System when the browser prefers dark. The names on the left
+   are the palette's: paper is hearth_paper, ink is cocoa_ink, and so on. The
+   last six are not in the desktop's palette, they are made from it. */
+:root[data-theme='dark'] {
+  --paper: #1d1712;
+  --ink: #f2e8dc;
+  --taupe: #2e2419;
+  --mocha: #4a3826;
+  --ember: #a8672e;
+  --ember-hover: #bf7a3b;
+  --line: #7a6248;
+  --blue: #7c93a3;
+  --blue-hover: #6b7f8c;
+  --on-blue: #1d1712;
+  --pill: #4a3826;
+  --pill-hover: #5a4631;
+  --card: #261e16;
+  --card-current: #3a2a1a;
+  --text-box: #241d17;
+
+  color-scheme: dark;
 }
 
 html,

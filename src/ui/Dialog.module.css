@@ -5,7 +5,7 @@
   display: grid;
   place-items: center;
   padding: 1rem;
-  background: rgb(59 46 39 / 35%);
+  background: rgb(0 0 0 / 45%);
 }
 
 .window {
@@ -143,4 +143,19 @@
 .quiet {
   font-size: 0.9rem;
   opacity: 0.8;
+}
+
+/* A group of settings with a title, and a row with a slider in it. */
+.group {
+  margin: 0.75rem 0;
+  padding: 0.25rem 0.75rem 0.5rem;
+  border: 2px solid var(--line);
+  border-radius: 0.6rem;
+}
+
+.rangeRow {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr) 3rem;
+  align-items: center;
+  gap: 0.5rem;
 }

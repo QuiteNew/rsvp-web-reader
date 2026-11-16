@@ -13,20 +13,20 @@ behaviour being right and tested, not at the final look.
 The pure parts come first, each proven against the desktop, then the UI
 that uses them. One commit per step.
 
-| #   | What                                                                  | State                 |
-| --- | --------------------------------------------------------------------- | --------------------- |
-| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done                  |
-| 2   | `settings_search` (36 lines), the same way                            | Done                  |
-| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Part 3a done, 3b next |
-| 4   | Guide marks and the focus letter offset                               | Waiting               |
-| 5   | The surrounding-words line (a new snapshot field in the engine)       | Waiting               |
-| 6   | The scrubber, with bookmark ticks                                     | Waiting               |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting               |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Waiting               |
-| 9   | Keyboard shortcuts                                                    | Waiting               |
-| 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting               |
-| 11  | The settings view for all of it, with search and reset                | Waiting               |
-| 12  | The Normalize button (left over from phase 3)                         | Waiting               |
+| #   | What                                                                  | State   |
+| --- | --------------------------------------------------------------------- | ------- |
+| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done    |
+| 2   | `settings_search` (36 lines), the same way                            | Done    |
+| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done    |
+| 4   | Guide marks and the focus letter offset                               | Done    |
+| 5   | The surrounding-words line (a new snapshot field in the engine)       | Next    |
+| 6   | The scrubber, with bookmark ticks                                     | Waiting |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Waiting |
+| 9   | Keyboard shortcuts                                                    | Waiting |
+| 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
+| 11  | The settings view for all of it, with search and reset                | Waiting |
+| 12  | The Normalize button (left over from phase 3)                         | Waiting |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -99,25 +99,67 @@ Found on the way, and fixed in this commit:
   launch"). `resyncDefaultReadingColors` and `resyncGuideMarkColorDefault`
   already exist from phase 3.
 
-### Part 3b, still to do (page work, with browser tests)
+### Part 3b, the page, done on 2026-11-16
 
-- Put the palette on the page as CSS custom properties, chosen by a
-  `data-theme` attribute on `<html>`. The current CSS has the light
-  colours written in `src/ui/*.css`; move each to a variable named after
-  the palette key (`--hearth-paper` and so on).
-- An Appearance choice in Settings (Light, Dark, System) writing
-  `appearance_mode` through the settings store. System follows
-  `matchMedia('(prefers-color-scheme: dark)')`, and should follow a
-  change while the page is open.
-- At page start, and when the theme changes: call
-  `resyncDefaultReadingColors` on the library and
-  `resyncGuideMarkColorDefault` on the settings, with the theme's colours.
-  New transcripts take `themeReadingColors` instead of the plain Defaults.
-  Open question for the owner: the desktop does this only at launch. On
-  the web a live switch is natural, because the chrome changes at once, and
-  the reading colours would otherwise lag until a reload.
-- Avoid a flash of the wrong theme: set `data-theme` from the saved
-  setting before React renders (a small script in `index.html` reading
-  localStorage), without breaking the CSP if there is one.
-- Tests: App tests for the Appearance choice; one e2e that picks Dark,
-  reloads and sees it kept.
+- `src/ui/global.css`: the light colours stay in `:root`, the dark ones
+  are in `:root[data-theme='dark']`. `src/ui/themeStyles.test.tsx` checks
+  the seven variables that are palette colours against `src/core/theme.ts`
+  (changing one made it fail). The other variables (blue, pill, card,
+  card-current, text-box, on-blue) are not in the desktop palette. The
+  dark values for them are my own, made from it. Polish them with the
+  rest of the front end.
+- `src/ui/useTheme.ts`: puts `data-theme` on `<html>`, follows the
+  browser for System, also while the page is open.
+- `index.html` has a small script that sets `data-theme` from the saved
+  setting before the page is drawn, so a dark page does not flash light.
+  It repeats the three-line rule of `isDarkTheme`, because it cannot
+  import it. There is no Content-Security-Policy yet. When one is added in
+  phase 7, this inline script needs a hash or has to move.
+- Settings has an Appearance choice (Light, Dark, System).
+- Decision taken, owner can reverse it: the colours that follow the theme
+  are resynced live, when the theme or the Defaults change, not only at
+  start as the desktop does. The reading colours of a transcript, and the
+  guide marks, follow at once.
+- The reading stage now uses the transcript's own font, highlight and
+  background colours (set as `--reading-*` on the stage). Before this the
+  stored colours were not shown at all. The font size is still not used
+  by the page. That belongs to step 4 or the reading view work.
+- Existing App tests that compare the whole library had to start from
+  transcripts already holding the Light colours, because the resync at
+  start rightly gives the Defaults to a transcript that follows them (the
+  model's own default font colour is white).
+- Tests: 7 App tests, 2 style tests, 4 browser tests (`e2e/theme.spec.ts`).
+  The browser tests ran in Chrome only, three full runs of all 15, with
+  the system Chrome. Firefox and WebKit not run here.
+
+## Step 4, guide marks and the focus letter offset, done on 2026-11-16
+
+Committed together with step 3b.
+
+- `src/core/guideMarks.ts`: the constants and the two length rules of
+  `reader_display.py` (`guideMarkLength`, `guideMarkHorizontalLength`).
+  That file draws with tkinter and cannot be run here, so there is **no
+  fixture**. The numbers in `guideMarks.test.ts` were worked out by hand
+  from the code. Python's half-to-even `round()` is used.
+- `src/ui/WordDisplay.tsx` and `.module.css` draw the marks: two vertical
+  bars above and below the focus letter, 6 px clear of its edge, and
+  optionally two 2 px ticks across their outer ends (row width less 34 px
+  each side, at least 20 px). Shown only while the status is `playing`.
+  The focus letter alone moves up (positive) or down by the offset, and
+  the marks follow it, as in the desktop.
+- Settings has a "Guide marks" group: horizontal lines, thickness (2 to
+  6), length (15 to 60 percent), focus letter height (-3 to 3) and the
+  colour. A picked colour stops following the theme (`setGuideMarkColor`).
+  This group is a stop-gap. Step 11 builds the real settings view.
+- The word is now shown at the transcript's own font size in px (it was a
+  fixed clamp). The line height is 1.2, so that the half height of the
+  focus letter is 0.6 em. The desktop uses the real height of its label,
+  so the gap may differ by a pixel or two. Judge it by eye and say.
+- Not done, on purpose: the desktop hides the marks while the flash is
+  panned off centre. Panning is the "fit wide flashes" work of step 10.
+- A very large font on a narrow screen can overflow the row (cut off at
+  the sides). Step 10.
+- Browser tests (`e2e/marks.spec.ts`): the marks sit above and below the
+  letter and are centred on it, go when paused, and the long ticks cross
+  the mark ends. All 18 e2e tests passed three times in Chrome. Firefox
+  and WebKit were not run here.

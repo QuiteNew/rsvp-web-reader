@@ -463,6 +463,14 @@ describe('under React strict mode', () => {
   });
 });
 
+// The colours the page gives a transcript that follows the theme, in Light.
+// A library already holding them is left as it is when the page opens.
+const LIGHT_READING = {
+  fontColor: '#3B2E27',
+  highlightColor: '#D98A3D',
+  backgroundColor: '#F6EFE3',
+};
+
 const SAVED: Library = {
   nextId: 3,
   currentSpaceIndex: 0,
@@ -470,13 +478,21 @@ const SAVED: Library = {
   transcripts: [
     {
       ...TRANSCRIPT_DEFAULTS,
+      ...LIGHT_READING,
       id: 1,
       title: 'Kept',
       space: 'General',
       rawText: 'one two three',
       isStopped: true,
     },
-    { ...TRANSCRIPT_DEFAULTS, id: 2, title: 'At work', space: 'Work', isStopped: true },
+    {
+      ...TRANSCRIPT_DEFAULTS,
+      ...LIGHT_READING,
+      id: 2,
+      title: 'At work',
+      space: 'Work',
+      isStopped: true,
+    },
   ],
 };
 
@@ -997,5 +1013,187 @@ describe('coming back after a reload', () => {
       clock.advance(5 * WORD_MS);
     });
     expect(word()).toBe('four');
+  });
+});
+
+describe('the theme', () => {
+  const DARK = { font: '#F2E8DC', highlight: '#A8672E', background: '#241D17' };
+
+  afterEach(() => {
+    delete document.documentElement.dataset.theme;
+    vi.unstubAllGlobals();
+  });
+
+  function pickAppearance(value: string): void {
+    press('Settings');
+    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value } });
+  }
+
+  function render_(library: Library = EMPTY_LIBRARY) {
+    const store = SavedLibraryStore.ready(new MemoryPersistence<Library>(), library);
+    const settings = savedSettings();
+    render(<App store={store} settings={settings} />);
+    return { store, settings };
+  }
+
+  test('it starts light', () => {
+    render_();
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  test('choosing Dark puts the dark theme on the page and saves the choice', () => {
+    const { settings } = render_();
+    pickAppearance('dark');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    expect(settings.saved().appearance_mode).toBe('dark');
+    expect(window.localStorage.getItem(SETTINGS_KEY)).toContain('"appearance_mode":"dark"');
+  });
+
+  test('System follows the browser, and a change of it while the page is open', () => {
+    let listener: () => void = () => undefined;
+    let dark = true;
+    vi.stubGlobal('matchMedia', () => ({
+      get matches() {
+        return dark;
+      },
+      addEventListener: (_type: string, fn: () => void) => {
+        listener = fn;
+      },
+      removeEventListener: () => undefined,
+    }));
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ appearance_mode: 'system' }));
+    render_();
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    dark = false;
+    act(() => {
+      listener();
+    });
+    expect(document.documentElement.dataset.theme).toBe('light');
+  });
+
+  test('reading colours that follow the theme follow a change to Dark, and back', () => {
+    const { store } = render_({
+      ...EMPTY_LIBRARY,
+      nextId: 2,
+      transcripts: [{ ...TRANSCRIPT_DEFAULTS, id: 1, title: 'follows', space: 'General' }],
+    });
+    pickAppearance('dark');
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      fontColor: DARK.font,
+      highlightColor: DARK.highlight,
+      backgroundColor: DARK.background,
+    });
+    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } });
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      ...LIGHT_READING,
+    });
+  });
+
+  test('a colour picked by hand stays the same in both themes', () => {
+    const { store } = render_({
+      ...EMPTY_LIBRARY,
+      nextId: 2,
+      transcripts: [
+        {
+          ...TRANSCRIPT_DEFAULTS,
+          id: 1,
+          title: 'picked',
+          space: 'General',
+          fontColor: '#ABCDEF',
+          fontColorIsDefault: false,
+        },
+      ],
+    });
+    pickAppearance('dark');
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      fontColor: '#ABCDEF',
+      highlightColor: DARK.highlight,
+    });
+  });
+
+  test('a new transcript gets the dark reading colours in Dark', () => {
+    const { store } = render_();
+    pickAppearance('dark');
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    addTranscript('Night');
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      fontColor: DARK.font,
+      highlightColor: DARK.highlight,
+      backgroundColor: DARK.background,
+    });
+  });
+
+  test('the guide marks follow the theme until a colour is picked by hand', () => {
+    const { settings } = render_();
+    pickAppearance('dark');
+    expect(settings.saved().guide_mark_color).toBe('#F2E8DC');
+    settings.setGuideMarkColor('#112233');
+    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } });
+    expect(settings.saved().guide_mark_color).toBe('#112233');
+  });
+});
+
+describe('the guide marks', () => {
+  function startReading() {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    return page;
+  }
+
+  function setSlider(name: RegExp, value: number): void {
+    press('Settings');
+    fireEvent.change(screen.getByRole('slider', { name }), { target: { value: String(value) } });
+    press('Close');
+  }
+
+  test('they show while words go by and are gone when paused', () => {
+    startReading();
+    expect(screen.getByTestId('guide-marks')).toBeInTheDocument();
+    press('Pause');
+    expect(screen.queryByTestId('guide-marks')).toBeNull();
+    press('Play');
+    expect(screen.getByTestId('guide-marks')).toBeInTheDocument();
+  });
+
+  test('the horizontal lines come with the setting', () => {
+    startReading();
+    expect(screen.getByTestId('guide-marks').children).toHaveLength(2);
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Show the horizontal lines too'));
+    press('Close');
+    expect(screen.getByTestId('guide-marks').children).toHaveLength(4);
+  });
+
+  test('thickness, length and the focus letter height reach the page', () => {
+    startReading();
+    setSlider(/Mark thickness/, 5);
+    setSlider(/Mark length/, 60);
+    setSlider(/Focus letter height/, -2);
+    const display = screen.getByTestId('word').parentElement;
+    expect(display?.style.getPropertyValue('--mark-thickness')).toBe('5px');
+    // the default 32 px font at 60 percent, 19.2 rounded
+    expect(display?.style.getPropertyValue('--mark-length')).toBe('19px');
+    expect(display?.style.getPropertyValue('--offset')).toBe('-2px');
+  });
+
+  test('the colour follows the theme until one is picked, then stays', () => {
+    startReading();
+    const display = () => screen.getByTestId('word').parentElement;
+    expect(display()?.style.getPropertyValue('--mark-color')).toBe('#3B2E27');
+    press('Settings');
+    fireEvent.change(screen.getByLabelText('Mark colour'), { target: { value: '#112233' } });
+    press('Close');
+    expect(display()?.style.getPropertyValue('--mark-color')).toBe('#112233');
+  });
+
+  test('the word is shown at the font size of the transcript', () => {
+    const { store } = startReading();
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.setFontSize(id, 64);
+    });
+    expect(screen.getByTestId('word').parentElement?.style.getPropertyValue('--size')).toBe('64px');
   });
 });

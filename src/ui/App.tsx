@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
 
 import { APP_NAME, APP_VERSION, REPO_URL } from '../core/appInfo';
 import { currentSpace, findTranscript } from '../core/library';
@@ -6,7 +6,13 @@ import type { Library, Settings, Transcript } from '../core/models';
 import { pyRound } from '../core/pythonText';
 import { ReaderSession } from '../core/reader';
 import { transcriptToReopen } from '../core/reopen';
-import { WPM_RANGE } from '../core/settings';
+import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
+import {
+  GUIDE_MARK_LENGTH_PERCENT_RANGE,
+  GUIDE_MARK_THICKNESS_RANGE,
+  HIGHLIGHT_OFFSET_RANGE,
+  WPM_RANGE,
+} from '../core/settings';
 import { formatDuration } from '../core/timing';
 import { WPM_KEY_STEP } from '../core/wpmStep';
 import type { StorageHealth } from '../store/contract';
@@ -17,9 +23,11 @@ import { DataSettings } from './DataSettings';
 import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
+import { RangeSetting } from './RangeSetting';
 import { Sidebar } from './Sidebar';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
+import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
 
 // The speed slider's ends and its step, the desktop app's.
@@ -95,6 +103,31 @@ export function App({ store, settings, health, ...parts }: AppProps) {
 
   const [engine, snapshot] = useReaderEngine(parts);
   const skipWords = preferences.skipWordCount;
+
+  // Light, Dark or System, put on the page. The colours that follow the theme
+  // (a transcript's reading colours that were not picked by hand, and the
+  // guide marks) are given the theme's colours once the saved library is
+  // there, and again whenever the theme or the Defaults change. The desktop
+  // does this only when it starts. The page changes at once, so its reading
+  // colours do too.
+  const isDark = useTheme(preferences.appearanceMode);
+  const lightDefaults = {
+    font: preferences.defaultFontColor,
+    highlight: preferences.defaultHighlightColor,
+    background: preferences.defaultBackgroundColor,
+  };
+  const {
+    font: themeFont,
+    highlight: themeHighlight,
+    background: themeBackground,
+  } = themeReadingColors(isDark, lightDefaults);
+  useEffect(() => {
+    if (!ready) return;
+    store.resyncDefaultReadingColors(themeFont, themeHighlight, themeBackground);
+  }, [store, ready, themeFont, themeHighlight, themeBackground]);
+  useEffect(() => {
+    settings.resyncGuideMarkColorDefault(themeGuideMarkColor(isDark));
+  }, [settings, isDark]);
   const isReading = snapshot.status !== 'empty';
 
   // Remember where the open transcript is being read, word by word, so
@@ -344,8 +377,30 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 <RestartIcon />
               </button>
             </div>
-            <div className={styles.stage}>
-              <WordDisplay chunk={snapshot.chunk} />
+            <div
+              className={styles.stage}
+              style={
+                selected === null
+                  ? undefined
+                  : ({
+                      '--reading-font': selected.fontColor,
+                      '--reading-highlight': selected.highlightColor,
+                      '--reading-background': selected.backgroundColor,
+                    } as CSSProperties)
+              }
+            >
+              <WordDisplay
+                chunk={snapshot.chunk}
+                fontSize={selected?.fontSize ?? 40}
+                offsetPx={preferences.highlightOffsetPx}
+                marks={{
+                  visible: snapshot.status === 'playing',
+                  horizontal: preferences.guideMarkHorizontalEnabled,
+                  thicknessPx: preferences.guideMarkThicknessPx,
+                  lengthPercent: preferences.guideMarkLengthPercent,
+                  color: preferences.guideMarkColor,
+                }}
+              />
               {snapshot.status === 'finished' && <p className={styles.end}>End of the text.</p>}
             </div>
           </div>
@@ -449,9 +504,9 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               title,
               space,
               wpm: preferences.defaultWpm,
-              fontColor: preferences.defaultFontColor,
-              highlightColor: preferences.defaultHighlightColor,
-              backgroundColor: preferences.defaultBackgroundColor,
+              fontColor: themeFont,
+              highlightColor: themeHighlight,
+              backgroundColor: themeBackground,
               fontSize: preferences.defaultFontSize,
               chunkingEnabled: preferences.defaultChunkingEnabled,
               chunkSize: preferences.defaultChunkSize,
@@ -536,6 +591,74 @@ export function App({ store, settings, health, ...parts }: AppProps) {
             It comes back at the same word and paused, so nothing starts playing on its own. Turn
             this off to start with no transcript open.
           </p>
+          <label className={dialogStyles.note}>
+            Appearance{' '}
+            <select
+              value={preferences.appearanceMode}
+              onChange={(event) => {
+                settings.set('appearanceMode', event.target.value as Settings['appearanceMode']);
+              }}
+            >
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+              <option value="system">System</option>
+            </select>
+          </label>
+          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
+            System follows your browser's own light or dark choice. Reading colours you picked by
+            hand stay as they are.
+          </p>
+          <fieldset className={dialogStyles.group}>
+            <legend>Guide marks</legend>
+            <label className={dialogStyles.note}>
+              <input
+                type="checkbox"
+                checked={preferences.guideMarkHorizontalEnabled}
+                onChange={(event) => {
+                  settings.set('guideMarkHorizontalEnabled', event.target.checked);
+                }}
+              />{' '}
+              Show the horizontal lines too
+            </label>
+            <RangeSetting
+              label="Mark thickness"
+              range={GUIDE_MARK_THICKNESS_RANGE}
+              value={preferences.guideMarkThicknessPx}
+              onChange={(value) => {
+                settings.set('guideMarkThicknessPx', value);
+              }}
+            />
+            <RangeSetting
+              label="Mark length"
+              range={GUIDE_MARK_LENGTH_PERCENT_RANGE}
+              value={preferences.guideMarkLengthPercent}
+              unit="%"
+              onChange={(value) => {
+                settings.set('guideMarkLengthPercent', value);
+              }}
+            />
+            <RangeSetting
+              label="Focus letter height"
+              range={HIGHLIGHT_OFFSET_RANGE}
+              value={preferences.highlightOffsetPx}
+              onChange={(value) => {
+                settings.set('highlightOffsetPx', value);
+              }}
+            />
+            <label className={dialogStyles.note}>
+              Mark colour{' '}
+              <input
+                type="color"
+                value={preferences.guideMarkColor}
+                onChange={(event) => {
+                  settings.setGuideMarkColor(event.target.value.toUpperCase());
+                }}
+              />
+            </label>
+            <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
+              The marks show only while words go by. A colour you pick stays in both themes.
+            </p>
+          </fieldset>
           <DataSettings
             library={library}
             store={store}

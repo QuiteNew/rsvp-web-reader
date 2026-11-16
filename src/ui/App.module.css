@@ -229,6 +229,10 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
+  /* The transcript's own reading colours, set on the element. */
+  background: var(--reading-background, transparent);
+  color: var(--reading-font, inherit);
+  border-radius: 0.5rem;
 }
 
 .end {
@@ -272,7 +276,7 @@
   background: var(--blue);
   border: 0;
   border-radius: 0.4rem;
-  color: #fff;
+  color: var(--on-blue);
 }
 
 .start:hover:enabled {

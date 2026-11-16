@@ -8,6 +8,25 @@
       content="A speed-reading page that flashes text one word at a time. Everything stays in your browser."
     />
     <title>RSVP Web Reader</title>
+    <script>
+      // Sets the theme before the page is drawn, so a dark page does not
+      // flash light first. The same rule as isDarkTheme() in src/core/theme.ts:
+      // "dark" is dark, "system" follows the browser, anything else is light.
+      // The page's own code sets it again once it runs.
+      (function () {
+        var mode = 'light';
+        try {
+          var saved = JSON.parse(localStorage.getItem('rsvp-web-reader.settings') || '{}');
+          if (saved && typeof saved.appearance_mode === 'string') mode = saved.appearance_mode;
+        } catch (error) {
+          // Nothing saved, or not readable: light.
+        }
+        var dark =
+          mode === 'dark' ||
+          (mode === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

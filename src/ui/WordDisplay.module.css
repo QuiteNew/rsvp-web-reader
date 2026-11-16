@@ -1,3 +1,11 @@
+/* The display is as tall as the word's line, so its middle is the middle of
+   the focus letter, and the guide marks are placed from there. */
+.display {
+  position: relative;
+  font-size: var(--size, 2.5rem);
+  line-height: 1.2;
+}
+
 /* The outer columns share what is left equally (1fr each, and minmax(0, ...)
    so a long word cannot push its own column wider than the other). That is
    what keeps the focus letter still. */
@@ -5,12 +13,11 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: baseline;
-  min-height: 1.5em;
-  font-size: clamp(1.25rem, 5vw, 2.5rem);
-  line-height: 1.5;
+  min-height: 1.2em;
   /* Keep the spaces inside a chunk of several words. */
   white-space: pre;
-  overflow: hidden;
+  /* Cut off sideways only, so a letter moved up or down is not cut. */
+  overflow-x: clip;
 }
 
 .before {
@@ -18,9 +25,56 @@
 }
 
 .focus {
-  color: var(--ember);
+  color: var(--reading-highlight, var(--ember));
+  /* A move of the focus letter alone: up when the offset is positive. */
+  transform: translateY(calc(var(--offset, 0px) * -1));
 }
 
 .after {
   text-align: left;
+}
+
+.marks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* The near end of a mark is 6 px from the letter's edge, and follows the
+   letter when it is moved. */
+.mark {
+  position: absolute;
+  left: 50%;
+  width: var(--mark-thickness);
+  height: var(--mark-length);
+  background: var(--mark-color);
+  transform: translateX(-50%);
+}
+
+.above {
+  bottom: calc(50% + var(--half) + 6px + var(--offset, 0px));
+}
+
+.below {
+  top: calc(50% + var(--half) + 6px - var(--offset, 0px));
+}
+
+/* The ticks across the outer ends of the marks: 2 px thick, the width of
+   the row less 34 px each side, at least 20 px. */
+.tick {
+  position: absolute;
+  left: 50%;
+  width: max(20px, calc(100% - 68px));
+  height: 2px;
+  background: var(--mark-color);
+  transform: translate(-50%, 50%);
+}
+
+.tickAbove {
+  bottom: calc(50% + var(--half) + 6px + var(--offset, 0px) + var(--mark-length));
+}
+
+.tickBelow {
+  top: calc(50% + var(--half) + 6px - var(--offset, 0px) + var(--mark-length));
+  transform: translate(-50%, -50%);
 }
