@@ -110,9 +110,16 @@ export function App({ store, health, ...parts }: AppProps) {
   // always of the selected transcript, so that is whose position moves.
   const readingId = isReading ? (selected?.id ?? null) : null;
   const readingIndex = snapshot.index;
+  const isPlaying = snapshot.status === 'playing';
   useEffect(() => {
-    if (readingId !== null) store.setPosition(readingId, readingIndex);
-  }, [store, readingId, readingIndex]);
+    if (readingId === null) return;
+    store.setPosition(readingId, readingIndex);
+    // While words go by, the store saves at most once a second. When the
+    // reader is not playing, the position moved because the person moved it
+    // (a skip, a drag) or because they just paused. Write that at once, so a
+    // reload right after cannot lose it.
+    if (!isPlaying) void store.flush();
+  }, [store, readingId, readingIndex, isPlaying]);
 
   useEffect(() => {
     void store.load();

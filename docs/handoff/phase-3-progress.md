@@ -212,3 +212,17 @@ Where the web differs from the desktop here:
 - Leaving a transcript (a new Space, a switch of Space) forgets it as the
   last one. The desktop keeps a transcript open across a switch of Space.
 - After an import nothing is open, whatever the file's settings say.
+
+Saving the place when the reader is not playing:
+
+- While words go by, the position is saved at most once a second, as the
+  desktop does. When the reader is not playing, a position change is a
+  skip, a drag or a pause, so `App.tsx` calls `flush()` and it is written
+  at once. Without that, a skip made within a second of the last write and
+  a reload right after lost the skip (found in the browser tests: about 1
+  run in 10 in Chrome).
+- The browser tests no longer assume where a pause lands. Restart leaves
+  the reader playing, so they pause first and read the word back.
+- `e2e/smoke.spec.ts` has the same kind of timing race. Under 6 parallel
+  Chrome runs, about 1 in 25 runs fails (with or without the change
+  above). Not fixed yet, to be done in its own commit.

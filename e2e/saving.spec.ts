@@ -19,20 +19,29 @@ async function addTranscript(page: Page, title: string, text: string): Promise<v
   await page.getByLabel('Transcript text').fill(text);
 }
 
-test('transcripts, Spaces and the place in the text survive a reload', async ({ page }) => {
-  await page.goto('./');
-  await addTranscript(
-    page,
-    'Kept',
-    'one two three four five six seven eight nine ten eleven twelve',
-  );
-  // Start, pause, and step ten words on, so the place is known exactly.
-  // The reader is left open and paused on that word.
+// Forty words that tell their own place: w0, w1, w2 and so on.
+const FORTY_WORDS = Array.from({ length: 40 }, (_, index) => `w${index}`).join(' ');
+
+// Start reading, pause, and step ten words on. Returns the word the reader
+// is paused on. Where the pause lands is not fixed, because it depends on
+// how fast the browser clicks, so the word is read back instead of assumed.
+// (Restart is no help here: it always leaves the reader playing.)
+async function pauseTenWordsOn(page: Page): Promise<string> {
   await page.getByRole('button', { name: 'Start reading' }).click();
   await page.getByRole('button', { name: 'Pause' }).click();
-  await page.getByRole('button', { name: 'Restart' }).click();
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  const shown = ((await page.getByTestId('word').textContent()) ?? '').trim();
+  const expected = `w${Number(shown.slice(1)) + 10}`;
   await page.getByRole('button', { name: 'Forward 10 words' }).click();
-  await expect(page.getByTestId('word')).toHaveText('eleven');
+  await expect(page.getByTestId('word')).toHaveText(expected);
+  return expected;
+}
+
+test('transcripts, Spaces and the place in the text survive a reload', async ({ page }) => {
+  await page.goto('./');
+  await addTranscript(page, 'Kept', FORTY_WORDS);
+  // The reader is left open and paused on a known word.
+  const place = await pauseTenWordsOn(page);
 
   await page.getByRole('button', { name: 'New Space' }).click();
   await page.getByLabel('Space name').fill('Work');
@@ -48,11 +57,11 @@ test('transcripts, Spaces and the place in the text survive a reload', async ({ 
   // It was left in the reader, so it opens in the reader, paused on the
   // same word. Nothing is playing, so there is no timing to race.
   await card(page, 'Kept').click();
-  await expect(page.getByTestId('word')).toHaveText('eleven');
+  await expect(page.getByTestId('word')).toHaveText(place);
   await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
   // Its text is saved too.
   await page.getByRole('button', { name: 'Stop reading' }).click();
-  await expect(page.getByLabel('Transcript text')).toHaveValue(/^one two three/);
+  await expect(page.getByLabel('Transcript text')).toHaveValue(/^w0 w1 w2/);
 });
 
 test('a save that cannot be read is put aside and the app starts empty', async ({ page }) => {
@@ -139,23 +148,15 @@ test('an export file brings everything back after it is deleted', async ({ page 
 
 test('a reload comes back to the word being read, paused', async ({ page }) => {
   await page.goto('./');
-  await addTranscript(
-    page,
-    'Lecture',
-    'one two three four five six seven eight nine ten eleven twelve',
-  );
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await page.getByRole('button', { name: 'Pause' }).click();
-  await page.getByRole('button', { name: 'Restart' }).click();
-  await page.getByRole('button', { name: 'Forward 10 words' }).click();
-  await expect(page.getByTestId('word')).toHaveText('eleven');
+  await addTranscript(page, 'Lecture', FORTY_WORDS);
+  const place = await pauseTenWordsOn(page);
 
   await page.reload();
 
   // No click needed: the reader is open on the same word, and it is paused.
-  await expect(page.getByTestId('word')).toHaveText('eleven');
+  await expect(page.getByTestId('word')).toHaveText(place);
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Lecture');
   await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
   await page.waitForTimeout(600);
-  await expect(page.getByTestId('word')).toHaveText('eleven');
+  await expect(page.getByTestId('word')).toHaveText(place);
 });

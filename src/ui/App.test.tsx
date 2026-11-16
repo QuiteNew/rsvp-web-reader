@@ -513,6 +513,22 @@ describe('saving', () => {
     expect(persistence.writes.at(-1)?.transcripts[0]?.position).toBe(1);
   });
 
+  test('a step made while paused is written at once, not held back', async () => {
+    const { persistence, clock } = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h i j k l m n o');
+    press('Start reading');
+    act(() => {
+      clock.advance(WORD_MS); // the first word has had its time: written
+    });
+    press('Pause');
+    press('Forward 10 words'); // less than a second after that write
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(persistence.writes.at(-1)?.transcripts[0]?.position).toBe(11);
+  });
+
   test('hiding the page writes what was waiting', async () => {
     const { store, persistence } = renderPage(SAVED);
     store.setPosition(1, 1);
