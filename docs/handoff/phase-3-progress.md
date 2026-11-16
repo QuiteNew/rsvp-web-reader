@@ -22,7 +22,7 @@ picked up by whoever comes next without guessing. The spec is
 | 2   | `storageFormat`: the port of `parse_data` and the write side          | Done   |
 | 3   | `bundle`: reading and writing an export file, the five messages       | Done   |
 | 4   | `library`: every `TranscriptStore` method as a pure function          | Done   |
-| 5   | `settings`: defaults, ranges, clamping, `_known_settings`             | Partly |
+| 5   | `settings`: defaults, ranges, reading, Replace, then the store        | Partly |
 | 6   | The store over a `Persistence`, with one in memory for tests          | Done   |
 | 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Done   |
 | 8   | The UI on the real store, export and import in Settings               | Done   |
@@ -167,24 +167,57 @@ Where the web differs from the desktop, on purpose:
   `rsvp-web-reader.settings.damaged`, not in IndexedDB as the spec said.
 
 Step 5 so far: `src/store/savedSettings.ts` keeps the settings of an
-imported file as they came and gives them back on export, so a desktop
-export loses nothing on a round trip. Nothing reads them as settings yet.
-Left for step 5: port `core/settings_store.py` (defaults, ranges, clamping,
-`_known_settings`, the profiles rule in Replace), build the `SettingsStore`
-of the contract, and move `WPM_RANGE` there.
+imported file as they are, so an export loses nothing on a round trip.
 
-Not checked yet:
+## Step 5a, the settings rules, done on 2026-11-16
 
-- Firefox and WebKit. The browser tests ran in Chrome only in the
-  workspace. The owner's machine and CI run all three.
-- A web export opened in the real desktop app.
-- Two tabs open at once. The last one to save wins.
+- `src/core/settings.ts`, with the fixture `settings.json` (171 cases)
+  made from the desktop's `SettingsStore` in a temporary folder.
+- The settings stay in the desktop's own shape, one object with
+  snake_case names (`SavedSettings`), so an export made here is the one
+  the desktop would make. `DEFAULT_SAVED_SETTINGS` has every desktop
+  setting but `data_directory`, window sizes included, in the desktop's
+  order.
+- `loadSavedSettings` is `_read_settings_file`: not an object is damaged,
+  unknown keys are dropped, missing ones get the default, and a missing
+  `guide_mark_color_is_default` is worked out from the colour.
+- `replaceFromBundle` is `replace_from_bundle`, with the profiles rule.
+- `setGuideMarkColor`, `restoreGuideMarkColor`,
+  `resyncGuideMarkColorDefault`: the three setters that have a rule.
+- `settingsView` gives the page its `Settings`. `withChanges` takes
+  changes from the page and cleans them before they are saved.
+- `WPM_RANGE` moved here from `wpmStep.ts`.
 
-Desktop tests still to port, now that there is a store: `test_storage.py`,
-`test_models.py`, `test_damaged_files.py`, `test_data_bundle.py`, the store
-parts of `test_transcript_speaker_list.py` (19) and `test_chunking.py`
-(25), and the settings halves of `test_transcript_sort.py`,
-`test_reopen_last_transcript.py` and `test_wpm_keys.py` with step 5.
+Found on the way:
+
+- The desktop setters do not clamp. Its Settings window checks the ranges
+  before it calls them, and the store saves what it is given. The spec
+  and the contract said the setters clamp. Both are corrected.
+- The desktop checks only ten settings when it reads them (the speaker
+  cue ones, bold starts, reopen, the last id, the sort). The rest are
+  read as they are, so `"default_wpm": "fast"` in a file reaches its
+  window as text.
+
+Where the web differs from the desktop here, on purpose:
+
+- What is saved is not cleaned, as on the desktop. What the page reads
+  (`settingsView`) always is: the wrong kind of value reads as the
+  default, a number outside its range as the nearest end. For the ten
+  settings the desktop checks, the view is tested against its getters.
+- Profiles: a value that is not a list reads as no profiles, as on the
+  desktop. The entries of a list are not checked yet. The desktop's
+  `clean_profile_list` comes with phase 6. Until then a damaged entry is
+  carried along, not dropped.
+- JSON in the browser cannot tell `3.0` from `3`. The desktop reads
+  `"last_transcript_id": 3.0` as no transcript, the web as transcript 3.
+
+Step 5b, next: the `SettingsStore` of the contract in `src/store` over
+`localStorage`, using these rules for load, change and Replace. Move
+`savedSettings.ts` onto it (`App.tsx` and `DataSettings.tsx` use it now),
+put damaged settings text aside as now, and add the switch for
+`reopen_last_transcript` to Settings. Then the desktop's own tests:
+`test_settings_store*.py` and the settings halves of the sort, reopen
+and wpm tests.
 
 ## Coming back where you left off, done on 2026-11-16
 

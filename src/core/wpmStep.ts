@@ -1,12 +1,6 @@
 // Changing the reading speed one step at a time, for the Up and Down arrow
 // keys. Ported from core/wpm_step.py of the desktop app.
-
-/**
- * The slowest and fastest speed Settings allows, in words per minute.
- * WPM_RANGE in the desktop's core/settings_store.py. It lives here until
- * the settings are ported, then it moves there.
- */
-export const WPM_RANGE: readonly [low: number, high: number] = [100, 1000];
+import { WPM_RANGE } from './settings';
 
 export const WPM_KEY_STEP = 10;
 

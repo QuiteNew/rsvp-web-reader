@@ -12,7 +12,8 @@ import {
   sortTranscripts,
   type Sortable,
 } from './transcriptSort';
-import { WPM_KEY_STEP, WPM_RANGE, stepWpm } from './wpmStep';
+import { WPM_RANGE } from './settings';
+import { WPM_KEY_STEP, stepWpm } from './wpmStep';
 
 type SortRow = [id: number, title: string, timesRead: number, seconds: number];
 

@@ -141,8 +141,9 @@ export interface LibraryStore {
   mergeAll(library: Library): void;
 }
 
-// The app-wide settings. A value outside its range is pulled back into it,
-// the way the desktop setters do.
+// The app-wide settings. A value outside its range is pulled back into it
+// before it is saved. On the desktop the Settings window does that, not the
+// store. Here it is withChanges() in src/core/settings.ts.
 export interface SettingsStore {
   subscribe(listener: () => void): () => void;
   getSnapshot(): Settings;

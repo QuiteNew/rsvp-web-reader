@@ -25,16 +25,16 @@ only keeps the current value, saves it and loads it. See the top of
 
 ### Core, each with fixtures and its ported tests
 
-| New file                 | From                       | Notes                                                                                                      |
-| ------------------------ | -------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `core/library.ts`        | `core/transcript_store.py` | Every method as a function from a `Library` to a new `Library`. Scenario fixtures, like `reader`.          |
-| `core/storageFormat.ts`  | `core/storage.py`          | `parse_data` and the write side. The only place that knows the snake_case names.                           |
-| `core/bundle.ts`         | `core/data_bundle.py`      | `BUNDLE_FORMAT_VERSION` is 1. The four error messages are shown to the person, so keep them word for word. |
-| `core/settings.ts`       | `core/settings_store.py`   | The defaults, the ranges, the clamping in each setter, `_known_settings`, `_whole_number_or_none`.         |
-| `core/reopen.ts`         | `core/reopen.py`           | 18 lines.                                                                                                  |
-| `core/transcriptSort.ts` | `core/transcript_sort.py`  | Six sort orders. Check how it compares titles, Python and JavaScript sort strings differently.             |
-| `core/wpmStep.ts`        | `core/wpm_step.py`         | 22 lines.                                                                                                  |
-| `core/normalizer.ts`     | `core/normalizer.py`       | 446 lines of regular expressions, 96 tests. The biggest port left. Give it its own commit.                 |
+| New file                 | From                       | Notes                                                                                                                                                  |
+| ------------------------ | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `core/library.ts`        | `core/transcript_store.py` | Every method as a function from a `Library` to a new `Library`. Scenario fixtures, like `reader`.                                                      |
+| `core/storageFormat.ts`  | `core/storage.py`          | `parse_data` and the write side. The only place that knows the snake_case names.                                                                       |
+| `core/bundle.ts`         | `core/data_bundle.py`      | `BUNDLE_FORMAT_VERSION` is 1. The four error messages are shown to the person, so keep them word for word.                                             |
+| `core/settings.ts`       | `core/settings_store.py`   | The defaults, the ranges, `_known_settings`, what each setting reads as, the Replace rule. The desktop setters do not clamp, its Settings window does. |
+| `core/reopen.ts`         | `core/reopen.py`           | 18 lines.                                                                                                                                              |
+| `core/transcriptSort.ts` | `core/transcript_sort.py`  | Six sort orders. Check how it compares titles, Python and JavaScript sort strings differently.                                                         |
+| `core/wpmStep.ts`        | `core/wpm_step.py`         | 22 lines.                                                                                                                                              |
+| `core/normalizer.ts`     | `core/normalizer.py`       | 446 lines of regular expressions, 96 tests. The biggest port left. Give it its own commit.                                                             |
 
 Things in `parse_data` that are easy to miss:
 

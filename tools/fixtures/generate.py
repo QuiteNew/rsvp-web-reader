@@ -1171,6 +1171,154 @@ def build_library(core):
     }
 
 
+def build_settings(core):
+    import tempfile
+    import core.settings_store as settings_store
+    from core.settings_store import SettingsStore
+
+    # What the web app reads as settings: every field but the ones that
+    # only mean something for a desktop window or a folder on a disk.
+    desktop_only = {
+        "window_width", "window_height", "window_x", "window_y", "window_maximized",
+        "sidebar_width", "bottom_band_height", "freeform_resize_enabled", "data_directory",
+    }
+
+    def store_from(folder, text):
+        # The store reads and writes settings.json in its folder. It gets a
+        # temporary one, far from the desktop repository and the real data.
+        if text is not None:
+            (Path(folder) / "settings.json").write_text(text, encoding="utf-8")
+        return SettingsStore(settings_directory=folder)
+
+    def view(store):
+        names = [f for f in store.export_settings() if f not in desktop_only]
+        return {name: getattr(store, name) if name != "profiles" else store.export_settings()["profiles"]
+                for name in names}
+
+    def defaults():
+        with tempfile.TemporaryDirectory() as folder:
+            return store_from(folder, None).export_settings()
+
+    def load(text):
+        with tempfile.TemporaryDirectory() as folder:
+            store = store_from(folder, text)
+            if store.damaged_file is not None:
+                return None
+            return {"saved": store.export_settings(), "view": view(store)}
+
+    def load_saved_only(text):
+        with tempfile.TemporaryDirectory() as folder:
+            store = store_from(folder, text)
+            return None if store.damaged_file is not None else store.export_settings()
+
+    def replace_from_bundle(current_text, incoming):
+        with tempfile.TemporaryDirectory() as folder:
+            store = store_from(folder, current_text)
+            store.replace_from_bundle(json.loads(json.dumps(incoming)))
+            return store.export_settings()
+
+    def guide_mark(current_text, method, arguments):
+        with tempfile.TemporaryDirectory() as folder:
+            store = store_from(folder, current_text)
+            getattr(store, method)(*arguments)
+            return store.export_settings()
+
+    constants = [[[name], list(getattr(settings_store, name))] for name in (
+        "WPM_RANGE", "SKIP_WORD_COUNT_RANGE", "FONT_SIZE_RANGE", "FONT_SIZE_STEP_RANGE",
+        "HIGHLIGHT_OFFSET_RANGE", "GUIDE_MARK_THICKNESS_RANGE", "GUIDE_MARK_LENGTH_PERCENT_RANGE",
+        "RESUME_REWIND_WORDS_RANGE", "CHUNK_SIZE_RANGE", "CHUNK_CHAR_TARGET_RANGE",
+        "LETTER_SPACING_LEVEL_RANGE", "SPEAKER_CUE_SOUNDS", "SPEAKER_CUE_TAG_POSITIONS",
+    )]
+    constants.append([["CHIME_STYLES"], list(settings_store.CHIME_STYLES)])
+
+    def text(**values):
+        return json.dumps(values)
+
+    profile = {"name": "Fast", "values": {"default_wpm": 450}}
+    custom = text(
+        default_wpm=420, default_font_size=40, skip_word_count=5, pause_on_skip=True,
+        appearance_mode="dark", guide_mark_color="#112233", guide_mark_color_is_default=False,
+        transcript_sort="newest", last_transcript_id=7, reopen_last_transcript=False,
+        speaker_cue_sound="per_speaker", speaker_cue_style="glass", profiles=[profile],
+        window_width=1200, window_x=40, window_maximized=True,
+    )
+
+    load_texts = [
+        "{}", json.dumps(defaults()), custom,
+        # The flag that came later is worked out from the colour.
+        text(guide_mark_color="#112233"), text(guide_mark_color="#3B2E27"),
+        text(guide_mark_color="#3B2E27", guide_mark_color_is_default=False),
+        text(guide_mark_color="#112233", guide_mark_color_is_default=True),
+        # Keys this version does not know are dropped, the rest stays.
+        text(header_height=80, default_wpm=350), text(a_setting_from_the_future=[1, 2], pause_on_skip=True),
+        text(data_directory="D:/somewhere", default_wpm=350),
+        # Profiles: anything that is not a list is no profiles.
+        text(profiles=None), text(profiles="x"), text(profiles={}), text(profiles=[]),
+        text(profiles=[profile]), text(profiles=[profile], something_unknown=1),
+        # Not settings at all.
+        "[]", "null", "5", '"text"', "true", "{", "", "not json", '{"default_wpm": }',
+    ]
+    # The settings the desktop checks when it reads them.
+    for name, values in (
+        ("bold_starts_enabled", [True, False, "false", "true", 1, 0, None]),
+        ("speaker_cues_enabled", [True, False, "yes", 1, None]),
+        ("speaker_cue_sound", ["off", "change", "per_speaker", "loud", "", 5, None, True]),
+        ("speaker_cue_style", ["bell", "soft", "glass", "wood", "gong", 2, None]),
+        ("speaker_cue_name_tag_enabled", [True, False, 0, None, "false"]),
+        ("speaker_cue_tag_position", ["above", "top_right", "left", 1, None]),
+        ("speaker_cue_flash_enabled", [True, False, 0, None, "no"]),
+        ("reopen_last_transcript", [True, False, 0, None, "false"]),
+        ("last_transcript_id", [None, 0, 7, -1, "3", True, False, 2.5]),
+        ("transcript_sort", ["title_az", "title_za", "newest", "oldest", "most_read", "most_time",
+                             "bogus", "", 5, None]),
+    ):
+        load_texts += [text(**{name: value}) for value in values]
+
+    # Values the desktop keeps as they are, whatever they are. Only what is
+    # saved is recorded for these, because the web cleans what it shows.
+    odd_texts = [
+        text(default_wpm="fast"), text(default_wpm=5000), text(default_wpm=-1), text(default_wpm=None),
+        text(default_font_color=5), text(default_font_color="red"), text(appearance_mode="purple"),
+        text(default_chunk_mode="weird"), text(letter_spacing_level=99), text(skip_word_count=0),
+        text(pause_on_skip="yes"), text(scrub_pause_enabled=0), text(highlight_offset_px=10),
+        text(guide_mark_thickness_px=1), text(resume_rewind_words="3"),
+    ]
+
+    bundles = [
+        {}, defaults(), json.loads(custom),
+        {"default_wpm": 500}, {"default_wpm": 500, "from_a_newer_version": True},
+        {"data_directory": "E:/other", "pause_on_skip": True},
+        {"profiles": []}, {"profiles": [{"name": "Slow", "values": {"default_wpm": 200}}]},
+        {"profiles": "junk"}, {"profiles": None},
+        {"guide_mark_color": "#445566"}, {"default_wpm": "fast", "skip_word_count": 999},
+    ]
+    replaces = [call(replace_from_bundle, current, incoming)
+                for current in (None, custom) for incoming in bundles]
+
+    following = text(guide_mark_color="#3B2E27", guide_mark_color_is_default=True)
+    picked = text(guide_mark_color="#112233", guide_mark_color_is_default=False)
+    guide_marks = []
+    for current in (None, following, picked):
+        for method, arguments in (
+            ("set_guide_mark_color", ["#3B2E27"]), ("set_guide_mark_color", ["#112233"]),
+            ("set_guide_mark_color", ["#ABCDEF"]),
+            ("restore_guide_mark_color", ["#ABCDEF", True]), ("restore_guide_mark_color", ["#ABCDEF", False]),
+            ("restore_guide_mark_color", ["#112233", True]),
+            ("resync_guide_mark_color_default", ["#F2E9DC"]), ("resync_guide_mark_color_default", ["#3B2E27"]),
+            ("resync_guide_mark_color_default", ["#112233"]),
+        ):
+            guide_marks.append(call(guide_mark, current, method, arguments))
+
+    return {
+        "constants": constants,
+        "defaults": [call(defaults)],
+        "load": [call(load, t) for t in load_texts],
+        "load_saved_only": [call(load_saved_only, t) for t in odd_texts],
+        "replace_from_bundle": replaces,
+        "guide_mark": guide_marks,
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1225,6 +1373,7 @@ MODULES = {
     "storage": build_storage,
     "bundle": build_bundle,
     "library": build_library,
+    "settings": build_settings,
 }
 
 

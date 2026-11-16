@@ -133,8 +133,8 @@ export const EMPTY_LIBRARY: Library = {
 // the ones that only mean something for a desktop window (its size and
 // place, the sidebar and band sizes, free resizing and the data folder).
 //
-// This is the shape only. The default values and the allowed ranges come
-// in phase 3, from settings_store.py, with fixtures.
+// This is the shape only. The default values and the allowed ranges are
+// in settings.ts, from settings_store.py, with fixtures.
 export interface Settings {
   // What a new transcript starts with.
   readonly defaultWpm: number;
