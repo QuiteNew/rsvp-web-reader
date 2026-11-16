@@ -29,8 +29,9 @@ picked up by whoever comes next without guessing. The spec is
 | 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Done  |
 
 Saving works end to end as of step 8, the settings are real settings as
-of step 5, and the normalizer is ported as of step 9. What is left of
-phase 3 is the desktop tests listed at the end of this file.
+of step 5, the normalizer is ported as of step 9, and the desktop's store
+tests are replayed. Phase 3 is ready for the owner to look over and
+confirm. What is still open is listed at the end of this file.
 
 ## Step 1, done on 2026-11-16
 
@@ -286,6 +287,58 @@ Not done here:
 - The patterns use lookbehind, which Safari has from 16.4. The parser
   already relied on that.
 
+## The desktop's own store tests, done on 2026-11-16
+
+They are replayed, not translated by hand, the same way as the
+normalizer's. `tools/fixtures/generate.py` runs twelve desktop test files
+with pytest as they are and writes down, for each test that passes, what
+it asks of the code that has a port here. The fixture is
+`desktop_tests.json` and the replay is `src/core/storeTests.desktop.test.ts`.
+Every case starts with the name of the Python test it came from.
+
+What is recorded, and what replays it:
+
+| Desktop call                               | Cases | Replayed with                       |
+| ------------------------------------------ | ----- | ----------------------------------- |
+| a `TranscriptStore` method that changes it | 164   | the rule in `library.ts`            |
+| `parse_data`                               | 60    | `parseData`                         |
+| `save_state` (the file it wrote)           | 119   | `toSavedData`                       |
+| `parse_bundle`                             | 22    | `parseBundle`                       |
+| `build_bundle`                             | 15    | `buildBundle`                       |
+| `SettingsStore()` on a `settings.json`     | 112   | `loadSavedSettings`, `settingsView` |
+| `replace_from_bundle`                      | 18    | `replaceFromBundle`                 |
+| the three guide mark setters               | 8     | the three rules in `settings.ts`    |
+
+A store step is replayed on its own: the library before it, the call, and
+the library and the answer after it. So a test that edits a file or the
+store's insides between two calls is still followed.
+
+The numbers, so nobody reads more into this than is there:
+
+- 620 tests are in the twelve files. 611 pass on the fixture machine. The
+  other 9 are in `test_damaged_files.py` and open the desktop window.
+- 334 of the 611 make at least one recorded call. Those are the ones the
+  replay stands for.
+- The other 277 pass on the desktop without touching anything recorded.
+  They test things that have no port to compare with:
+  - one setter per setting (`set_window_size`, `set_defaults` and so on).
+    The web has one `withChanges`, with its own tests.
+  - getters on a fresh store, which the settings fixture covers as
+    defaults.
+  - the chunking of `core/reader.py` and the speaker cleaner, both ported
+    in phase 2 with their own tests.
+  - copying a damaged file aside on a disk. The web's copy is in
+    IndexedDB and has a browser test.
+  - reading profiles. 5 more calls were left out because they hold
+    profiles the desktop cleans. Both wait for phase 6.
+- `tests/test_models.py` is ported by hand in `models.desktop.test.ts`
+  (4 of its 8 tests; the other 4 check what the compiler checks here).
+
+Not run at all, because they import tkinter: `test_transcript_sort.py`,
+`test_reopen_last_transcript.py`, `test_wpm_keys.py`. Their rule halves
+(`sort_transcripts`, `transcript_to_reopen`, `step_wpm`) were ported by
+hand in step 1. Their window halves belong to the UI phases.
+
 ## Coming back where you left off, done on 2026-11-16
 
 Asked for by the owner after trying the saving, and it is what the desktop
@@ -303,7 +356,7 @@ does (`_reopen_last_transcript` in `gui/app.py`, `core/reopen.py`):
 - The same holds when a transcript is picked in the list: one that was
   left in the reader opens in the reader, paused.
 - `reopen_last_transcript: false` in the saved settings switches it off.
-  There is no switch for it on the page yet. That comes with step 5.
+  Settings has the switch for it since step 5b.
 
 Where the web differs from the desktop here:
 
@@ -328,3 +381,21 @@ Saving the place when the reader is not playing:
   word while reading is going. They pause first, or ask only that the word
   changes, and the Restart test lets the page write down the words it
   shows. The text is 300 words longer so a pause never lands at the end.
+
+## Still open at the end of phase 3
+
+For the owner:
+
+- Phase 3 was confirmed on 2026-11-16. Phase 4 is tracked in
+  [phase-4-progress.md](phase-4-progress.md).
+- Try a web export in the real desktop app, and a desktop export here.
+- Decide whether the page should read settings cleaned, as it does now,
+  or raw like the desktop (see step 5a).
+
+For later phases:
+
+- The Normalize button and the controls for the other settings, with the
+  UI that uses them.
+- Profiles: `clean_profile_list` and the profile tests, phase 6.
+- Two tabs open at once: the last save wins. Not handled.
+- The window halves of the sort, reopen and wpm-key tests.

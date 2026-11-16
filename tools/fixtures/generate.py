@@ -1507,6 +1507,400 @@ def build_normalizer(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 3: the desktop's own tests for the stores, run as they are.
+# ---------------------------------------------------------------------------
+
+DESKTOP_STORE_TESTS = [
+    "test_transcript_store.py", "test_storage.py", "test_damaged_files.py", "test_data_bundle.py",
+    "test_transcript_speaker_list.py", "test_chunking.py", "test_models.py",
+    "test_settings_store.py", "test_settings_store_bold_starts.py", "test_settings_store_dyslexia.py",
+    "test_settings_store_speaker_cues.py", "test_settings_store_profiles.py",
+]
+
+# The TranscriptStore methods that change the library. Each has a pure
+# function in src/core/library.ts.
+RECORDED_STORE_METHODS = [
+    "add_space", "switch_to_space", "rename_space", "delete_space", "add_transcript", "delete_transcript",
+    "set_transcript_title", "set_transcript_space", "set_transcript_text", "set_transcript_draft_text",
+    "set_transcript_position", "set_transcript_wpm", "set_transcript_paused", "set_transcript_stopped",
+    "set_transcript_font_size", "set_transcript_font_color", "set_transcript_highlight_color",
+    "set_transcript_background_color", "resync_default_reading_colors", "set_transcript_normalization",
+    "set_transcript_chunking", "set_transcript_speakers", "add_bookmark", "remove_bookmark",
+    "set_bookmark_label", "add_session_stats", "replace_all", "merge_all",
+]
+
+# The settings the desktop checks when it reads them.
+CHECKED_SETTINGS = [
+    "bold_starts_enabled", "speaker_cues_enabled", "speaker_cue_sound", "speaker_cue_style",
+    "speaker_cue_name_tag_enabled", "speaker_cue_tag_position", "speaker_cue_flash_enabled",
+    "reopen_last_transcript", "last_transcript_id", "transcript_sort",
+]
+
+
+def build_desktop_tests(core):
+    """Runs the desktop's store and settings tests with pytest, as they are,
+    and writes down what they ask of the code that has a port: every change
+    to a TranscriptStore, every parse_data and save_state, every bundle read
+    or built, and every SettingsStore load, Replace and guide mark change.
+    Only tests that pass are kept. The web tests replay each call."""
+    import copy
+    import inspect
+    import pytest
+    from dataclasses import asdict, is_dataclass
+    import core.data_bundle as data_bundle
+    import core.settings_store as settings_store
+    import core.storage as storage
+    from core.profiles import clean_profile_list
+    from core.settings_store import SettingsStore
+    from core.transcript_store import TranscriptStore
+
+    desktop = Path(storage.__file__).resolve().parents[1]
+
+    class NotRecordable(Exception):
+        pass
+
+    def plain(value):
+        """The value as JSON can hold it, or NotRecordable."""
+        if is_dataclass(value) and not isinstance(value, type):
+            value = asdict(value)
+        if isinstance(value, dict):
+            if not all(isinstance(key, str) for key in value):
+                raise NotRecordable
+            return {key: plain(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [plain(item) for item in value]
+        if value is None or isinstance(value, (bool, int, str)):
+            return value
+        if isinstance(value, float) and value == value and abs(value) != float("inf"):
+            return value
+        raise NotRecordable
+
+    def with_now(state):
+        """A bookmark is stamped with the time it was made. The port is
+        handed the text "NOW", so every stamp is recorded as that."""
+        for transcript in state.get("transcripts", []) if isinstance(state, dict) else []:
+            if isinstance(transcript, dict):
+                for bookmark in transcript.get("bookmarks") or []:
+                    if isinstance(bookmark, dict) and "created_at" in bookmark:
+                        bookmark["created_at"] = "NOW"
+        return state
+
+    def clean_profiles(holder):
+        """Whether the profiles in these settings are ones the desktop keeps
+        as they are. Checking each profile is not ported yet (phase 6)."""
+        if not isinstance(holder, dict) or not isinstance(holder.get("profiles"), list):
+            return True
+        return clean_profile_list(copy.deepcopy(holder["profiles"])) == holder["profiles"]
+
+    events = {name: [] for name in (
+        "store_step", "parse_data", "save_state", "parse_bundle", "build_bundle",
+        "settings_load", "settings_replace", "settings_guide_mark",
+    )}
+    left_out = {"not JSON": 0, "profiles to check": 0}
+    now = {"test": None, "events": [], "busy": False}
+
+    def record(kind, arguments, result):
+        now["events"].append((kind, arguments, result))
+
+    def recording():
+        return now["test"] is not None and not now["busy"]
+
+    def watch_store(name):
+        real = getattr(TranscriptStore, name)
+        signature = inspect.signature(real)
+
+        def run(self, *arguments, **named):
+            if not recording():
+                return real(self, *arguments, **named)
+            ready = None
+            try:
+                bound = signature.bind(self, *arguments, **named)
+                bound.apply_defaults()
+                given = plain(copy.deepcopy(list(bound.arguments.values())[1:]))
+                if name in ("replace_all", "merge_all"):
+                    given = [with_now(given[0])]
+                ready = (with_now(plain(self.export_state())), given)
+            except NotRecordable:
+                left_out["not JSON"] += 1
+            now["busy"] = True
+            try:
+                answer = real(self, *arguments, **named)
+            finally:
+                now["busy"] = False
+            if ready is not None:
+                answer = plain(answer)
+                if name == "add_transcript":
+                    answer = with_now({"transcripts": [answer]})["transcripts"][0]
+                record("store_step", [ready[0], name, ready[1]], [answer, with_now(plain(self.export_state()))])
+            return answer if name != "add_transcript" else self._find_transcript(answer["id"])
+        return run
+
+    real_parse_data = storage.parse_data
+
+    def parse_data(data):
+        given = None
+        if now["test"] is not None:
+            try:
+                given = [plain(copy.deepcopy(data))]
+            except NotRecordable:
+                left_out["not JSON"] += 1
+        result = real_parse_data(data)
+        if given is not None:
+            record("parse_data", given, None if result is None else plain(result))
+        return result
+
+    real_save_state = storage.save_state
+
+    def save_state(directory, *arguments, **named):
+        real_save_state(directory, *arguments, **named)
+        if now["test"] is not None:
+            written = json.loads((Path(directory) / "data.json").read_text(encoding="utf-8"))
+            record("save_state", [written], written)
+
+    real_parse_bundle = data_bundle.parse_bundle
+
+    def parse_bundle(json_text):
+        try:
+            bundle = real_parse_bundle(json_text)
+        except data_bundle.BundleFormatError as error:
+            if now["test"] is not None and isinstance(json_text, str):
+                record("parse_bundle", [json_text], ["error", str(error)])
+            raise
+        if now["test"] is not None and isinstance(json_text, str):
+            record("parse_bundle", [json_text], ["ok", plain(bundle["data"]), plain(bundle["settings"])])
+        return bundle
+
+    real_build_bundle = data_bundle.build_bundle
+
+    def build_bundle(transcript_store, settings_store_):
+        bundle = real_build_bundle(transcript_store, settings_store_)
+        if now["test"] is not None:
+            record(
+                "build_bundle",
+                [plain(transcript_store.export_state()), plain(settings_store_.export_settings())],
+                plain(bundle),
+            )
+        return bundle
+
+    real_settings_init = SettingsStore.__init__
+
+    def settings_init(self, settings_directory=None):
+        text = None
+        known = settings_directory is not None and now["test"] is not None
+        if known:
+            file = Path(settings_directory) / "settings.json"
+            if file.exists():
+                try:
+                    text = file.read_bytes().decode("utf-8")
+                    text.encode("utf-8")
+                except UnicodeError:
+                    known = False
+        real_settings_init(self, settings_directory)
+        if not known or text is None:
+            return
+        try:
+            parsed = json.loads(text)
+        except ValueError:
+            parsed = None
+        if not clean_profiles(parsed):
+            left_out["profiles to check"] += 1
+            return
+        if self.damaged_file is not None:
+            record("settings_load", [text], None)
+            return
+        try:
+            saved = plain(self.export_settings())
+            view = plain({name: getattr(self, name) for name in CHECKED_SETTINGS})
+        except NotRecordable:
+            left_out["not JSON"] += 1
+            return
+        record("settings_load", [text], {"saved": saved, "view": view})
+
+    def watch_settings(name, kind):
+        real = getattr(SettingsStore, name)
+
+        def run(self, *arguments):
+            if now["test"] is None:
+                return real(self, *arguments)
+            try:
+                before = plain(self.export_settings())
+                given = plain(copy.deepcopy(list(arguments)))
+            except NotRecordable:
+                left_out["not JSON"] += 1
+                return real(self, *arguments)
+            answer = real(self, *arguments)
+            if not (clean_profiles(before) and all(clean_profiles(item) for item in given)):
+                left_out["profiles to check"] += 1
+                return answer
+            try:
+                after = plain(self.export_settings())
+            except NotRecordable:
+                left_out["not JSON"] += 1
+                return answer
+            if kind == "settings_replace":
+                record(kind, [before, given[0]], after)
+            else:
+                record(kind, [before, name, given], after)
+            return answer
+        return run
+
+    originals = []
+
+    def swap(owner, name, replacement):
+        originals.append((owner, name, getattr(owner, name)))
+        setattr(owner, name, replacement)
+
+    # A bookmark is stamped with the time it is made, and those stamps end
+    # up in saved files and bundles. The clock stands still while the tests
+    # run, so the fixture comes out the same on every run.
+    import datetime as datetime_module
+    import core.transcript_store as transcript_store_module
+
+    class StoppedClock(datetime_module.datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return cls(2026, 1, 1, 12, 0, 0, tzinfo=tz)
+
+    swap(transcript_store_module, "datetime", StoppedClock)
+    for name in RECORDED_STORE_METHODS:
+        swap(TranscriptStore, name, watch_store(name))
+    swap(storage, "parse_data", parse_data)
+    swap(storage, "save_state", save_state)
+    swap(data_bundle, "parse_bundle", parse_bundle)
+    swap(data_bundle, "build_bundle", build_bundle)
+    swap(SettingsStore, "__init__", settings_init)
+    swap(SettingsStore, "replace_from_bundle", watch_settings("replace_from_bundle", "settings_replace"))
+    for name in ("set_guide_mark_color", "restore_guide_mark_color", "resync_guide_mark_color_default"):
+        swap(SettingsStore, name, watch_settings(name, "settings_guide_mark"))
+    # Modules that took a function by name hold the old one. Give them the new.
+    by_name = {real_parse_data: parse_data, real_save_state: save_state,
+               real_parse_bundle: parse_bundle, real_build_bundle: build_bundle}
+
+    tests = []
+    seen = set()
+
+    class Recorder:
+        def pytest_collection_modifyitems(self, items):
+            for module in {item.module for item in items} | {sys.modules["core.transcript_store"]}:
+                for name, value in list(vars(module).items()):
+                    if inspect.isfunction(value) and value in by_name:
+                        swap(module, name, by_name[value])
+
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_call(self, item):
+            now["test"], now["events"] = item.name, []
+            try:
+                outcome = yield
+            finally:
+                now["test"] = None
+            passed = outcome.excinfo is None
+            kept = 0
+            if passed:
+                for kind, arguments, result in now["events"]:
+                    key = json.dumps([kind, arguments, result], sort_keys=True)
+                    if key not in seen:
+                        seen.add(key)
+                        events[kind].append([[item.name, *arguments], result])
+                        kept += 1
+            tests.append([[item.path.name, item.name], [passed, len(now["events"]), kept]])
+
+    try:
+        status = pytest.main(
+            [str(desktop / "tests" / name) for name in DESKTOP_STORE_TESTS]
+            + ["-q", "--no-header", "-p", "no:cacheprovider", "--noconftest",
+               "--rootdir", str(desktop), "-o", "addopts="],
+            plugins=[Recorder()],
+        )
+    finally:
+        for owner, name, original in reversed(originals):
+            setattr(owner, name, original)
+    print(f"desktop store tests: pytest status {status}, left out {left_out}")
+
+    return {**events, "tests": tests}
+
+
+# ---------------------------------------------------------------------------
+# Phase 4: the reading experience.
+# ---------------------------------------------------------------------------
+
+def record_desktop_tests(test_file, module, shapes):
+    """Runs one of the desktop's test files with pytest, as it is, and
+    returns what each test asked of `module`: for every function named in
+    `shapes`, the arguments and the answer (passed through the shape, which
+    turns it into something JSON can hold). A test that fails stops the
+    run, because a recording of a failing test proves nothing."""
+    import pytest
+
+    desktop = Path(module.__file__).resolve().parents[1]
+    recorded = {}
+
+    class Recorder:
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_call(self, item):
+            calls = recorded.setdefault(item.name, [])
+
+            def watched(name):
+                real = getattr(module, name)
+
+                def run(*arguments):
+                    result = real(*arguments)
+                    calls.append([name, list(arguments), shapes[name](result)])
+                    return result
+                return run
+
+            originals = {name: getattr(item.module, name) for name in shapes}
+            for name in shapes:
+                setattr(item.module, name, watched(name))
+            try:
+                outcome = yield
+            finally:
+                for name, original in originals.items():
+                    setattr(item.module, name, original)
+            if outcome.excinfo is not None:
+                raise SystemExit(f"the desktop test {item.name} failed, so it cannot be recorded")
+
+    status = pytest.main(
+        [str(desktop / "tests" / test_file), "-q", "--no-header", "-p", "no:cacheprovider",
+         "--noconftest", "--rootdir", str(desktop), "-o", "addopts="],
+        plugins=[Recorder()],
+    )
+    if status != 0:
+        raise SystemExit(f"pytest ended with status {status} on the desktop's {test_file}")
+    return [[[name], calls] for name, calls in recorded.items()]
+
+
+def build_colors(core):
+    import core.colors as colors
+
+    rng = random.Random(4)
+    palette = [
+        "#000000", "#FFFFFF", "#ffffff", "#3B2E27", "#D98A3D", "#F6EFE3", "#1E1E1E", "#E74C3C",
+        "#000", "#fff", "#f00", "#00F", "abc", "ABCDEF", "0a0b0c", "##112233", "#11223344",
+    ]
+    ratios = [0, 0.0, 1, 1.0, 0.5, 0.25, 0.75, 0.55, 0.18, 0.3, 0.45, -1.0, 2.0, -0.0, 1e-9, 0.999999]
+    blends = [call(colors.blend_colors, a, b, ratio) for a in palette[:9] for b in palette[:9] for ratio in ratios[:8]]
+    blends += [call(colors.blend_colors, rng.choice(palette), rng.choice(palette), rng.choice(ratios)) for _ in range(150)]
+    # Halves, where rounding to the even number shows: 1 and 2 at one half
+    # is 1.5, which rounds to 2, and 2 and 3 is 2.5, which also rounds to 2.
+    for low in range(0, 255, 7):
+        blends.append(call(colors.blend_colors, f"#{low:02X}0000", f"#{low + 1:02X}0000", 0.5))
+    for _ in range(300):
+        a, b = (f"#{rng.randrange(0x1000000):06X}" for _ in range(2))
+        blends.append(call(colors.blend_colors, a, b, rng.random()))
+    # Not colours: the desktop raises ValueError for each of these.
+    broken = ["", "#", "#12", "#1234", "#12345", "#GGGGGG", "#12345G", "xyz", "#zzz", "red"]
+    blends += [call(colors.blend_colors, bad, "#000000", 0.5) for bad in broken]
+    blends += [call(colors.blend_colors, "#000000", bad, 0.5) for bad in broken]
+
+    return {
+        "blend_colors": blends,
+        "_channels": [call(lambda value: list(colors._channels(value)), value) for value in palette + broken],
+        "desktop_tests": record_desktop_tests(
+            "test_colors.py", colors, {"blend_colors": lambda text: text, "_channels": list}),
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1563,6 +1957,8 @@ MODULES = {
     "library": build_library,
     "settings": build_settings,
     "normalizer": build_normalizer,
+    "desktop_tests": build_desktop_tests,
+    "colors": build_colors,
 }
 
 
