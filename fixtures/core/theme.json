@@ -1,0 +1,16 @@
+{
+ "meta": {"written_by": "tools/fixtures/generate.py", "desktop_repository": "QuiteNew/rsvp-desktop-reader", "desktop_commit": "8112ff1b4d0f23cc2174db6e9e418094d320f453", "desktop_version": "4.1.1", "python": "3.13", "unicode": "15.1.0"},
+ "functions": {
+  "palette": [
+   [["light"],{"hearth_paper":"#F6EFE3","cocoa_ink":"#3B2E27","cocoa_ink_light":"#4A3C33","warm_taupe":"#ECE0CF","warm_mocha":"#B7A38A","dusk_blue":"#6E8496","dusk_blue_hover":"#5C7284","ember_glow":"#D98A3D","ember_glow_hover":"#C17A2F","warm_line":"#D6C4AC","text_on_light":"#3B2E27","text_on_dark":"#F6EFE3"}],
+   [["dark"],{"hearth_paper":"#1D1712","cocoa_ink":"#F2E8DC","cocoa_ink_light":"#D9CBB8","warm_taupe":"#2E2419","warm_mocha":"#4A3826","dusk_blue":"#7C93A3","dusk_blue_hover":"#6B7F8C","ember_glow":"#A8672E","ember_glow_hover":"#BF7A3B","warm_line":"#7A6248","text_on_light":"#F2E8DC","text_on_dark":"#1D1712"}]
+  ],
+  "constant": [
+   [["DARK_READING_BACKGROUND_COLOR"],"#241D17"],
+   [["DARK_READING_FONT_COLOR"],"#F2E8DC"],
+   [["DARK_READING_GUIDE_MARK_COLOR"],"#F2E8DC"],
+   [["DARK_READING_HIGHLIGHT_COLOR"],"#A8672E"],
+   [["LIGHT_READING_GUIDE_MARK_COLOR"],"#3B2E27"]
+  ]
+ }
+}

@@ -13,20 +13,20 @@ behaviour being right and tested, not at the final look.
 The pure parts come first, each proven against the desktop, then the UI
 that uses them. One commit per step.
 
-| #   | What                                                                  | State   |
-| --- | --------------------------------------------------------------------- | ------- |
-| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done    |
-| 2   | `settings_search` (36 lines), the same way                            | Done    |
-| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Next    |
-| 4   | Guide marks and the focus letter offset                               | Waiting |
-| 5   | The surrounding-words line (a new snapshot field in the engine)       | Waiting |
-| 6   | The scrubber, with bookmark ticks                                     | Waiting |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Waiting |
-| 9   | Keyboard shortcuts                                                    | Waiting |
-| 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
-| 11  | The settings view for all of it, with search and reset                | Waiting |
-| 12  | The Normalize button (left over from phase 3)                         | Waiting |
+| #   | What                                                                  | State                 |
+| --- | --------------------------------------------------------------------- | --------------------- |
+| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done                  |
+| 2   | `settings_search` (36 lines), the same way                            | Done                  |
+| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Part 3a done, 3b next |
+| 4   | Guide marks and the focus letter offset                               | Waiting               |
+| 5   | The surrounding-words line (a new snapshot field in the engine)       | Waiting               |
+| 6   | The scrubber, with bookmark ticks                                     | Waiting               |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting               |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Waiting               |
+| 9   | Keyboard shortcuts                                                    | Waiting               |
+| 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting               |
+| 11  | The settings view for all of it, with search and reset                | Waiting               |
+| 12  | The Normalize button (left over from phase 3)                         | Waiting               |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -79,3 +79,45 @@ Found on the way, and fixed in this commit:
   fixtures came out byte for byte the same.
 - Not done here: the search box itself. That is step 11, which will call
   `matches` with each setting's name, keywords and description.
+
+## Step 3, themes. Part 3a (the colours and rules), done on 2026-11-16
+
+- `src/core/theme.ts`: `LIGHT_PALETTE`, `DARK_PALETTE`, the dark reading
+  colours, the two guide mark colours, `isDarkTheme(mode, systemPrefersDark)`,
+  `paletteFor`, `themeReadingColors(isDark, lightDefaults)` and
+  `themeGuideMarkColor(isDark)`. Fixture `theme.json` (7 cases) holds the
+  palettes and constants as `gui/theme.py` assigns them. The fixture script
+  reads only those assignments with `ast`, because `gui/theme.py` imports
+  tkinter and cannot be imported on this machine.
+- `src/core/theme.test.ts` plays the 8 tests of
+  `test_reading_colours_follow_theme.py` under their Python names, against
+  `addTranscript`, `setFontColor` and `resyncDefaultReadingColors`. They are
+  written again by hand, not replayed from a recording, because the desktop
+  tests build `RSVPApp`, which needs tkinter. The guide mark rule is
+  checked with `resyncGuideMarkColorDefault`.
+- The desktop reads its theme once at launch ("takes effect on next
+  launch"). `resyncDefaultReadingColors` and `resyncGuideMarkColorDefault`
+  already exist from phase 3.
+
+### Part 3b, still to do (page work, with browser tests)
+
+- Put the palette on the page as CSS custom properties, chosen by a
+  `data-theme` attribute on `<html>`. The current CSS has the light
+  colours written in `src/ui/*.css`; move each to a variable named after
+  the palette key (`--hearth-paper` and so on).
+- An Appearance choice in Settings (Light, Dark, System) writing
+  `appearance_mode` through the settings store. System follows
+  `matchMedia('(prefers-color-scheme: dark)')`, and should follow a
+  change while the page is open.
+- At page start, and when the theme changes: call
+  `resyncDefaultReadingColors` on the library and
+  `resyncGuideMarkColorDefault` on the settings, with the theme's colours.
+  New transcripts take `themeReadingColors` instead of the plain Defaults.
+  Open question for the owner: the desktop does this only at launch. On
+  the web a live switch is natural, because the chrome changes at once, and
+  the reading colours would otherwise lag until a reload.
+- Avoid a flash of the wrong theme: set `data-theme` from the saved
+  setting before React renders (a small script in `index.html` reading
+  localStorage), without breaking the CSP if there is one.
+- Tests: App tests for the Appearance choice; one e2e that picks Dark,
+  reloads and sees it kept.

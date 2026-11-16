@@ -1945,6 +1945,31 @@ def build_settings_search(core):
     }
 
 
+def build_theme(core):
+    """gui/theme.py cannot be imported here, because it imports tkinter. Its
+    colour tables are plain assignments, so only those are read and run:
+    the palettes, the dark reading colours and the guide mark colours."""
+    import ast
+
+    wanted = {
+        "LIGHT_PALETTE", "DARK_PALETTE", "DARK_READING_FONT_COLOR", "DARK_READING_HIGHLIGHT_COLOR",
+        "DARK_READING_BACKGROUND_COLOR", "LIGHT_READING_GUIDE_MARK_COLOR", "DARK_READING_GUIDE_MARK_COLOR",
+    }
+    source = (Path(core.__file__).resolve().parents[1] / "gui" / "theme.py").read_text(encoding="utf-8")
+    values = {}
+    for node in ast.parse(source).body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and getattr(node.targets[0], "id", None) in wanted:
+            module = ast.Module(body=[node], type_ignores=[])
+            exec(compile(module, "gui/theme.py", "exec"), values)
+    missing = wanted - values.keys()
+    if missing:
+        raise SystemExit(f"gui/theme.py no longer assigns {sorted(missing)}")
+    return {
+        "palette": [[[name], values[name.upper() + "_PALETTE"]] for name in ("light", "dark")],
+        "constant": [[[name], values[name]] for name in sorted(wanted - {"LIGHT_PALETTE", "DARK_PALETTE"})],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1996,6 +2021,7 @@ MODULES = {
     "transcript_sort": build_transcript_sort,
     "reopen": build_reopen,
     "settings_search": build_settings_search,
+    "theme": build_theme,
     "case": build_case,
     "storage": build_storage,
     "bundle": build_bundle,
