@@ -9,6 +9,7 @@
 // against them character by character.
 
 import { CASEFOLD_EXCEPTIONS } from './pythonCasefoldTable';
+import { DECIMAL_ZEROS, DIGIT_RANGES } from './pythonDigitTable';
 import { LOWER } from './pythonLowerTable';
 
 // Every character Python treats as whitespace: str.isspace(), str.split(),
@@ -182,4 +183,35 @@ export function pyCompareText(a: string, b: string): number {
     if (difference !== 0) return difference;
   }
   return left.length - right.length;
+}
+
+/**
+ * Python's str.isdigit() for one character. More than 0 to 9 in every
+ * script: a superscript two and a circled one count as well. JavaScript
+ * cannot be asked this, so the list comes from Python.
+ */
+export function isPyDigit(character: string): boolean {
+  const code = character.codePointAt(0);
+  if (code === undefined) return false;
+  return DIGIT_RANGES.some(([first, last]) => code >= first && code <= last);
+}
+
+/**
+ * Python's int() for text made only of decimal digits, in any script, such
+ * as what \d+ matched. Each digit is worth its distance from the zero of
+ * its own script.
+ */
+export function pyInt(digits: string): number {
+  let value = 0;
+  for (const digit of digits) {
+    const code = digit.codePointAt(0) ?? 0;
+    let zero = -1;
+    for (const candidate of DECIMAL_ZEROS) {
+      if (candidate > code) break;
+      zero = candidate;
+    }
+    if (zero < 0 || code - zero > 9) throw new RangeError(`"${digits}" is not a whole number`);
+    value = value * 10 + (code - zero);
+  }
+  return value;
 }

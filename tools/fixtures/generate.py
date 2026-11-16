@@ -1319,6 +1319,194 @@ def build_settings(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 3: the normalizer.
+# ---------------------------------------------------------------------------
+
+def digit_table():
+    """The source of src/core/pythonDigitTable.ts: what str.isdigit() and
+    int() know about digits that JavaScript has no way to ask for."""
+    zeros, digits, start, previous = [], [], None, None
+    for number in range(0x110000):
+        ch = chr(number)
+        if ch.isdecimal() and unicodedata.decimal(ch) == 0:
+            zeros.append(number)
+        if ch.isdigit():
+            if start is None:
+                start = number
+            previous = number
+        elif start is not None:
+            digits.append((start, previous))
+            start = None
+    lines = [
+        "// Written by tools/fixtures/generate.py. Do not edit by hand.",
+        "//",
+        f"// Digits as Python {EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]} knows them (Unicode {unicodedata.unidata_version}).",
+        "",
+        "// The first and last code point of every run of characters that",
+        "// str.isdigit() is true for. That is more than 0 to 9 in every script:",
+        "// a superscript two and a circled one are digits too.",
+        "export const DIGIT_RANGES: readonly (readonly [number, number])[] = [",
+    ]
+    lines += [f"  [0x{first:x}, 0x{last:x}]," for first, last in digits]
+    lines += [
+        "];",
+        "",
+        "// The code point of the zero of every script's decimal digits. The nine",
+        "// that follow each zero are its 1 to 9, which is how int() reads them.",
+        "export const DECIMAL_ZEROS: readonly number[] = [",
+    ]
+    lines += ["  " + ", ".join(f"0x{zero:x}" for zero in zeros[i:i + 8]) + "," for i in range(0, len(zeros), 8)]
+    lines += ["];", ""]
+    return "\n".join(lines)
+
+
+NORMALIZER_PIECES = [
+    # List markers of every kind, at the start of a line and inside one.
+    "1. Mix", "2. Bake", "3. Eat", "1) First", "2) Second", "(1) One", "[2] Two", "1: Intro",
+    "1.3: Methods", "1.1 Scope", "1.2 Terms", "0.50 0.25", "3.14 is pi", "12", "1990. A year.",
+    "- Apples", "* Pears", "– Plums", "• Figs", "●", "✓ done", "[X] Cats", "[ ] Dogs",
+    "[x]", "[X].", "a) Apples", "b) Pears", "A. Smith said", "I. M. Pei", "i. Alpha", "ii. Beta",
+    "IV. Four", "(iv) four", "(b) bee", "1.", "2.", "v2.", "(2)", "p. 12.", "Fig. 3.", "Vol. 2.",
+    "see no. 1. and 2.", "Steps: 1. Mix 2. Bake 3. Eat", "1) 2) 3)", "1. 2. 3.",
+    # Headings.
+    "Part 1: Introduction", "Chapter IV", "Section 2.1 Scope", "Appendix A", "Step 3", "Part of the plan.",
+    "CHAPTER 2", "lesson 5.", "Unit 7-", "Book one", "Module X)",
+    # Python's ignore-case has a few pairs JavaScript's does not.
+    "ſection 2", "BooK 3", "Unİt 4", "Unıt 5", "fİg. 3.", "ſec. 2.",
+    # Timestamps.
+    "[00:01:23]", "(1:23)", "00:02:45", "0:05", "10:30 we met", "00:00:01,000 --> 00:00:04,000",
+    "[00:01:23] Welcome.", "text [00:01:23], more",
+    # PDF damage.
+    "ef�icient", "ﬂow", "ﬁne", "oﬃce", "�", "�low",
+    # Sentences and line ends.
+    "This sentence was", "broken in the middle.", "and then we went", "to the store,", "infor-",
+    "mation overload", "well-", "known", "Hello world.", "Introduction", "said: \"yes.\"", "(done.)",
+    "wait…", "wait...", "really?!", "end;", "\"quoted start", "'single", "“curly", "(paren",
+    "Dr. Smith", "e.g. this", "the U.S. Army", "J. W. Forrester", "at 5 p.m. Then",
+    # Digits that are not 0 to 9, and letters Python and JavaScript may sort differently.
+    "٣. three", "١. one ٢. two", "² squared", "① circled", "１. wide",
+    "école", "École", "ʕ", "ª", "ǅ", "\U0001d7ce1. zero",
+    # Whitespace Python and JavaScript disagree about, and line ends.
+    "\x0b", "\x0c", "\x1c", "\x1d", "\x85", "\xa0", " ", " ", "﻿", "　", "\t",
+    "\r", "\r\n", "  ", "",
+    # Characters that count as one in Python and two in JavaScript.
+    "\U0001F600", "\U0001F600.", "\U0001F468‍\U0001F469",
+]
+
+NORMALIZER_SENTENCES = [
+    "The quick brown fox jumps over the lazy dog near the river bank today.",
+    "Dr. Smith of Acme Inc. went to the U.S. office, e.g. the big one.",
+    "It was a long pause ... Then it carried on for a good while longer.",
+    "\"Is that so?\" she asked. “Yes,” he said!",
+    "The value of pi is 3.14 in the notes (see p. 12.) and so on.",
+    "\U0001F600\U0001F600\U0001F600\U0001F600\U0001F600 A sentence after five faces.",
+    "J. W. Forrester noted it at 5 p.m. Later it changed.",
+    "short one.", "And a Capital start? Yes! No.", "An ending bracket.) Next (one.",
+]
+
+
+def build_normalizer(core):
+    import pytest
+    import core.normalizer as normalizer
+
+    desktop = Path(normalizer.__file__).resolve().parents[1]
+
+    def toggle(*arguments):
+        result = normalizer.toggle_normalization(*arguments)
+        return [result.text, result.pre_normalize_text, result.normalized_text]
+
+    rng = random.Random(20261116)
+
+    def made_up(pieces, count, longest):
+        return [
+            "".join(rng.choice(pieces) + rng.choice([" ", " ", "\n", "\n", "\n\n", ""]) for _ in range(rng.randint(0, longest)))
+            for _ in range(count)
+        ]
+
+    texts = made_up(NORMALIZER_PIECES, 600, 14)
+    # One piece at a time, alone and between two plain lines.
+    for piece in NORMALIZER_PIECES:
+        texts += [piece, f"Before\n{piece}\nafter it.", f"Before {piece} after it", f"{piece}\n{piece}"]
+    # Walls of prose, with lengths around the 400 characters that matter.
+    walls = [" ".join(rng.choice(NORMALIZER_SENTENCES) for _ in range(rng.randint(1, 16))) for _ in range(100)]
+    walls += ["\n".join(rng.choice(NORMALIZER_SENTENCES) for _ in range(rng.randint(3, 14))) for _ in range(40)]
+    for size in range(395, 406):
+        walls.append(("Ab cd. " * 80)[:size - 3] + " X.")
+        walls.append("\U0001F600" * (size - 12) + ". Two x. Three.")
+    walls.append("x" * 500)
+    walls.append("A b. " * 200)
+
+    normalize = [call(normalizer.normalize_transcript, text, False) for text in unique(texts)]
+    normalize += [call(normalizer.normalize_transcript, text, True) for text in unique(walls + texts[:150])]
+
+    lines = unique(line for text in texts[:250] for line in text.split("\n"))
+    toggles = []
+    for text in unique(texts[:60] + walls[:10]):
+        first = toggle(text, "", "")
+        toggles.append([[text, "", "", False], first])
+        toggles.append([[first[0] + "\n", first[1], first[2], False], toggle(first[0] + "\n", first[1], first[2])])
+        toggles.append([[first[0] + " edited", first[1], first[2], True], toggle(first[0] + " edited", first[1], first[2], True)])
+    reverts = [call(normalizer.can_revert, *arguments) for arguments in (
+        ("Buy milk\n\nBuy eggs", "1. Buy milk\n2. Buy eggs", "Buy milk\n\nBuy eggs"),
+        ("Buy milk\n\nBuy eggs\n", "1. Buy milk\n2. Buy eggs", "Buy milk\n\nBuy eggs"),
+        (" \x1c\x85Buy milk　\n", "x", "Buy milk"), ("﻿Buy milk", "x", "Buy milk"),
+        ("Buy milk\n\nBuy bread", "1. Buy milk\n2. Buy eggs", "Buy milk\n\nBuy eggs"),
+        ("Buy milk", "", ""), ("", "", ""), ("", "x", ""), ("a", "x", "a "),
+    )]
+
+    # The desktop's own tests, run as they are. Every call they make to the
+    # normalizer is written down with what it returned. A test that passes
+    # there and whose calls give the same here holds here too.
+    recorded = {}
+
+    class Recorder:
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_call(self, item):
+            calls = recorded.setdefault(item.name, [])
+            module = item.module
+
+            def watched(name, shape):
+                real = getattr(normalizer, name)
+
+                def run(*arguments, **named):
+                    result = real(*arguments, **named)
+                    split = named.get("split_long_paragraphs", False)
+                    calls.append([name, list(arguments) + ([split] if "split_long_paragraphs" in named else []), shape(result)])
+                    return result
+                return run
+
+            originals = {name: getattr(module, name) for name in ("normalize_transcript", "toggle_normalization", "can_revert")}
+            module.normalize_transcript = watched("normalize_transcript", lambda text: text)
+            module.toggle_normalization = watched(
+                "toggle_normalization", lambda r: [r.text, r.pre_normalize_text, r.normalized_text])
+            module.can_revert = watched("can_revert", bool)
+            try:
+                outcome = yield
+            finally:
+                for name, original in originals.items():
+                    setattr(module, name, original)
+            if outcome.excinfo is not None:
+                raise SystemExit(f"the desktop test {item.name} failed, so it cannot be recorded")
+
+    status = pytest.main(
+        [str(desktop / "tests" / "test_normalizer.py"), "-q", "--no-header", "-p", "no:cacheprovider",
+         "--noconftest", "--rootdir", str(desktop), "-o", "addopts="],
+        plugins=[Recorder()],
+    )
+    if status != 0:
+        raise SystemExit(f"pytest ended with status {status} on the desktop's test_normalizer.py")
+
+    return {
+        "normalize_transcript": normalize,
+        "_split_numbered_run": [call(normalizer._split_numbered_run, line) for line in lines],
+        "_split_sentences": [call(normalizer._split_sentences, wall) for wall in unique(walls)],
+        "can_revert": reverts,
+        "toggle_normalization": toggles,
+        "desktop_tests": [[[name], calls] for name, calls in recorded.items()],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1374,6 +1562,7 @@ MODULES = {
     "bundle": build_bundle,
     "library": build_library,
     "settings": build_settings,
+    "normalizer": build_normalizer,
 }
 
 
@@ -1466,6 +1655,9 @@ def main():
     print(f"{table.name}: written")
     table = table.with_name("pythonLowerTable.ts")
     table.write_text(lower_table(), encoding="ascii", newline="\n")
+    print(f"{table.name}: written")
+    table = table.with_name("pythonDigitTable.ts")
+    table.write_text(digit_table(), encoding="ascii", newline="\n")
     print(f"{table.name}: written")
 
 

@@ -26,11 +26,11 @@ picked up by whoever comes next without guessing. The spec is
 | 6   | The store over a `Persistence`, with one in memory for tests          | Done  |
 | 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Done  |
 | 8   | The UI on the real store, export and import in Settings               | Done  |
-| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Next  |
+| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Done  |
 
-Saving works end to end as of step 8, and the settings are real settings
-as of step 5. What is left of phase 3 is step 9 (the normalizer), plus the
-desktop tests listed at the end of this file.
+Saving works end to end as of step 8, the settings are real settings as
+of step 5, and the normalizer is ported as of step 9. What is left of
+phase 3 is the desktop tests listed at the end of this file.
 
 ## Step 1, done on 2026-11-16
 
@@ -241,6 +241,50 @@ Not done here, on purpose:
 
 Next for settings: the desktop's own tests, `test_settings_store*.py` and
 the settings halves of the sort, reopen and wpm tests.
+
+## Step 9, the normalizer, done on 2026-11-16
+
+- `src/core/normalizer.ts`: `normalizeTranscript`, `canRevert`,
+  `toggleNormalization` (and `splitNumberedRun`, `splitSentences`, which
+  are exported for the tests). Fixture `normalizer.json`, 2411 cases:
+  made-up texts built from pieces that hit every pattern, walls of prose
+  around the 400 character limit, and each helper on its own.
+- The desktop's `tests/test_normalizer.py` is not ported by hand. The
+  fixture script runs it with pytest (`-p no:cacheprovider`,
+  `--noconftest`, Python started with `-B`) and writes down every call
+  each test makes to the normalizer with what came back. All 113 pass
+  there. `normalizer.test.ts` replays the calls under the Python test
+  names. This holds because the normalizer is pure: a test that passes
+  there and whose calls give the same here passes here.
+- New in `pythonText.ts`: `isPyDigit` and `pyInt`, with the generated
+  `pythonDigitTable.ts`. Python's `isdigit()` and `int()` know digits of
+  every script, and JavaScript cannot be asked.
+
+Python and JavaScript differ in these places. Each is covered by fixture
+cases that fail when the port takes the JavaScript way:
+
+- `\s` and `strip()`: Python's whitespace list, not JavaScript's.
+- `\d`: digits of every script. `int()` of them: `pyInt`.
+- `re.IGNORECASE`: Python also pairs s with the long s, k with the Kelvin
+  sign, and i with the dotted capital and the dotless small i. The
+  patterns are written out letter by letter (`anyCase`). JavaScript's
+  `(?i:...)` group is too new to rely on.
+- `$` with `re.MULTILINE` stops only at a line feed. JavaScript's `m`
+  flag also stops at U+2028 and U+2029, so the port spells it
+  `(?![^\n])`.
+- `len()` counts an emoji as one. The 400 character limit uses
+  `pyLength`.
+- `islower()` and `isdigit()` for the first letter of a line.
+
+Not done here:
+
+- The Normalize button. It belongs to the edit view, with the rest of
+  the UI. The store already has `setNormalization`.
+- `tests/test_normalize_in_app.py` (329 lines) tests the desktop window,
+  not the rules. It is the list of what the button has to do when it is
+  built.
+- The patterns use lookbehind, which Safari has from 16.4. The parser
+  already relied on that.
 
 ## Coming back where you left off, done on 2026-11-16
 

@@ -15,3 +15,4 @@ fixtures
 # Written by tools/fixtures/generate.py.
 src/core/pythonCasefoldTable.ts
 src/core/pythonLowerTable.ts
+src/core/pythonDigitTable.ts
