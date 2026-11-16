@@ -1,0 +1,70 @@
+/* The reading position: words above, slider, a strip of bookmark ticks below. */
+.scrubber {
+  display: flex;
+  flex-direction: column;
+  width: min(14rem, 100%);
+  min-width: 0;
+}
+
+.readout {
+  min-height: 1.2em;
+  text-align: center;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  width: 100%;
+  height: 1.2rem;
+  margin: 0;
+  background: none;
+  appearance: none;
+}
+
+.slider::-webkit-slider-runnable-track {
+  height: 0.3rem;
+  background: var(--line);
+  border-radius: 0.15rem;
+}
+
+.slider::-moz-range-track {
+  height: 0.3rem;
+  background: var(--line);
+  border-radius: 0.15rem;
+}
+
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.1rem;
+  height: 1.1rem;
+  margin-top: -0.4rem;
+  background: var(--ember);
+  border: 0;
+  border-radius: 50%;
+}
+
+.slider::-moz-range-thumb {
+  width: 1.1rem;
+  height: 1.1rem;
+  background: var(--ember);
+  border: 0;
+  border-radius: 50%;
+}
+
+/* Always as tall as a tick, so the bar does not jump when bookmarks come and
+   go. The thumb's middle travels from half its width in to half its width
+   short of the far end, and so do the ticks. */
+.ticks {
+  position: relative;
+  height: 6px;
+}
+
+.tick {
+  position: absolute;
+  top: 0;
+  left: calc(0.55rem + var(--fraction) * (100% - 1.1rem));
+  width: 2px;
+  height: 5px;
+  background: var(--ember);
+  transform: translateX(-50%);
+}

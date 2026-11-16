@@ -26,6 +26,7 @@ import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
 import { RangeSetting } from './RangeSetting';
+import { Scrubber } from './Scrubber';
 import { Sidebar } from './Sidebar';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
@@ -131,6 +132,10 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   useEffect(() => {
     engine.setPeripheralContext(showContext);
   }, [engine, showContext]);
+  const scrubPause = preferences.scrubPauseEnabled;
+  useEffect(() => {
+    engine.setBehaviour({ scrubPauseEnabled: scrubPause });
+  }, [engine, scrubPause]);
   const lightDefaults = {
     font: preferences.defaultFontColor,
     highlight: preferences.defaultHighlightColor,
@@ -366,6 +371,23 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               >
                 <PowerIcon />
               </button>
+              <Scrubber
+                total={snapshot.totalWords}
+                index={snapshot.index}
+                bookmarks={selected?.bookmarks.map((bookmark) => bookmark.index) ?? []}
+                onMove={(index) => {
+                  engine.scrubMove(index);
+                }}
+                onEnd={() => {
+                  if (!engine.getSnapshot().isScrubbing) return;
+                  engine.scrubEnd();
+                  // The state it ends in (paused or going on) is saved once,
+                  // like a pause made by hand.
+                  if (selected !== null) {
+                    store.setPaused(selected.id, engine.getSnapshot().status !== 'playing');
+                  }
+                }}
+              />
               <span className={styles.spring} />
               <span className={styles.readout}>{timeLeft(snapshot.remainingMs)} left</span>
               <span className={styles.readout}>{snapshot.percent}%</span>
@@ -630,6 +652,16 @@ export function App({ store, settings, health, ...parts }: AppProps) {
             System follows your browser's own light or dark choice. Reading colours you picked by
             hand stay as they are.
           </p>
+          <label className={dialogStyles.note}>
+            <input
+              type="checkbox"
+              checked={preferences.scrubPauseEnabled}
+              onChange={(event) => {
+                settings.set('scrubPauseEnabled', event.target.checked);
+              }}
+            />{' '}
+            Stay paused after moving the position slider
+          </label>
           <label className={dialogStyles.note}>
             <input
               type="checkbox"

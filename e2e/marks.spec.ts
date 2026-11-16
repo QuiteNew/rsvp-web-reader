@@ -75,6 +75,7 @@ test('the surrounding words sit under the marks, with the middle word under the 
   expect(middle.y).toBeGreaterThan(letter.y + letter.height);
   expect(Math.abs(middle.x + middle.width / 2 - (letter.x + letter.width / 2))).toBeLessThan(1.5);
   // The other words run away from it, on either side.
-  expect(left.x + left.width).toBeLessThanOrEqual(middle.x);
-  expect(right.x).toBeGreaterThanOrEqual(middle.x + middle.width);
+  // (With a tolerance: Firefox rounds positions at the fifth decimal.)
+  expect(left.x + left.width).toBeLessThanOrEqual(middle.x + 0.5);
+  expect(right.x).toBeGreaterThanOrEqual(middle.x + middle.width - 0.5);
 });

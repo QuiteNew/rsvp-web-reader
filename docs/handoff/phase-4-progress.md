@@ -20,8 +20,8 @@ that uses them. One commit per step.
 | 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done    |
 | 4   | Guide marks and the focus letter offset                               | Done    |
 | 5   | The surrounding-words line (a new snapshot field in the engine)       | Done    |
-| 6   | The scrubber, with bookmark ticks                                     | Next    |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Waiting |
+| 6   | The scrubber, with bookmark ticks                                     | Done    |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Next    |
 | 8   | Chunking: per transcript, and the defaults for new ones               | Waiting |
 | 9   | Keyboard shortcuts                                                    | Waiting |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
@@ -190,3 +190,36 @@ Committed together with step 3b.
 - Tests: 5 App tests, 1 new browser test (below the word, middle word
   under the focus letter, the others on either side). All 19 e2e tests
   passed three times in Chrome only.
+
+## Step 6, the scrubber with bookmark ticks, done on 2026-11-17
+
+- `src/core/scrub.ts`: the read-out ("word 1,234 of 5,678"), the slider's
+  range, which tick indices to draw and where (fraction along). From
+  `gui/components/scrub_bar.py`, which is tkinter, so no fixture: the
+  expected values in `scrub.test.ts` were worked out by hand.
+- `src/ui/Scrubber.tsx`: a range input with the read-out above and a row of
+  ticks below (a separate row, as on the desktop, so a tick never blocks a
+  drag). Off with under two words. It uses the engine's existing
+  `scrubMove` on every change and `scrubEnd` when the drag is over (pointer
+  up, key up, or focus lost). The state it ends in (paused or reading on)
+  is saved once, the way a pause by hand is.
+- Settings: "Stay paused after moving the position slider"
+  (`scrub_pause_enabled`, already in the settings), sent to the engine with
+  `setBehaviour`. The page did not use `setBehaviour` before.
+- Keyboard: arrows move it a word, Home and End go to the first and the
+  last word (the browser's own range keys). The bookmark keys come with
+  step 7 and the shortcuts with step 9.
+- Ticks are tested at unit level only (`--fraction` of each tick). A browser
+  check of where they sit relative to the thumb needs a way to add a
+  bookmark on the page, so it goes with step 7.
+- Tests: 7 App tests, 3 browser tests (keys only). All 22 e2e tests
+  passed three times in Chrome. The owner ran all three browsers: two
+  Firefox failures, both in the tests and not in the page:
+  the surrounding-words test compared positions that differed by 0.00006 px
+  (now a half pixel tolerance), and the arrow keys test pressed Home while
+  reading was still on the first word, where Home does nothing, so a slow
+  Firefox was one word on before the arrows came (w4, not w3). That test
+  now pauses first, and a separate test presses Home while reading is
+  going, after it has left the first word. I could not run Firefox here, so
+  the second fix is reasoned from the numbers and checked in Chrome only.
+  Run `npm run e2e` again.

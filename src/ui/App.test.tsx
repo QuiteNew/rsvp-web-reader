@@ -1258,3 +1258,92 @@ describe('the surrounding-words line', () => {
     expect(screen.queryByTestId('context')).toBeNull();
   });
 });
+
+describe('the position slider', () => {
+  function startReading(text = 'a b c d e f g h') {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste(text);
+    press('Start reading');
+    return page;
+  }
+
+  const slider = () => screen.getByRole('slider', { name: 'Position' });
+
+  function drag(to: number): void {
+    fireEvent.change(slider(), { target: { value: String(to) } });
+  }
+
+  test('it reads "word X of Y" and rests on the word being read', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3 }));
+    startReading();
+    expect(screen.getByText('word 1 of 8')).toBeInTheDocument();
+    expect(slider()).toHaveAttribute('max', '7');
+    press('Pause');
+    press('Forward 3 words');
+    expect(screen.getByText('word 4 of 8')).toBeInTheDocument();
+    expect(slider()).toHaveValue('3');
+  });
+
+  test('moving it goes to that word and holds reading while it moves', () => {
+    startReading();
+    drag(5);
+    expect(word()).toBe('f');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(screen.getByText('word 6 of 8')).toBeInTheDocument();
+  });
+
+  test('letting go leaves it paused, and saves that', () => {
+    const { store } = startReading();
+    drag(5);
+    fireEvent.keyUp(slider(), { key: 'ArrowRight' });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(true);
+    expect(store.getSnapshot().transcripts[0]?.position).toBe(5);
+  });
+
+  test('with "stay paused" off, letting go reads on from that word', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ scrub_pause_enabled: false }));
+    const { store } = startReading();
+    drag(5);
+    fireEvent.pointerUp(slider());
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(false);
+  });
+
+  test('keys alone: arrow presses move it a word at a time, and a stray key-up does nothing', () => {
+    startReading();
+    press('Pause');
+    fireEvent.keyUp(slider(), { key: 'Tab' });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    drag(1);
+    drag(2);
+    fireEvent.keyUp(slider(), { key: 'ArrowRight' });
+    expect(word()).toBe('c');
+  });
+
+  test('there is a tick for each bookmark, under the spot the thumb rests at', () => {
+    const { store } = startReading();
+    expect(screen.queryAllByTestId('bookmark-tick')).toHaveLength(0);
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.addBookmark(id, 7, 'h');
+      store.addBookmark(id, 0, 'a');
+    });
+    const ticks = screen.getAllByTestId('bookmark-tick');
+    expect(ticks.map((tick) => tick.style.getPropertyValue('--fraction'))).toEqual(['0', '1']);
+    act(() => {
+      store.addBookmark(id, 3, 'd');
+    });
+    expect(
+      screen
+        .getAllByTestId('bookmark-tick')
+        .map((tick) => tick.style.getPropertyValue('--fraction')),
+    ).toEqual(['0', String(3 / 7), '1']);
+  });
+
+  test('one word has nothing to move', () => {
+    startReading('alone');
+    expect(slider()).toBeDisabled();
+  });
+});
