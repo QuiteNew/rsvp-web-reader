@@ -11,3 +11,7 @@ reference
 
 # Golden fixtures are written by a script, not by hand.
 fixtures
+
+# Written by tools/fixtures/generate.py.
+src/core/pythonCasefoldTable.ts
+src/core/pythonLowerTable.ts

@@ -9,6 +9,7 @@
 // against them character by character.
 
 import { CASEFOLD_EXCEPTIONS } from './pythonCasefoldTable';
+import { LOWER } from './pythonLowerTable';
 
 // Every character Python treats as whitespace: str.isspace(), str.split(),
 // str.strip() and \s in a regular expression all use this one list. Written
@@ -43,6 +44,7 @@ const ONE_SPACE = new RegExp(`^[${PY_SPACE}]$`, 'u');
 const ONE_LETTER_OR_NUMBER = /^[\p{L}\p{N}]$/u;
 const ONE_LOWERCASE = /^\p{Lowercase}$/u;
 const CASEFOLD = new Map(Object.entries(CASEFOLD_EXCEPTIONS));
+const LOWERED = new Map(Object.entries(LOWER));
 
 /** Python's str.isspace() for one character. */
 export function isPySpace(character: string): boolean {
@@ -71,14 +73,13 @@ export function isPyLower(character: string): boolean {
  * Python's str.casefold(): lower case made for comparing, not for showing.
  * It is close to lower-casing each character on its own, and
  * pythonCasefoldTable.ts lists where it is not: "ß" becomes "ss", a final
- * sigma becomes an ordinary one, and so on. toLowerCase() on the whole text
- * would be wrong too, because it treats a sigma at the end of a word
- * differently.
+ * sigma becomes an ordinary one, and so on. Lower-casing goes through
+ * pythonLowerTable.ts, see pyLower() for why.
  */
 export function pyCasefold(text: string): string {
   let folded = '';
   for (const character of text) {
-    folded += CASEFOLD.get(character) ?? character.toLowerCase();
+    folded += CASEFOLD.get(character) ?? LOWERED.get(character) ?? character;
   }
   return folded;
 }
@@ -134,4 +135,51 @@ export function pyRound(value: number): number {
   if (gap < 0.5) return below;
   if (gap > 0.5) return below + 1;
   return below % 2 === 0 ? below : below + 1;
+}
+
+// A capital sigma is lower-cased to the final form when it ends a word:
+// a cased letter before it and none after it, looking past characters such
+// as apostrophes and accents. Python's rule, in handle_capital_sigma().
+const CASED_BEFORE = /\p{Cased}\p{Case_Ignorable}*$/u;
+const CASED_AFTER = /^\p{Case_Ignorable}*\p{Cased}/u;
+
+/**
+ * Python's str.lower(). Each character is looked up in pythonLowerTable.ts,
+ * not handed to toLowerCase(): the browser's Unicode can be newer or older
+ * than Python's, and then it lower-cases a different set of characters.
+ * Which characters count as cased, for the sigma rule, still comes from the
+ * browser.
+ */
+export function pyLower(text: string): string {
+  let lowered = '';
+  let position = 0;
+  for (const character of text) {
+    const end = position + character.length;
+    if (character === '\u03a3') {
+      const final =
+        CASED_BEFORE.test(text.slice(0, position)) && !CASED_AFTER.test(text.slice(end));
+      lowered += final ? '\u03c2' : '\u03c3';
+    } else {
+      lowered += LOWERED.get(character) ?? character;
+    }
+    position = end;
+  }
+  return lowered;
+}
+
+/**
+ * Compare two strings the way Python's < does: character by character, by
+ * code point. JavaScript's < compares UTF-16 units, which puts an emoji
+ * before a character near the end of the first 65,536, the wrong way round.
+ * Returns a negative number, zero or a positive number, as a sort wants.
+ */
+export function pyCompareText(a: string, b: string): number {
+  const left = characters(a);
+  const right = characters(b);
+  const shared = Math.min(left.length, right.length);
+  for (let i = 0; i < shared; i += 1) {
+    const difference = (left[i]?.codePointAt(0) ?? 0) - (right[i]?.codePointAt(0) ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return left.length - right.length;
 }

@@ -3,8 +3,9 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-16. Phase 2 is done. Phase 3 (saving) is next and is
-not started. Its spec, the saved shapes and the storage schema are written.
+Last updated: 2026-11-16. Phase 2 is done. Phase 3 (saving) is under way:
+[handoff/phase-3-progress.md](handoff/phase-3-progress.md) says which step
+is next.
 
 ## Phases
 
@@ -13,7 +14,7 @@ not started. Its spec, the saved shapes and the storage schema are written.
 | 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                    |
 | 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                            |
 | 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout on a library that is not saved yet |
-| 3     | Saved data                             | Not started                                                                                                                                                 |
+| 3     | Saved data                             | Started. Step 1 of 9 is done. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                |
 | 4     | The reading experience                 | Not started                                                                                                                                                 |
 | 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                           |
 | 6     | Comfort and the rest                   | Not started                                                                                                                                                 |

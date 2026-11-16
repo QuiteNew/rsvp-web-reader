@@ -21,9 +21,10 @@ Rules this script keeps:
   letter, a digit or a space comes from Python's Unicode tables, and those
   change between Python versions.
 
-Besides the fixtures it writes src/core/pythonCasefoldTable.ts, the short
-list of characters where Python's str.casefold() and a plain lower-casing
-disagree. The port needs that list at run time, so it lives with the code.
+Besides the fixtures it writes two tables the port needs at run time, so
+they live with the code: src/core/pythonLowerTable.ts, every character
+Python's str.lower() changes, and src/core/pythonCasefoldTable.ts, the
+short list where str.casefold() and lower-casing disagree.
 
 To add a module: write a build_<module>() function that returns
 {function name: [cases]}, and add it to MODULES at the bottom. A case is
@@ -773,6 +774,141 @@ def casefold_table():
     return "\n".join(lines)
 
 
+def lower_table():
+    """The source of src/core/pythonLowerTable.ts: every character that
+    str.lower() changes, with what it becomes."""
+    def escape(text):
+        return "".join(
+            f"\\u{ord(ch):04x}" if ord(ch) <= 0xFFFF else f"\\u{{{ord(ch):x}}}" for ch in text
+        )
+
+    lines = [
+        "// Written by tools/fixtures/generate.py. Do not edit by hand.",
+        "//",
+        "// Every character Python's str.lower() changes, with what it becomes",
+        f"// (Python {EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]}, Unicode {unicodedata.unidata_version}). The port uses this and not the browser's",
+        "// toLowerCase(), because a browser with a newer or older Unicode lower-cases",
+        "// a different set of characters, and saved keys would stop matching.",
+        "",
+        "export const LOWER: Readonly<Record<string, string>> = {",
+    ]
+    for number in range(0x110000):
+        if 0xD800 <= number <= 0xDFFF:
+            continue
+        ch = chr(number)
+        if ch.lower() != ch:
+            lines.append(f"  '{escape(ch)}': '{escape(ch.lower())}',")
+    lines.extend(["};", ""])
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: the small library helpers.
+# ---------------------------------------------------------------------------
+
+def build_wpm_step(core):
+    import core.wpm_step
+    step = core.wpm_step.step_wpm
+    cases = []
+    for wpm in list(range(-25, 46)) + list(range(80, 131)) + list(range(285, 316)) + list(range(975, 1031)):
+        for direction in (1, -1):
+            cases.append(call(step, wpm, direction))
+    # Anything that is not "up" counts as "down", zero included.
+    for direction in (0, 2, -5):
+        for wpm in (300, 305, 100, 1000):
+            cases.append(call(step, wpm, direction))
+    return {
+        "step_wpm": cases,
+        "constants": [[["WPM_KEY_STEP"], core.wpm_step.WPM_KEY_STEP]],
+    }
+
+
+SORT_TITLES = [
+    "beta", "Alpha", "gamma", "alpha", "ALPHA", "", " leading space", "10", "9", "Zebra", "apple",
+    "Éclair", "eclair", "éclair", "İstanbul", "istanbul", "I", "ı",
+    "ΣΑΣ", "σας", "σασ", "straße", "STRASSE", "strasse",
+    "ǅ", "ǆ", "￿ last in the BMP", "\U0001F600 emoji", "\U00010400 deseret",
+    "\U00010428 deseret", " private", "张三", "_underscore", "~tilde", "Same", "same",
+]
+
+
+def build_transcript_sort(core):
+    import core.transcript_sort
+    from core.models import Transcript
+    module = core.transcript_sort
+
+    def sort_ids(rows, sort_id):
+        transcripts = [
+            Transcript(id=i, title=title, space="General", times_read=read, total_time_spent_seconds=seconds)
+            for i, title, read, seconds in rows
+        ]
+        return [t.id for t in module.sort_transcripts(transcripts, sort_id)]
+
+    rng = random.Random(3)
+    lists = [
+        [[1, "beta", 2, 300], [2, "Alpha", 5, 100], [3, "gamma", 1, 900]],
+        [[1, "same", 0, 0], [2, "Same", 0, 0], [3, "same", 0, 0]],
+        [],
+        [[7, "only", 1, 1]],
+        [[i + 1, title, 0, 0] for i, title in enumerate(SORT_TITLES)],
+    ]
+    for _ in range(40):
+        count = rng.randint(2, 12)
+        ids = rng.sample(range(1, 60), count)
+        lists.append([[i, rng.choice(SORT_TITLES), rng.randint(0, 3), rng.choice([0, 0, 60, 61, 3600])] for i in ids])
+
+    sort_ids_cases = []
+    for rows in lists:
+        for sort_id in list(module.SORT_ORDERS) + ["", "TITLE_AZ", None, 3]:
+            sort_ids_cases.append(call(sort_ids, rows, sort_id))
+
+    odd = ["", "Title (A–Z)", "TITLE_AZ", None, 3, ["title_az"], True, "oldest ", 0]
+    return {
+        "sort_transcripts": sort_ids_cases,
+        "known_sort": [call(module.known_sort, value) for value in list(module.SORT_ORDERS) + odd],
+        "orders": [[[sort_id], [order.label, order.reverse]] for sort_id, order in module.SORT_ORDERS.items()],
+        "constants": [[["DEFAULT_SORT"], module.DEFAULT_SORT]],
+    }
+
+
+def build_case(core):
+    """Not a desktop module: what Python's own str.lower() and str.casefold()
+    do to every single character, so the port's tables can be checked whole.
+    Plus some longer texts, for the sigma at the end of a Greek word."""
+    def changed(method):
+        return [[cp, method(chr(cp))] for cp in range(sys.maxunicode + 1)
+                if not 0xD800 <= cp <= 0xDFFF and method(chr(cp)) != chr(cp)]
+
+    texts = SORT_TITLES + [
+        "Σ", "ΑΣ", "ΣΑ", "ΑΣ ΑΣ.", "ΑΣ'Α", "Α'Σ",
+        "ΑΣ́", "AΣ", "1Σ", "ΑΣΣ", "ΟΔΥΣΣΕΥΣ",
+        "İ", "İ", "ẞ", "ﬁ", "\U00010400\U00010401",
+    ]
+    return {
+        "lower_characters": [[["all"], changed(str.lower)]],
+        "casefold_characters": [[["all"], changed(str.casefold)]],
+        "lower": [call(str.lower, text) for text in unique(texts)],
+        "casefold": [call(str.casefold, text) for text in unique(texts)],
+    }
+
+
+def build_reopen(core):
+    import core.reopen
+    from core.models import Transcript
+
+    def reopen_id(enabled, last_id, ids):
+        transcripts = [Transcript(id=i, title=f"T{i}", space="General") for i in ids]
+        found = core.reopen.transcript_to_reopen(enabled, last_id, transcripts)
+        return None if found is None else found.id
+
+    cases = []
+    for enabled in (True, False):
+        for last_id in (None, 0, 1, 2, 99, -1):
+            for ids in ([], [1], [1, 2], [2, 1], [5, 99, 0]):
+                cases.append(call(reopen_id, enabled, last_id, ids))
+    return {"transcript_to_reopen": cases}
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -782,6 +918,10 @@ MODULES = {
     "timing": build_timing,
     "speakers": build_speakers,
     "reader": build_reader,
+    "wpm_step": build_wpm_step,
+    "transcript_sort": build_transcript_sort,
+    "reopen": build_reopen,
+    "case": build_case,
 }
 
 
@@ -871,6 +1011,9 @@ def main():
 
     table = here.parents[2] / "src" / "core" / "pythonCasefoldTable.ts"
     table.write_text(casefold_table(), encoding="ascii", newline="\n")
+    print(f"{table.name}: written")
+    table = table.with_name("pythonLowerTable.ts")
+    table.write_text(lower_table(), encoding="ascii", newline="\n")
     print(f"{table.name}: written")
 
 
