@@ -181,9 +181,8 @@ describe('against the Python fixtures', () => {
   });
 });
 
-// A few examples that read on their own. The desktop tests for the reader
-// (test_reader.py, test_chunking.py, test_seeking.py and
-// test_reader_speaker_cues.py) are still to be ported, see docs/STATUS.md.
+// A few examples that read on their own. The desktop project's own tests
+// for the reader are ported in reader.desktop.test.ts.
 
 describe('examples', () => {
   const text = 'Welcome to the show. Today we read fast, really fast!';

@@ -150,10 +150,18 @@ Still to do in phase 2:
     `test_speaker_rows.py`, `test_whole_transcript_speakers.py` and the
     cleaner tests of `test_transcript_speaker_list.py`, each under its
     Python name. The store tests of that last file wait for phase 3.
-  - Left: the reader half, into `src/core/reader.desktop.test.ts` the same
-    way: `test_reader.py`, `test_chunking.py`,
-    `test_reader_speaker_cues.py`, `test_context_ribbon.py` and the core
-    parts of `test_seeking.py` and `test_edge_cases.py`. About 200 tests.
+  - Done (2026-11-16): the reader half, in
+    `src/core/reader.desktop.test.ts`. It holds all of `test_reader.py` and
+    `test_reader_speaker_cues.py`, the reader and model tests of
+    `test_chunking.py`, and the two tests of a finished session from
+    `test_edge_cases.py`. Two of them patch the reader's imports, the way
+    pytest's monkeypatch does.
+  - Not ported, on purpose: `test_seeking.py` and `test_context_ribbon.py`.
+    Every test in them drives the desktop reader widget or the whole app.
+    The engine tests cover the loop, and the ribbon comes with its screen.
+  - Waiting for phase 3: the 25 store and settings tests of
+    `test_chunking.py` and the 19 store tests of
+    `test_transcript_speaker_list.py`.
 
 The full list, with the order and the checks, is in
 [handoff/phase-2-rest.md](handoff/phase-2-rest.md).

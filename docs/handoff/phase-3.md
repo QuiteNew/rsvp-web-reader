@@ -99,6 +99,11 @@ the storage format: "The store setter", "Loading data.json" and "Export and
 import". Port them with the store, next to the rules they check. Its
 cleaner tests are already in `src/core/speakers.desktop.test.ts`.
 
+`tests/test_chunking.py` has 25 tests of the same kind: the settings store
+defaults and setters, the transcript store seeding and setting chunking,
+and old saves loading with defaults. Its reader tests are already in
+`src/core/reader.desktop.test.ts`.
+
 ## Done when
 
 - The owner's desktop export loads in the web app with every transcript,

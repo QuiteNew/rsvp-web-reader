@@ -2,8 +2,8 @@
 
 Done already: `speakers` and `reader` are ported and match their fixtures,
 the engine loop (job 2) is built and tested, and the first screen (job 3)
-is built with its component tests and its Playwright smoke test. Left: job
-1, a first run of the browser tests in Firefox and WebKit, and the owner
+is built with its component tests and its Playwright smoke test. Job 1 is
+done too. Left: a first run of the browser tests in Firefox and WebKit, and the owner
 trying the page and confirming the phase.
 
 ## 1. Port the desktop tests for speakers and reader
@@ -12,23 +12,23 @@ The fixtures prove the behaviour. The ported tests are the second check
 that [PORTING.md](../PORTING.md) asks for, and they keep the reasons the
 desktop project wrote down next to each odd case.
 
-The speakers half is done (2026-11-16) and lives in
-`src/core/speakers.desktop.test.ts`. Do the reader half the same way, in
+Done on 2026-11-16, in `src/core/speakers.desktop.test.ts` and
 `src/core/reader.desktop.test.ts`, with one `describe` per desktop file.
 
-| Desktop file                            | Tests | State                          |
-| --------------------------------------- | ----- | ------------------------------ |
-| `test_speakers.py`                      | 39    | done                           |
-| `test_speaker_rows.py`                  | 23    | done                           |
-| `test_transcript_speaker_list.py`       | 30    | cleaner done, store in phase 3 |
-| `test_whole_transcript_speakers.py`     | 10    | done                           |
-| `test_reader.py`                        | 83    | to do                          |
-| `test_chunking.py`                      | 58    | to do                          |
-| `test_reader_speaker_cues.py`           | 44    | to do                          |
-| `test_context_ribbon.py`                | 7     | to do                          |
-| `test_seeking.py`, `test_edge_cases.py` | some  | to do, see below               |
+| Desktop file                        | Tests | State                                   |
+| ----------------------------------- | ----- | --------------------------------------- |
+| `test_speakers.py`                  | 39    | done                                    |
+| `test_speaker_rows.py`              | 23    | done                                    |
+| `test_transcript_speaker_list.py`   | 30    | 11 done, 19 store tests in phase 3      |
+| `test_whole_transcript_speakers.py` | 10    | done                                    |
+| `test_reader.py`                    | 83    | done                                    |
+| `test_chunking.py`                  | 58    | 33 done, 25 store tests in phase 3      |
+| `test_reader_speaker_cues.py`       | 44    | done                                    |
+| `test_edge_cases.py`                | 12    | 2 done, the rest drive windows          |
+| `test_seeking.py`                   | 12    | not ported, all drive the reader widget |
+| `test_context_ribbon.py`            | 7     | not ported, all drive the whole app     |
 
-Rules:
+The rules that were followed, for the next module:
 
 - Keep the Python test names as they are, without `test_`, so a test can be
   found in the desktop repo by its name. Keep the comment that explains
