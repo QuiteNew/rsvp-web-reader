@@ -256,6 +256,8 @@ Saving the place when the reader is not playing:
   run in 10 in Chrome).
 - The browser tests no longer assume where a pause lands. Restart leaves
   the reader playing, so they pause first and read the word back.
-- `e2e/smoke.spec.ts` has the same kind of timing race. Under 6 parallel
-  Chrome runs, about 1 in 25 runs fails (with or without the change
-  above). Not fixed yet, to be done in its own commit.
+- `e2e/smoke.spec.ts` had the same kind of timing race, and failed in
+  WebKit on the owner's machine. Fixed: no browser test expects a certain
+  word while reading is going. They pause first, or ask only that the word
+  changes, and the Restart test lets the page write down the words it
+  shows. The text is 300 words longer so a pause never lands at the end.
