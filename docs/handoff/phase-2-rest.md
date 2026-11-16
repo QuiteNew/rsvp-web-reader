@@ -1,8 +1,9 @@
 # Phase 2, the rest: desktop tests, the engine and the first screen
 
 Done already: `speakers` and `reader` are ported and match their fixtures,
-and the engine loop (job 2) is built and tested. Left: jobs 1 and 3. Each
-is one or two commits.
+the engine loop (job 2) is built and tested, and the first screen (job 3)
+is built with its component tests. Left: job 1, the Playwright part of job
+3, and the owner trying the page and confirming the phase.
 
 ## 1. Port the desktop tests for speakers and reader
 
@@ -92,7 +93,12 @@ Then break it on purpose: schedule from now instead of the due time, count
 chunks instead of words, let a skip fire `onNewSpeaker`, keep counting
 active time while hidden. Each must fail a test.
 
-## 3. The first screen
+## 3. The first screen (built on 2026-11-15, Playwright still to do)
+
+See "Phase 2: the first screen" in [STATUS.md](../STATUS.md) for what was
+built and checked. The part of this spec that is still open is Playwright:
+the smoke test in the repository and the CI job. What follows is the spec
+the screen was built from.
 
 One page in `src/ui`: a text box to paste into, a Start button, and the
 reader with Play and Pause, skip back, skip forward, Restart, a speed

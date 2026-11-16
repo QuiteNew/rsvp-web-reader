@@ -3,21 +3,21 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-15, part way through phase 2, with the handoff package
-written.
+Last updated: 2026-11-15. Phase 2 is built and waits for the owner. The
+handoff package is written.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                                               |
-| ----- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                            |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                    |
-| 2     | The reading session and a first screen | Part done: `speakers`, `reader` and the engine loop are in. The desktop tests for the two core modules and the first screen are not started. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
-| 3     | Saved data                             | Not started                                                                                                                                                                                         |
-| 4     | The reading experience                 | Not started                                                                                                                                                                                         |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                   |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                         |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                                         |
+| Phase | What                                   | State                                                                                                                                                                                                                    |
+| ----- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                 |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                         |
+| 2     | The reading session and a first screen | Built, waiting for the owner to try it and confirm. Still open inside it: the desktop tests for `speakers` and `reader`, and Playwright in the repository and CI. See [handoff/phase-2-rest.md](handoff/phase-2-rest.md) |
+| 3     | Saved data                             | Not started                                                                                                                                                                                                              |
+| 4     | The reading experience                 | Not started                                                                                                                                                                                                              |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                        |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                              |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                                              |
 
 ## Phase 0: what was checked, and where
 
@@ -150,7 +150,7 @@ Still to do in phase 2:
   far. The fixtures already prove the behaviour, so this is the second line
   of defence that [PORTING.md](PORTING.md) asks for, not a gap in what is
   known to work.
-- The first screen, and Playwright.
+- Playwright in the repository and in CI.
 
 The full list, with the order and the checks, is in
 [handoff/phase-2-rest.md](handoff/phase-2-rest.md).
@@ -197,6 +197,45 @@ Differences from the desktop loop, both on purpose:
 - An empty text counts no reading time. The desktop loop opens its time
   span on load even when there are no words, and closes it only on stop.
   Whether the desktop app can reach that state at all was not checked.
+
+## Phase 2: the first screen
+
+One page in `src/ui`: a box to paste text into, Start, and the reader with
+Play and Pause, Back 10 and Forward 10, Restart, a speed slider (100 to 1000
+words a minute, in steps of 10), time left, percent and the word count.
+Nothing is saved yet, and there are no shortcuts, themes or settings.
+
+- `useReaderEngine.ts` makes the loop once and reads it with
+  `useSyncExternalStore`. React state never drives the words.
+- `WordDisplay.tsx` keeps the focus letter still with a three-column grid
+  whose outer columns are always equally wide.
+- `Reader.tsx` is the reading area and its controls. `App.tsx` is the page.
+
+Checked:
+
+- 21 component tests on a fake clock, one of them under React strict mode.
+  `npm run check` passes with 342 tests in the scratch copy (Node 22).
+- By hand in the assistant's workspace, in real Chrome against the built
+  site under `/rsvp-web-reader/`, at 1000 px and 360 px wide: 16 words,
+  among them a one-letter word, a 34-letter word and an emoji. The middle of
+  the focus letter was at the same pixel for every word, and at the middle
+  of the reading area. Words changed after 200 ms, 300 ms after a comma and
+  500 ms after a full stop, as the session says. Pause held the word. The
+  page asked for nothing from another address.
+
+Not checked: Firefox and Safari, a real phone, and the owner's own machine.
+That one-off Chrome run is not a test in the repository. Playwright there
+and in CI is still to do.
+
+Known gaps, all belonging to later phases:
+
+- A word wider than half the reading area is cut off at the edge. On a
+  360 px screen that starts at about 20 letters. Fitting wide flashes is
+  phase 4.
+- The browser asks for `/favicon.ico` and gets a 404. An icon comes with
+  phase 7.
+- The focus letter colour is the desktop default, `#D98A3D` on `#F6EFE3`.
+  Its contrast is low. Colours and themes are phase 4.
 
 ## The handoff package
 

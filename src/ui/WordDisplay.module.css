@@ -1,0 +1,26 @@
+/* The outer columns share what is left equally (1fr each, and minmax(0, ...)
+   so a long word cannot push its own column wider than the other). That is
+   what keeps the focus letter still. */
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: baseline;
+  min-height: 1.5em;
+  font-size: clamp(1.25rem, 6vw, 2rem);
+  line-height: 1.5;
+  /* Keep the spaces inside a chunk of several words. */
+  white-space: pre;
+  overflow: hidden;
+}
+
+.before {
+  text-align: right;
+}
+
+.focus {
+  color: var(--reader-focus);
+}
+
+.after {
+  text-align: left;
+}

@@ -8,8 +8,9 @@ It is the website version of
 [RSVP Desktop Reader](https://github.com/QuiteNew/rsvp-desktop-reader), and it
 is being built step by step from that app's logic.
 
-**Status:** early. The page at
-https://quitenew.github.io/rsvp-web-reader/ only shows a placeholder for now.
+**Status:** early. At https://quitenew.github.io/rsvp-web-reader/ you can
+paste a text and read it, with speed, pause, skip and restart. Nothing is
+saved yet.
 See [docs/STATUS.md](docs/STATUS.md) for what is done and what is next.
 
 ## What it promises
