@@ -14,7 +14,10 @@ const TEXT = [
 
 async function startReading(page: Page, text: string): Promise<void> {
   await page.goto('./');
-  await page.getByLabel('Text to read').fill(text);
+  await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByLabel('Transcript title').fill('Smoke test');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByLabel('Transcript text').fill(text);
   await page.getByRole('button', { name: 'Start reading' }).click();
 }
 
@@ -28,7 +31,8 @@ async function focusLetterCentre(page: Page): Promise<number> {
 test('the page loads under its base path', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('RSVP Web Reader');
-  await expect(page.getByRole('button', { name: 'Start reading' })).toBeDisabled();
+  await expect(page.getByRole('heading', { level: 2 })).toHaveText('List of Transcripts');
+  await expect(page.getByRole('button', { name: 'Settings' })).toBeVisible();
 });
 
 test('paste, start, the words advance, and pause holds', async ({ page }) => {
@@ -67,11 +71,11 @@ test('the focus letter stays on one spot', async ({ page }) => {
   await expect(word).toHaveText('I');
   const first = await focusLetterCentre(page);
 
-  await page.getByRole('button', { name: 'Forward 10' }).click();
+  await page.getByRole('button', { name: 'Forward 10 words' }).click();
   await expect(word).toHaveText('extraordinarily');
   const second = await focusLetterCentre(page);
 
-  await page.getByRole('button', { name: 'Forward 10' }).click();
+  await page.getByRole('button', { name: 'Forward 10 words' }).click();
   await expect(word).toHaveText('cat');
   const third = await focusLetterCentre(page);
 
@@ -85,6 +89,22 @@ test('the focus letter stays on one spot', async ({ page }) => {
   expect(Math.abs(first - (row.x + row.width / 2))).toBeLessThanOrEqual(0.5);
 });
 
+test('transcripts live in their own Space', async ({ page }) => {
+  await page.goto('./');
+  await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByLabel('Transcript title').fill('In General');
+  await page.getByRole('button', { name: 'Create' }).click();
+
+  await page.getByRole('button', { name: 'New Space' }).click();
+  await page.getByLabel('Space name').fill('Work');
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByRole('button', { name: 'In General', exact: true })).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Select Space' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'General', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'In General', exact: true })).toBeVisible();
+});
+
 test('the site asks for nothing from anywhere else', async ({ page, baseURL }) => {
   const origin = new URL(baseURL ?? '').origin;
   const elsewhere: string[] = [];
@@ -94,5 +114,8 @@ test('the site asks for nothing from anywhere else', async ({ page, baseURL }) =
   });
   await startReading(page, TEXT);
   await expect(page.getByTestId('word')).not.toHaveText('I');
+  // The fonts come from the site itself, never from a font service.
+  // A string, because this file is checked as Node code and has no `document`.
+  await expect.poll(() => page.evaluate('document.fonts.check("16px Quicksand")')).toBe(true);
   expect(elsewhere).toEqual([]);
 });

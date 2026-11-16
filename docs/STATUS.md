@@ -3,8 +3,8 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-15. Phase 2 is built and waits for the owner. The
-handoff package is written.
+Last updated: 2026-11-16. Phase 2 is built and the owner has tried it. The
+page now has the desktop app's layout, on a library that is not saved yet.
 
 ## Phases
 
@@ -266,6 +266,62 @@ them is possible later if it gets annoying.
 
 Not used: Playwright's clock control. The tests are short enough in real
 time, and real time is what they are there to check.
+
+## The desktop layout, before saving (2026-11-16)
+
+The owner tried the first screen, said it works, and asked for the look of
+the desktop app next: the transcript list on the left, organised in Spaces,
+and Settings top right. This is out of the brief's order on purpose. The
+order agreed with the owner: the layout first, on a library kept in memory,
+then phase 3 puts real saving under it.
+
+What is there, in the light theme only:
+
+- The sidebar: "List of Transcripts" with an add button, a search box, the
+  transcripts of the current Space as cards, and the Space band at the
+  bottom with Select Space and New Space.
+- The right side: the open transcript's title, Settings, the text box with
+  Start reading, or the word being read with Stop, Pause, Restart, time left
+  and percent. The band at the bottom has the speed and the two skip
+  buttons.
+- Dialogs for a new transcript, a new Space, the list of Spaces (switch,
+  rename, delete an empty one), deleting a transcript, and Settings, which
+  only says that there are no settings yet.
+- Each transcript keeps its own text, speed and place. Reading picks up at
+  the word it was stopped on.
+- The desktop app's colours (`LIGHT_PALETTE` in its `gui/theme.py`) and its
+  two fonts, Fredoka and Quicksand, copied from its `assets/fonts` with
+  their SIL OFL texts into `src/ui/fonts`.
+- On a screen narrower than 720 px the sidebar sits on top.
+
+`src/store/memoryLibrary.ts` is a stand-in. It implements the part of the
+`LibraryStore` contract the page uses, in memory, so a reload empties the
+list. Its rules were read from `transcript_store.py` and have 15 tests, but
+no golden fixtures. Phase 3 replaces it: the rules move to `src/core` with
+fixtures, as [handoff/phase-3.md](handoff/phase-3.md) says, and the page
+should not need to change, because it is written against the contract.
+
+Choices made here that the desktop code was not checked for. Each is a
+question for phase 3:
+
+- A new transcript asks only for a title. The desktop asks "Blank
+  transcript" or "Add from file" first. Files are phase 5.
+- Typing in the text box changes the transcript at once. The desktop keeps
+  a draft until it is saved.
+- A changed text is read from its first word again.
+- A transcript that was read to the end starts again from the first word.
+
+Left out for now, though the desktop screenshots show them: the sort
+button, the bookmark, detached window and focus buttons, the two blue
+buttons under the text box, the colour pickers, the word size and Group
+controls, renaming or moving a transcript, and the dark theme.
+
+Checked: `npm run check` passes with 371 tests in the scratch copy (Node
+22). The browser tests, now six, pass in the workspace's Chrome three times
+in a row, and one of them checks that the Quicksand font loads from the
+site itself. Looked at by eye in Chrome at 1300 px and 380 px wide. Not run:
+Firefox, WebKit, the owner's machine. The dialogs do not yet keep keyboard
+focus inside them or give it back when they close. That is for phase 7.
 
 ## The handoff package
 

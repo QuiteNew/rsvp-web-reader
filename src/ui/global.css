@@ -1,17 +1,76 @@
-/* Page-wide basics. Colours follow the system's light or dark setting until
-   the app gets its own themes in phase 4. */
+/* Page-wide basics: the fonts and the colours of the desktop app's light
+   theme (LIGHT_PALETTE in its gui/theme.py). Dark comes later. */
+
+/* The same two fonts the desktop app ships, both under the SIL Open Font
+   License. Their licence texts are next to them in ./fonts. */
+@font-face {
+  font-family: 'Fredoka';
+  font-weight: 600;
+  font-display: swap;
+  src: url('./fonts/Fredoka-SemiBold.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Quicksand';
+  font-weight: 500;
+  font-display: swap;
+  src: url('./fonts/Quicksand-Medium.ttf') format('truetype');
+}
 
 :root {
-  color-scheme: light dark;
-  font-family:
-    system-ui,
-    -apple-system,
-    'Segoe UI',
-    Roboto,
-    sans-serif;
+  --paper: #f6efe3;
+  --ink: #3b2e27;
+  --taupe: #ece0cf;
+  --mocha: #b7a38a;
+  --ember: #d98a3d;
+  --ember-hover: #c17a2f;
+  --line: #d6c4ac;
+  --blue: #3b8ad2;
+  --blue-hover: #2f78bd;
+  --pill: #d9d9d9;
+  --pill-hover: #c9c9c9;
+  --card: #f8f1e6;
+  --card-current: #f3dfc6;
+  --text-box: #fafafa;
+
+  --font-heading: 'Fredoka', system-ui, sans-serif;
+  --font-body: 'Quicksand', system-ui, sans-serif;
+
+  color-scheme: light;
+  font-family: var(--font-body);
+  font-weight: 500;
   line-height: 1.5;
+  color: var(--ink);
+  background: var(--paper);
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
   margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
