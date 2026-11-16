@@ -20,8 +20,8 @@ picked up by whoever comes next without guessing. The spec is
 | --- | --------------------------------------------------------------------- | ------- |
 | 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done    |
 | 2   | `storageFormat`: the port of `parse_data` and the write side          | Done    |
-| 3   | `bundle`: reading and writing an export file, the five messages       | Next    |
-| 4   | `library`: every `TranscriptStore` method as a pure function          | Waiting |
+| 3   | `bundle`: reading and writing an export file, the five messages       | Done    |
+| 4   | `library`: every `TranscriptStore` method as a pure function          | Next    |
 | 5   | `settings`: defaults, ranges, clamping, `_known_settings`             | Waiting |
 | 6   | The store over a `Persistence`, with one in memory for tests          | Waiting |
 | 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Waiting |
@@ -83,3 +83,33 @@ Found on the way, and fixed:
 - The desktop tests for this (`test_storage.py`, `test_models.py`,
   `test_damaged_files.py`) are not ported yet. Do them with step 6, when
   there is a store to run the save and load ones against.
+
+## Step 3, done on 2026-11-16
+
+- `src/core/bundle.ts`: `buildBundle`, `bundleText`, `parseBundle` with
+  the five messages word for word, `BUNDLE_FORMAT_VERSION` and
+  `BUNDLE_FILE_NAME`. Fixture `bundle.json`.
+- `src/core/library.ts` is started with the two functions an import needs:
+  `replaceAll` and `mergeAll`, checked against the real `TranscriptStore`
+  in a temporary folder. Step 4 adds the rest of the store's methods here.
+- `parseBundle` gives the file's settings back raw, as the desktop does.
+  Turning them into `Settings` is step 5. The `Bundle` type in
+  `src/store/contract.ts` says `Settings | null`, so the store's
+  `BundleService` does that conversion when it is built.
+- `bundleText` is `JSON.stringify(bundle, null, 2)`. The desktop escapes
+  every non-ASCII character, this does not. Decided: leave it, both sides
+  read both. Whether the desktop takes a web export in full is still to be
+  tried with the real app, by the owner.
+
+Known differences from the desktop, all in refusing a bad file:
+
+- Python's JSON reader accepts `NaN` and `Infinity`. JavaScript's does
+  not, so such a file gets the "isn't valid JSON" message here.
+- The "different version" message shows the file's format the way Python
+  prints it. A format written as `2.0` shows as `2` here, and a number
+  beyond 2^53 loses its last digits.
+- `"bundle_format": true` is let in, because in Python `True == 1`.
+
+Not done in this step: the desktop tests `test_data_bundle.py` and
+`test_export_import_in_app.py`. Port the first with step 6, when the store
+exists. The second drives the app and belongs to step 8.

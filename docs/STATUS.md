@@ -14,7 +14,7 @@ is next.
 | 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                    |
 | 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                            |
 | 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout on a library that is not saved yet |
-| 3     | Saved data                             | Started. Step 1 of 9 is done. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                |
+| 3     | Saved data                             | Started. Steps 1 to 3 of 9 are done. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                         |
 | 4     | The reading experience                 | Not started                                                                                                                                                 |
 | 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                           |
 | 6     | Comfort and the rest                   | Not started                                                                                                                                                 |

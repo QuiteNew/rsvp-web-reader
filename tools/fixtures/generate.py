@@ -958,6 +958,96 @@ def build_storage(core):
     }
 
 
+def build_bundle(core):
+    import copy
+    import tempfile
+    from dataclasses import asdict
+    import core.data_bundle
+    import core.storage
+    from core.transcript_store import TranscriptStore
+
+    def state_dict(state):
+        return {**state, "transcripts": [asdict(t) for t in state["transcripts"]]}
+
+    def parse_bundle(text):
+        try:
+            bundle = core.data_bundle.parse_bundle(text)
+        except core.data_bundle.BundleFormatError as error:
+            return ["error", str(error)]
+        return ["ok", state_dict(bundle["data"]), bundle["settings"]]
+
+    def fresh_store(folder, data):
+        # The store saves into its folder. It gets a temporary one, far from
+        # the desktop repository and from the real data folder.
+        store = TranscriptStore(data_directory=folder)
+        store.replace_all(core.storage.parse_data(copy.deepcopy(data)))
+        return store
+
+    def replace_all(data):
+        with tempfile.TemporaryDirectory() as folder:
+            return fresh_store(folder, data).export_state()
+
+    def merge_all(current, incoming):
+        with tempfile.TemporaryDirectory() as folder:
+            store = fresh_store(folder, current)
+            store.merge_all(core.storage.parse_data(copy.deepcopy(incoming)))
+            return store.export_state()
+
+    def data(spaces, transcripts, next_id, index=0):
+        return {"next_id": next_id, "current_space_index": index, "spaces": spaces, "transcripts": transcripts}
+
+    def t(i, title, space, **more):
+        return {"id": i, "title": title, "space": space, **more}
+
+    mine = data(["General", "Work"], [t(1, "One", "General"), t(4, "Four", "Work", position=9)], 5, 1)
+    theirs = data(
+        ["General", "Books", "work"],
+        [t(1, "A", "General", bookmarks=[{"index": 2, "label": "x"}]), t(2, "B", "Books", wpm=450),
+         t(7, "C", "work", speaker_custom={"ann": "Ann"})],
+        8, 2,
+    )
+    empty = data([], [], 1)
+    libraries = [mine, theirs, empty, data(["General"], [], 1), data(["Solo"], [t(3, "S", "Solo")], 4, 5),
+                 data(["A", "B"], [t(1, "x", "B")], 2, -1)]
+
+    def text(bundle):
+        return json.dumps(bundle)
+
+    good = {"bundle_format": 1, "data": theirs, "settings": {"default_wpm": 450, "unknown": [1]}}
+    texts = [
+        text(good), json.dumps(good, indent=2), text({**good, "extra": 1}),
+        text({**good, "data": empty}), text({**good, "settings": {}}),
+        # Python's True equals 1, so this one is let in.
+        text({**good, "bundle_format": True}),
+        # 1. Not JSON.
+        "", "not json", "{", "[1, 2,]", "{'bundle_format': 1}", "﻿" + text(good),
+        # 2. Not an object, or no bundle_format.
+        "null", "5", "\"text\"", "[]", "[1]", "{}", text({"data": theirs, "settings": {}}), "true",
+        # 3. Another format.
+        text({**good, "bundle_format": 2}), text({**good, "bundle_format": 0}),
+        text({**good, "bundle_format": -1}), text({**good, "bundle_format": "1"}),
+        text({**good, "bundle_format": "two"}), text({**good, "bundle_format": None}),
+        text({**good, "bundle_format": False}), text({**good, "bundle_format": [1]}),
+        text({**good, "bundle_format": []}), text({**good, "bundle_format": {"a": "b"}}),
+        # 4. data or settings is not an object.
+        text({"bundle_format": 1}), text({"bundle_format": 1, "data": theirs}),
+        text({"bundle_format": 1, "settings": {}}), text({**good, "data": []}),
+        text({**good, "settings": None}), text({**good, "settings": [1]}), text({**good, "data": "x"}),
+        # 5. data that parse_data refuses.
+        text({**good, "data": {}}), text({**good, "data": data(["General"], [{"id": 1}], 2)}),
+        text({**good, "data": data(["General"], [5], 2)}),
+    ]
+    return {
+        "parse_bundle": [call(parse_bundle, value) for value in texts],
+        "replace_all": [call(replace_all, value) for value in libraries],
+        "merge_all": [call(merge_all, a, b) for a in libraries[:5] for b in libraries],
+        "constants": [
+            [["BUNDLE_FORMAT_VERSION"], core.data_bundle.BUNDLE_FORMAT_VERSION],
+            [["DEFAULT_SPACE"], core.transcript_store.DEFAULT_SPACE],
+        ],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -1010,6 +1100,7 @@ MODULES = {
     "reopen": build_reopen,
     "case": build_case,
     "storage": build_storage,
+    "bundle": build_bundle,
 }
 
 
