@@ -15,6 +15,7 @@
 // holds the current value, saves it and loads it.
 
 import type { Library, Settings, SpeakerCustom, Transcript } from '../core/models';
+import type { SavedSettings } from '../core/savedShapes';
 
 // Where a value is kept. One for the library, one for the settings. The
 // rest of the store is written against this, so tests can use one that
@@ -144,18 +145,27 @@ export interface LibraryStore {
 // The app-wide settings. A value outside its range is pulled back into it
 // before it is saved. On the desktop the Settings window does that, not the
 // store. Here it is withChanges() in src/core/settings.ts.
+//
+// They are kept in localStorage, which answers at once, so every change is
+// written before the method returns and there is nothing to flush.
 export interface SettingsStore {
   subscribe(listener: () => void): () => void;
   getSnapshot(): Settings;
+  // The settings in the desktop's shape, for an export file.
+  saved(): SavedSettings;
   damagedNotice(): string | null;
   clearDamagedNotice(): void;
-  flush(): Promise<void>;
+  // Why the last save did not work, or null.
+  saveProblem(): string | null;
 
   set<K extends keyof Settings>(key: K, value: Settings[K]): void;
   // Several at once, as one change and one save.
   update(changes: Partial<Settings>): void;
-  // Used by a bundle import in Replace mode.
-  replaceAll(settings: Settings): void;
+  // A guide mark colour picked by hand. It stops following the theme.
+  setGuideMarkColor(color: string): void;
+  // Used by a bundle import in Replace mode. Takes the "settings" part of
+  // the file as it is. Profiles already here are kept when the file has none.
+  replaceFromBundle(settings: SavedSettings): void;
 }
 
 // An export file, or a file being imported. On disk it has the desktop

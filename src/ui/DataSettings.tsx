@@ -9,11 +9,7 @@ import {
 } from '../core/bundle';
 import type { Library } from '../core/models';
 import type { SavedLibraryStore } from '../store/libraryStore';
-import {
-  browserSettingsStorage,
-  readSavedSettings,
-  writeSavedSettings,
-} from '../store/savedSettings';
+import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './Dialog.module.css';
 import { saveTextFile } from './saveFile';
 
@@ -22,6 +18,7 @@ type ReadBundle = Extract<ParsedBundle, { kind: 'ok' }>;
 interface DataSettingsProps {
   readonly library: Library;
   readonly store: SavedLibraryStore;
+  readonly settings: SavedSettingsStore;
   // Called after an import has changed the library.
   readonly onImported: () => void;
   // How a file is handed to the person. Tests pass their own.
@@ -38,6 +35,7 @@ function count(amount: number, one: string, many: string): string {
 export function DataSettings({
   library,
   store,
+  settings,
   onImported,
   saveFile = saveTextFile,
 }: DataSettingsProps) {
@@ -45,9 +43,7 @@ export function DataSettings({
   const [chosen, setChosen] = useState<ReadBundle | null>(null);
 
   function exportAll() {
-    const storage = browserSettingsStorage();
-    const settings = storage === null ? {} : readSavedSettings(storage);
-    saveFile(BUNDLE_FILE_NAME, bundleText(buildBundle(library, settings)));
+    saveFile(BUNDLE_FILE_NAME, bundleText(buildBundle(library, settings.saved())));
   }
 
   async function choose(file: File | undefined) {
@@ -71,8 +67,7 @@ export function DataSettings({
 
   function replace(bundle: ReadBundle) {
     store.replaceAll(bundle.library);
-    const storage = browserSettingsStorage();
-    if (storage !== null) writeSavedSettings(storage, bundle.settings);
+    settings.replaceFromBundle(bundle.settings);
     onImported();
   }
 

@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { IndexedDbLibrary } from './store/indexedDbLibrary';
 import { SavedLibraryStore } from './store/libraryStore';
+import { browserSettingsStorage, SavedSettingsStore } from './store/settingsStore';
 import { browserStorageHealth } from './store/storageHealth';
 import { App } from './ui/App';
 import './ui/global.css';
@@ -13,11 +14,12 @@ if (!root) {
 
 // One store for the page, made here so that React's StrictMode, which
 // mounts everything twice while developing, still reads the saved library
-// once.
+// and the saved settings once.
 const store = new SavedLibraryStore(new IndexedDbLibrary());
+const settings = new SavedSettingsStore(browserSettingsStorage());
 
 createRoot(root).render(
   <StrictMode>
-    <App store={store} health={browserStorageHealth} />
+    <App store={store} settings={settings} health={browserStorageHealth} />
   </StrictMode>,
 );

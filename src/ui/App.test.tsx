@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
@@ -6,10 +6,13 @@ import { APP_VERSION } from '../core/appInfo';
 import { FakeClock, FakeVisibility } from '../testing/fakeClock';
 import { buildBundle, bundleText } from '../core/bundle';
 import { EMPTY_LIBRARY, TRANSCRIPT_DEFAULTS, type Library } from '../core/models';
+import { DEFAULT_SAVED_SETTINGS } from '../core/settings';
 import { SavedLibraryStore } from '../store/libraryStore';
 import { MemoryPersistence } from '../store/memoryPersistence';
 import { SETTINGS_KEY } from '../store/schema';
+import { SavedSettingsStore } from '../store/settingsStore';
 import { App } from './App';
+import { DataSettings } from './DataSettings';
 
 // The page remembers the open transcript in localStorage. Each test starts
 // with none.
@@ -32,8 +35,14 @@ function renderPage(library: Library = EMPTY_LIBRARY): Page {
   const visibility = new FakeVisibility();
   const persistence = new MemoryPersistence<Library>();
   const store = SavedLibraryStore.ready(persistence, library);
-  render(<App store={store} clock={clock} visibility={visibility} />);
+  // Read from localStorage as the page opens, the way main.tsx does it.
+  render(<App store={store} settings={savedSettings()} clock={clock} visibility={visibility} />);
   return { clock, visibility, store, persistence };
+}
+
+// The settings as the page finds them when it opens.
+function savedSettings(): SavedSettingsStore {
+  return new SavedSettingsStore(window.localStorage);
 }
 
 function press(name: string): void {
@@ -437,6 +446,7 @@ describe('under React strict mode', () => {
       <StrictMode>
         <App
           store={SavedLibraryStore.ready(new MemoryPersistence<Library>())}
+          settings={savedSettings()}
           clock={clock}
           visibility={visibility}
         />
@@ -475,7 +485,7 @@ describe('saving', () => {
     const store = new SavedLibraryStore(
       new MemoryPersistence<Library>({ kind: 'ok', value: SAVED }),
     );
-    render(<App store={store} />);
+    render(<App store={store} settings={savedSettings()} />);
     expect(screen.getByRole('status').textContent).toContain('Opening your library');
     expect(screen.queryByRole('button', { name: 'Add transcript' })).toBeNull();
     expect(await screen.findByRole('button', { name: 'Kept' })).toBeTruthy();
@@ -551,7 +561,7 @@ describe('saving', () => {
         keptAs: 'library.damaged-20261116-101500',
       }),
     );
-    render(<App store={store} />);
+    render(<App store={store} settings={savedSettings()} />);
     const notice = await screen.findByRole('alert');
     expect(notice.textContent).toContain('library.damaged-20261116-101500');
     fireEvent.click(within(notice).getByRole('button', { name: 'OK' }));
@@ -563,7 +573,7 @@ describe('saving', () => {
       read: () => Promise.reject(new Error('blocked')),
       write: () => Promise.reject(new Error('blocked')),
     });
-    render(<App store={store} />);
+    render(<App store={store} settings={savedSettings()} />);
     expect((await screen.findByRole('alert')).textContent).toContain('not letting the app save');
     press('Add transcript');
     answerDialog('Lecture');
@@ -575,6 +585,7 @@ describe('saving', () => {
     render(
       <App
         store={SavedLibraryStore.ready(new MemoryPersistence<Library>())}
+        settings={savedSettings()}
         health={{ requestPersistence }}
       />,
     );
@@ -684,6 +695,82 @@ describe('export and import', () => {
   });
 });
 
+describe('the settings the page uses', () => {
+  function save(settings: object): void {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+  }
+
+  test('a new transcript starts with what Settings holds for one', () => {
+    save({ default_wpm: 450, default_font_size: 40, default_chunk_size: 3 });
+    const { store } = renderPage();
+    addTranscript('Notes');
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      wpm: 450,
+      fontSize: 40,
+      chunkSize: 3,
+      fontColor: '#3B2E27',
+      chunkingEnabled: false,
+    });
+    expect(screen.getByRole('slider', { name: 'Speed' })).toHaveValue('450');
+  });
+
+  test('the skip buttons move by the number of words in the settings', () => {
+    save({ skip_word_count: 3 });
+    renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    press('Pause');
+    press('Forward 3 words');
+    expect(word()).toBe('d');
+    press('Back 3 words');
+    expect(word()).toBe('a');
+  });
+
+  test('a setting outside its range is used as the nearest end of it', () => {
+    save({ default_wpm: 5000 });
+    const { store } = renderPage();
+    addTranscript('Notes');
+    expect(store.getSnapshot().transcripts[0]?.wpm).toBe(1000);
+  });
+
+  test('settings that cannot be read are announced once and put aside', () => {
+    window.localStorage.setItem(SETTINGS_KEY, 'not settings');
+    renderPage();
+    const notice = screen.getByRole('alert');
+    expect(notice.textContent).toContain('The saved settings could not be read');
+    expect(window.localStorage.getItem(`${SETTINGS_KEY}.damaged`)).toBe('not settings');
+    fireEvent.click(within(notice).getByRole('button', { name: 'OK' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+    // The page works with the defaults.
+    addTranscript('Notes');
+    expect(screen.getByRole('slider', { name: 'Speed' })).toHaveValue('300');
+  });
+
+  test('an export carries every setting, in the desktop shape', () => {
+    save({ default_wpm: 450, window_width: 1200 });
+    const saveFile = vi.fn<(name: string, text: string) => void>();
+    const store = SavedLibraryStore.ready(new MemoryPersistence<Library>());
+    const settings = savedSettings();
+    render(
+      <DataSettings
+        library={store.getSnapshot()}
+        store={store}
+        settings={settings}
+        onImported={() => {}}
+        saveFile={saveFile}
+      />,
+    );
+    press('Export to a file');
+    const bundle = JSON.parse(saveFile.mock.calls[0]?.[1] ?? '') as { settings: object };
+    expect(bundle.settings).toEqual({
+      ...DEFAULT_SAVED_SETTINGS,
+      default_wpm: 450,
+      window_width: 1200,
+    });
+  });
+});
+
 // A reload, as far as the page can tell: the old page goes away, and a new
 // one opens on what was saved, with the same localStorage.
 describe('coming back after a reload', () => {
@@ -699,7 +786,7 @@ describe('coming back after a reload', () => {
     const store = new SavedLibraryStore(persistence);
     const clock = new FakeClock();
     const visibility = new FakeVisibility();
-    render(<App store={store} clock={clock} visibility={visibility} />);
+    render(<App store={store} settings={savedSettings()} clock={clock} visibility={visibility} />);
     await screen.findByRole('heading', { level: 2 });
     return { clock, visibility, store, persistence };
   }
@@ -709,7 +796,9 @@ describe('coming back after a reload', () => {
     const visibility = new FakeVisibility();
     const persistence = new MemoryPersistence<Library>();
     const store = SavedLibraryStore.ready(persistence, library);
-    const { unmount } = render(<App store={store} clock={clock} visibility={visibility} />);
+    const { unmount } = render(
+      <App store={store} settings={savedSettings()} clock={clock} visibility={visibility} />,
+    );
     return { page: { clock, visibility, store, persistence }, unmount };
   }
 
@@ -827,6 +916,35 @@ describe('coming back after a reload', () => {
     expect(screen.queryByLabelText('Transcript text')).toBeNull();
   });
 
+  test('the switch in Settings turns reopening off, and on again', async () => {
+    const { page, unmount } = firstPage();
+    addAndType('Lecture', TEXT);
+    press('Start reading');
+    press('Settings');
+    const reopen = screen.getByRole('checkbox', {
+      name: 'Reopen the last transcript when the page opens',
+    });
+    expect(reopen).toBeChecked();
+    fireEvent.click(reopen);
+    expect(reopen).not.toBeChecked();
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
+      reopen_last_transcript: false,
+      last_transcript_id: 1,
+    });
+
+    const second = await reload(page, unmount);
+    expect(screen.queryByTestId('word')).toBeNull();
+    expect(screen.queryByLabelText('Transcript text')).toBeNull();
+
+    // Switched back on, the next reload opens what is open then.
+    press('Lecture');
+    press('Settings');
+    fireEvent.click(screen.getByRole('checkbox', { name: /Reopen the last transcript/ }));
+    cleanup();
+    await reload(second, () => {});
+    expect(word()).toBe('one');
+  });
+
   test('picking a transcript that was left in the reader opens it there, paused', () => {
     const { page } = firstPage();
     addAndType('First', TEXT);
@@ -867,6 +985,7 @@ describe('coming back after a reload', () => {
           store={
             new SavedLibraryStore(new MemoryPersistence<Library>({ kind: 'ok', value: saved }))
           }
+          settings={savedSettings()}
           clock={clock}
           visibility={new FakeVisibility()}
         />

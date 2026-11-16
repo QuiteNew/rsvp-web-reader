@@ -16,21 +16,21 @@ picked up by whoever comes next without guessing. The spec is
 
 ## Steps
 
-| #   | What                                                                  | State  |
-| --- | --------------------------------------------------------------------- | ------ |
-| 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done   |
-| 2   | `storageFormat`: the port of `parse_data` and the write side          | Done   |
-| 3   | `bundle`: reading and writing an export file, the five messages       | Done   |
-| 4   | `library`: every `TranscriptStore` method as a pure function          | Done   |
-| 5   | `settings`: defaults, ranges, reading, Replace, then the store        | Partly |
-| 6   | The store over a `Persistence`, with one in memory for tests          | Done   |
-| 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Done   |
-| 8   | The UI on the real store, export and import in Settings               | Done   |
-| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Next   |
+| #   | What                                                                  | State |
+| --- | --------------------------------------------------------------------- | ----- |
+| 1   | `wpmStep`, `transcriptSort`, `reopen`, and Python's `lower()` exactly | Done  |
+| 2   | `storageFormat`: the port of `parse_data` and the write side          | Done  |
+| 3   | `bundle`: reading and writing an export file, the five messages       | Done  |
+| 4   | `library`: every `TranscriptStore` method as a pure function          | Done  |
+| 5   | `settings`: defaults, ranges, reading, Replace, then the store        | Done  |
+| 6   | The store over a `Persistence`, with one in memory for tests          | Done  |
+| 7   | IndexedDB and `localStorage`, the damaged copy, `flush()`             | Done  |
+| 8   | The UI on the real store, export and import in Settings               | Done  |
+| 9   | `normalizer` (446 lines, 96 tests), its own commit                    | Next  |
 
-Saving works end to end as of step 8. What is left of phase 3 is the rest
-of step 5 (the settings as real settings) and step 9 (the normalizer),
-plus the desktop tests listed at the end of this file.
+Saving works end to end as of step 8, and the settings are real settings
+as of step 5. What is left of phase 3 is step 9 (the normalizer), plus the
+desktop tests listed at the end of this file.
 
 ## Step 1, done on 2026-11-16
 
@@ -211,13 +211,36 @@ Where the web differs from the desktop here, on purpose:
 - JSON in the browser cannot tell `3.0` from `3`. The desktop reads
   `"last_transcript_id": 3.0` as no transcript, the web as transcript 3.
 
-Step 5b, next: the `SettingsStore` of the contract in `src/store` over
-`localStorage`, using these rules for load, change and Replace. Move
-`savedSettings.ts` onto it (`App.tsx` and `DataSettings.tsx` use it now),
-put damaged settings text aside as now, and add the switch for
-`reopen_last_transcript` to Settings. Then the desktop's own tests:
-`test_settings_store*.py` and the settings halves of the sort, reopen
-and wpm tests.
+## Step 5b, the settings store, done on 2026-11-16
+
+- `src/store/settingsStore.ts`: `SavedSettingsStore` over `localStorage`.
+  It reads when it is made and writes after every change, so there is no
+  `load()` and no `flush()`. The contract's `SettingsStore` was changed to
+  match: `saved()`, `saveProblem()`, `setGuideMarkColor()` and
+  `replaceFromBundle()` in, `flush()` and `replaceAll(Settings)` out.
+- `savedSettings.ts` and its test are gone. `main.tsx` makes the one store
+  and `App` gets it as the `settings` prop.
+- Text that is not settings (not JSON, or not an object) is copied to
+  `rsvp-web-reader.settings.damaged`, the defaults are used and the page
+  says so once. The text itself stays until a change is saved over it.
+- What the page takes from the settings now: reopening and the last
+  transcript, the number of words a skip moves, and the nine values a new
+  transcript starts with (speed, colours, size, chunking).
+- Settings has its first switch: "Reopen the last transcript when the
+  page opens".
+- An export now carries every setting, not only the ones a file brought.
+
+Not done here, on purpose:
+
+- No controls for the other settings. They come with the features that
+  use them (phases 4 and 6).
+- The colours a new transcript gets are the desktop's light theme ones.
+  Nothing on the page draws with them until themes exist.
+- Two tabs open at once: the last one to save a setting wins, and the
+  other does not notice. Same as the library.
+
+Next for settings: the desktop's own tests, `test_settings_store*.py` and
+the settings halves of the sort, reopen and wpm tests.
 
 ## Coming back where you left off, done on 2026-11-16
 

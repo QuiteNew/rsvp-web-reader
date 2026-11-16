@@ -160,3 +160,25 @@ test('a reload comes back to the word being read, paused', async ({ page }) => {
   await page.waitForTimeout(600);
   await expect(page.getByTestId('word')).toHaveText(place);
 });
+
+test('with reopening switched off in Settings, a reload opens nothing', async ({ page }) => {
+  await page.goto('./');
+  await addTranscript(page, 'Lecture', FORTY_WORDS);
+  await pauseTenWordsOn(page);
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('checkbox', { name: /Reopen the last transcript/ }).uncheck();
+  await page.keyboard.press('Escape');
+  await page.reload();
+
+  // The transcript is still in the list, and nothing is open.
+  await expect(card(page, 'Lecture')).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('RSVP Web Reader');
+  await expect(page.getByTestId('word')).toHaveCount(0);
+
+  // The switch itself was saved too.
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await expect(
+    page.getByRole('checkbox', { name: /Reopen the last transcript/ }),
+  ).not.toBeChecked();
+});

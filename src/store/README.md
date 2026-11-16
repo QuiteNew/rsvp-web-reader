@@ -12,7 +12,8 @@ Saved data: IndexedDB and localStorage, behind small interfaces.
 - `indexedDbLibrary.ts`: the saved record in IndexedDB. Only the browser
   tests in `e2e/` can run it.
 - `memoryPersistence.ts`: the same thing in memory, for tests.
-- `savedSettings.ts`: the settings of an imported file, kept as they came.
+- `settingsStore.ts`: the app-wide settings, kept in `localStorage`. The
+  rules are in `src/core/settings.ts`.
 - `storageHealth.ts`: asking the browser not to clear the data.
 
 What is done and what is left is in

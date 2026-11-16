@@ -2,19 +2,16 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 
 import { APP_NAME, APP_VERSION, REPO_URL } from '../core/appInfo';
 import { currentSpace, findTranscript } from '../core/library';
-import type { Library, Transcript } from '../core/models';
+import type { Library, Settings, Transcript } from '../core/models';
 import { pyRound } from '../core/pythonText';
 import { ReaderSession } from '../core/reader';
 import { transcriptToReopen } from '../core/reopen';
+import { WPM_RANGE } from '../core/settings';
 import { formatDuration } from '../core/timing';
+import { WPM_KEY_STEP } from '../core/wpmStep';
 import type { StorageHealth } from '../store/contract';
 import type { SavedLibraryStore } from '../store/libraryStore';
-import {
-  browserSettingsStorage,
-  readLastTranscriptId,
-  reopenLastTranscript,
-  writeLastTranscriptId,
-} from '../store/savedSettings';
+import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './App.module.css';
 import { DataSettings } from './DataSettings';
 import { Dialog, NameDialog } from './Dialog';
@@ -25,13 +22,9 @@ import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { WordDisplay } from './WordDisplay';
 
-// The desktop app's limits and steps. They move into the settings later
-// (WPM_RANGE and skip_word_count in its core/settings_store.py, and
-// WPM_KEY_STEP in core/wpm_step.py).
-const WPM_MIN = 100;
-const WPM_MAX = 1000;
-const WPM_STEP = 10;
-const SKIP_WORDS = 10;
+// The speed slider's ends and its step, the desktop app's.
+const [WPM_MIN, WPM_MAX] = WPM_RANGE;
+const WPM_STEP = WPM_KEY_STEP;
 
 type OpenDialog =
   | { readonly kind: 'none' }
@@ -62,24 +55,19 @@ function sessionFor(transcript: Transcript): ReaderSession | null {
 
 // The transcript that was open when the page was last used, if it is to be
 // opened again and still exists.
-function transcriptOpenLast(library: Library): Transcript | null {
-  const storage = browserSettingsStorage();
-  if (storage === null) return null;
+function transcriptOpenLast(library: Library, settings: Settings): Transcript | null {
   return transcriptToReopen(
-    reopenLastTranscript(storage),
-    readLastTranscriptId(storage),
+    settings.reopenLastTranscript,
+    settings.lastTranscriptId,
     library.transcripts,
   );
-}
-
-function rememberOpen(id: number | null): void {
-  const storage = browserSettingsStorage();
-  if (storage !== null) writeLastTranscriptId(storage, id);
 }
 
 export interface AppProps extends ReaderEngineParts {
   // The saved library. main.tsx passes the one kept in the browser.
   readonly store: SavedLibraryStore;
+  // The saved settings. main.tsx passes the ones kept in the browser.
+  readonly settings: SavedSettingsStore;
   // Asked to keep the data once there is something worth keeping.
   readonly health?: StorageHealth;
 }
@@ -89,11 +77,14 @@ export interface AppProps extends ReaderEngineParts {
 //
 // The library is saved in the browser by the store. Until the store has
 // read what was saved, the page shows nothing that could be changed.
-export function App({ store, health, ...parts }: AppProps) {
+export function App({ store, settings, health, ...parts }: AppProps) {
   const ready = useSyncExternalStore(store.subscribe, store.isReady);
   const damagedNotice = useSyncExternalStore(store.subscribe, store.damagedNotice);
   const saveProblem = useSyncExternalStore(store.subscribe, store.saveProblem);
   const library = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const preferences = useSyncExternalStore(settings.subscribe, settings.getSnapshot);
+  const damagedSettings = useSyncExternalStore(settings.subscribe, settings.damagedNotice);
+  const settingsProblem = useSyncExternalStore(settings.subscribe, settings.saveProblem);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(NO_DIALOG);
   const [problem, setProblem] = useState('');
@@ -103,6 +94,7 @@ export function App({ store, health, ...parts }: AppProps) {
   const selected = inSpace.find((transcript) => transcript.id === selectedId) ?? null;
 
   const [engine, snapshot] = useReaderEngine(parts);
+  const skipWords = preferences.skipWordCount;
   const isReading = snapshot.status !== 'empty';
 
   // Remember where the open transcript is being read, word by word, so
@@ -160,7 +152,7 @@ export function App({ store, health, ...parts }: AppProps) {
     void store.flush();
     setProblem('');
     setSelectedId(id);
-    rememberOpen(id);
+    settings.set('lastTranscriptId', id);
     const transcript = id === null ? null : findTranscript(store.getSnapshot(), id);
     if (transcript === null || transcript.isStopped) return;
     const session = sessionFor(transcript);
@@ -176,14 +168,14 @@ export function App({ store, health, ...parts }: AppProps) {
   const [choseAtStart, setChoseAtStart] = useState(false);
   if (ready && !choseAtStart) {
     setChoseAtStart(true);
-    setSelectedId(transcriptOpenLast(store.getSnapshot())?.id ?? null);
+    setSelectedId(transcriptOpenLast(store.getSnapshot(), settings.getSnapshot())?.id ?? null);
   }
   const reopened = useRef(false);
   useEffect(() => {
     if (!ready || reopened.current) return;
     reopened.current = true;
     const library = store.getSnapshot();
-    const last = transcriptOpenLast(library);
+    const last = transcriptOpenLast(library, settings.getSnapshot());
     if (last === null) return;
     if (last.space !== currentSpace(library)) store.switchToSpace(last.space);
     if (last.isStopped) return;
@@ -191,7 +183,7 @@ export function App({ store, health, ...parts }: AppProps) {
     if (session === null) return;
     engine.load(session, true);
     store.setPaused(last.id, true);
-  }, [ready, store, engine]);
+  }, [ready, store, settings, engine]);
 
   function startReading(transcript: Transcript) {
     const session = sessionFor(transcript);
@@ -262,6 +254,25 @@ export function App({ store, health, ...parts }: AppProps) {
         {saveProblem !== null && (
           <p role="alert" className={styles.notice}>
             {saveProblem}
+          </p>
+        )}
+        {damagedSettings !== null && (
+          <p role="alert" className={styles.notice}>
+            {damagedSettings}{' '}
+            <button
+              type="button"
+              className={styles.dismiss}
+              onClick={() => {
+                settings.clearDamagedNotice();
+              }}
+            >
+              OK
+            </button>
+          </p>
+        )}
+        {settingsProblem !== null && (
+          <p role="alert" className={styles.notice}>
+            {settingsProblem}
           </p>
         )}
         <div className={styles.head}>
@@ -384,11 +395,11 @@ export function App({ store, health, ...parts }: AppProps) {
               <button
                 type="button"
                 className={styles.square}
-                aria-label={`Back ${SKIP_WORDS} words`}
-                title={`Back ${SKIP_WORDS} words`}
+                aria-label={`Back ${skipWords} words`}
+                title={`Back ${skipWords} words`}
                 disabled={!isReading}
                 onClick={() => {
-                  engine.skip(-SKIP_WORDS);
+                  engine.skip(-skipWords);
                 }}
               >
                 {'<<'}
@@ -409,11 +420,11 @@ export function App({ store, health, ...parts }: AppProps) {
               <button
                 type="button"
                 className={styles.square}
-                aria-label={`Forward ${SKIP_WORDS} words`}
-                title={`Forward ${SKIP_WORDS} words`}
+                aria-label={`Forward ${skipWords} words`}
+                title={`Forward ${skipWords} words`}
                 disabled={!isReading}
                 onClick={() => {
-                  engine.skip(SKIP_WORDS);
+                  engine.skip(skipWords);
                 }}
               >
                 {'>>'}
@@ -433,7 +444,20 @@ export function App({ store, health, ...parts }: AppProps) {
             const title = name.trim();
             if (title === '') return 'Give the transcript a title.';
             // A new transcript starts as text to edit, not in the reader.
-            const added = store.addTranscript({ title, space });
+            // It gets what Settings holds for a new transcript.
+            const added = store.addTranscript({
+              title,
+              space,
+              wpm: preferences.defaultWpm,
+              fontColor: preferences.defaultFontColor,
+              highlightColor: preferences.defaultHighlightColor,
+              backgroundColor: preferences.defaultBackgroundColor,
+              fontSize: preferences.defaultFontSize,
+              chunkingEnabled: preferences.defaultChunkingEnabled,
+              chunkSize: preferences.defaultChunkSize,
+              chunkMode: preferences.defaultChunkMode,
+              chunkCharTarget: preferences.defaultChunkCharTarget,
+            });
             store.setStopped(added.id, true);
             open(added.id);
             // Now there is something to lose, so ask the browser to keep it.
@@ -498,9 +522,24 @@ export function App({ store, health, ...parts }: AppProps) {
 
       {dialog.kind === 'settings' && (
         <Dialog title="Settings" onClose={closeDialog}>
+          <label className={dialogStyles.note}>
+            <input
+              type="checkbox"
+              checked={preferences.reopenLastTranscript}
+              onChange={(event) => {
+                settings.set('reopenLastTranscript', event.target.checked);
+              }}
+            />{' '}
+            Reopen the last transcript when the page opens
+          </label>
+          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
+            It comes back at the same word and paused, so nothing starts playing on its own. Turn
+            this off to start with no transcript open.
+          </p>
           <DataSettings
             library={library}
             store={store}
+            settings={settings}
             onImported={() => {
               // The open transcript may be gone, or have another id.
               open(null);
