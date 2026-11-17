@@ -497,3 +497,41 @@ All twelve steps are done, except the choice in step 10 about a flash
 still too wide at 60 percent. The phase is done when the owner has read a
 long transcript with chunking on, used the scrubber and bookmarks by
 keyboard only, and confirmed it.
+
+## The layout of the desktop, 2026-11-17
+
+The owner tried phase 4 ("looks and works great") and asked for the page
+to be laid out exactly like the desktop's main window, from screenshots of
+it. Menus and functions that are not built yet come later.
+
+- The line between the sidebar and the rest is now the same 3 px line as
+  under the two headers (it was a wide brown gap).
+- The footer and the Space band are the same height, 5.75rem, so they line
+  up, and both are shorter than before.
+- The footer is the desktop's `footer.py`: three equal columns. Left: the
+  open transcript's Font and Background colours. Middle: the speed, << and
+  > > beside the slider, and Group as a switch with its - and + below.
+  > > Right: the word size with - and +, and the Highlight colour. The colour
+  > > squares are new on the page and set the transcript's own colours, which
+  > > then stop following the theme, as on the desktop. The footer is there
+  > > with no transcript open too, empty.
+- The toolbar is the desktop's `canvas.py` row: Stop at the left, the
+  position slider beside it while reading, and at the right the time left,
+  the percent, Pause, Restart and Bookmarks. It stays over the text box,
+  where its buttons do nothing (`aria-disabled`), as on the desktop. The
+  time read-out no longer says "left". Detach and focus mode are not
+  built.
+- Settings: the list now runs out to the window's edge, so its scrollbar
+  is beside the settings and not over them. Its sliders and colour squares
+  look like the ones on the page.
+- On a narrow screen the position slider gets its own row and the footer
+  stacks.
+- A question from the owner: the Word size in Settings does not change
+  the number in the footer. That is on purpose and the desktop's: the
+  Defaults note says speed, the three colours and the word size are what
+  new transcripts start with. The footer shows the open transcript's own
+  size.
+- Tests: 3 App tests (the toolbar over the text box, the footer colours,
+  the footer with nothing open). The keyboard bookmark test now tabs past
+  Play and Restart to reach Bookmarks. 38 e2e tests passed in Chrome.
+  Looked at by eye in Chrome at 1000 and 390 px wide, light and dark.

@@ -347,7 +347,7 @@ describe('reading', () => {
     const page = startReading();
     wait(page, WORD_MS * 5);
     expect(screen.getByText('End of the text.')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Play' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('100%')).toBeVisible();
     press('Restart');
     expect(word()).toBe('one');
@@ -356,7 +356,7 @@ describe('reading', () => {
 
   test('time left and percent follow along', () => {
     const page = startReading();
-    expect(screen.getByText('1s left')).toBeVisible();
+    expect(screen.getByText('1s')).toBeVisible();
     expect(screen.getByText('0%')).toBeVisible();
     wait(page, WORD_MS * 2);
     expect(screen.getByText('40%')).toBeVisible();
@@ -2249,5 +2249,43 @@ describe('test_normalize_in_app.py', () => {
     two({ rawText: wall });
     pressNormalize();
     expect((box() as HTMLTextAreaElement).value).toContain('\n\n');
+  });
+});
+
+describe('the layout of the desktop', () => {
+  test('over the text box the toolbar is there, and its buttons do nothing', () => {
+    const { store } = renderPage();
+    addTranscript('Notes');
+    paste('a b c');
+    for (const name of ['Stop reading', 'Play', 'Restart', 'Bookmarks']) {
+      const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('aria-disabled', 'true');
+      fireEvent.click(button);
+    }
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByLabelText('Transcript text')).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isStopped).toBe(true);
+  });
+
+  test("the footer changes the open transcript's colours, which then stop following the theme", () => {
+    const { store } = renderPage();
+    addTranscript('Notes');
+    fireEvent.change(screen.getByLabelText('Font'), { target: { value: '#112233' } });
+    fireEvent.change(screen.getByLabelText('Background'), { target: { value: '#445566' } });
+    fireEvent.change(screen.getByLabelText('Highlight'), { target: { value: '#778899' } });
+    expect(store.getSnapshot().transcripts[0]).toMatchObject({
+      fontColor: '#112233',
+      fontColorIsDefault: false,
+      backgroundColor: '#445566',
+      backgroundColorIsDefault: false,
+      highlightColor: '#778899',
+      highlightColorIsDefault: false,
+    });
+  });
+
+  test('the footer is there with no transcript open, empty', () => {
+    renderPage();
+    expect(screen.queryByRole('slider', { name: 'Speed' })).toBeNull();
+    expect(document.querySelector('[class*="band"]')).not.toBeNull();
   });
 });

@@ -27,6 +27,7 @@ import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import { DataSettings } from './DataSettings';
 import { Dialog } from './Dialog';
+import appStyles from './App.module.css';
 import styles from './Dialog.module.css';
 
 type Tab = 'Defaults' | 'Appearance' | 'Data';
@@ -132,6 +133,7 @@ export function SettingsDialog({
         <span>{label}</span>
         <input
           type="range"
+          className={appStyles.slider}
           min={low}
           max={high}
           step={step}
@@ -151,6 +153,7 @@ export function SettingsDialog({
         <span>{label}</span>
         <input
           type="color"
+          className={appStyles.swatch}
           value={value}
           onChange={(event) => {
             onChange(event.target.value);

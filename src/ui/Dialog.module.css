@@ -295,4 +295,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  /* Out to the window's edge, so the scrollbar is beside the settings and
+     not over them. */
+  margin-right: -1.5rem;
+  padding-right: 1.5rem;
 }

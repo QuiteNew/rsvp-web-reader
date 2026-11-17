@@ -396,7 +396,7 @@ In short:
   hand.
 - The design notes for chunking, the shortcuts and reader fit are in
   `reference/desktop-design/`.
-- `npm run check` passes with 1145 tests in the scratch copy (Node 22).
+- `npm run check` passes with 1148 tests in the scratch copy (Node 22).
   The browser tests (38 tests a browser) pass in Chrome in the workspace.
   On the owner's laptop Firefox and WebKit ran out of time under load. The
   config now runs fewer at once and allows 60 s a test. See the progress

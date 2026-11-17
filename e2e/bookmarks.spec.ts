@@ -46,13 +46,20 @@ async function goToWord(page: Page, index: number): Promise<void> {
   await expect(page.getByTestId('word')).toHaveText(`w${index}`);
 }
 
+async function tabToBookmarks(page: Page): Promise<void> {
+  for (const name of ['Play', 'Restart', 'Bookmarks']) {
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('button', { name })).toBeFocused();
+  }
+}
+
 test('add a bookmark, go away, and come back to it, with the keyboard only', async ({ page }) => {
   await startPaused(page);
   await goToWord(page, 5);
 
-  // The Bookmarks button is the next stop after the slider.
-  await page.keyboard.press('Tab');
-  await expect(page.getByRole('button', { name: 'Bookmarks' })).toBeFocused();
+  // As on the desktop, Bookmarks comes after Play and Restart, so it is
+  // three stops after the slider.
+  await tabToBookmarks(page);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Add bookmark here' })).toBeFocused();
   await page.keyboard.press('Enter');
@@ -62,7 +69,7 @@ test('add a bookmark, go away, and come back to it, with the keyboard only', asy
   await expect(page.getByTestId('bookmark-tick')).toHaveCount(1);
 
   await goToWord(page, 12);
-  await page.keyboard.press('Tab');
+  await tabToBookmarks(page);
   await page.keyboard.press('Enter');
   await expect(page.getByRole('button', { name: 'Add bookmark here' })).toBeFocused();
   await page.keyboard.press('Tab');

@@ -58,6 +58,32 @@ function chunkingOf(transcript: Transcript): ChunkingChoice {
   };
 }
 
+// A colour of the open transcript in the footer: its name, then a small
+// rounded square in that colour that opens the browser's colour picker.
+function ColorSwatch({
+  label,
+  value,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: string;
+  readonly onChange: (color: string) => void;
+}) {
+  return (
+    <label className={styles.swatchRow}>
+      <span>{label}</span>
+      <input
+        type="color"
+        className={styles.swatch}
+        value={value}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+      />
+    </label>
+  );
+}
+
 // How long a short message beside Start reading stays, as on the desktop.
 const FEEDBACK_MS = 2000;
 
@@ -529,6 +555,91 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           </button>
         </div>
 
+        {selected !== null && (
+          // The desktop's toolbar row: Stop at the left, the position slider
+          // next to it while reading, and at the right the time left, the
+          // percent, Pause, Restart and Bookmarks. It stays over the text box
+          // too, as on the desktop, where its buttons then do nothing.
+          <div className={styles.toolbar}>
+            <button
+              type="button"
+              className={styles.pill}
+              aria-label="Stop reading"
+              title="Stop reading (Esc)"
+              aria-disabled={!isReading}
+              onClick={() => {
+                if (isReading) stopReading();
+              }}
+            >
+              <PowerIcon />
+            </button>
+            {isReading && (
+              <div className={styles.scrubSlot}>
+                <Scrubber
+                  total={snapshot.totalWords}
+                  index={snapshot.index}
+                  bookmarks={selected.bookmarks.map((bookmark) => bookmark.index)}
+                  onMove={(index) => {
+                    engine.scrubMove(index);
+                  }}
+                  onEnd={() => {
+                    if (!engine.getSnapshot().isScrubbing) return;
+                    engine.scrubEnd();
+                    // The state it ends in (paused or going on) is saved once,
+                    // like a pause made by hand.
+                    store.setPaused(selected.id, engine.getSnapshot().status !== 'playing');
+                  }}
+                />
+              </div>
+            )}
+            <span className={styles.spring} />
+            {isReading && (
+              <>
+                <span className={styles.readout} title="Time left">
+                  {timeLeft(snapshot.remainingMs)}
+                </span>
+                <span className={styles.readout}>{snapshot.percent}%</span>
+              </>
+            )}
+            <button
+              type="button"
+              className={styles.pill}
+              aria-label={snapshot.status === 'playing' ? 'Pause' : 'Play'}
+              title={snapshot.status === 'playing' ? 'Pause (Space)' : 'Play (Space)'}
+              aria-disabled={!isReading || snapshot.status === 'finished'}
+              onClick={() => {
+                if (isReading) togglePause();
+              }}
+            >
+              {snapshot.status === 'playing' ? <PauseIcon /> : <PlayIcon />}
+            </button>
+            <button
+              type="button"
+              className={styles.pill}
+              aria-label="Restart"
+              title="Restart (R)"
+              aria-disabled={!isReading}
+              onClick={() => {
+                if (isReading) engine.restart();
+              }}
+            >
+              <RestartIcon />
+            </button>
+            <button
+              type="button"
+              className={styles.pill}
+              aria-label="Bookmarks"
+              title="Bookmarks (B adds or removes one here)"
+              aria-disabled={!isReading}
+              onClick={() => {
+                if (isReading) setDialog({ kind: 'bookmarks' });
+              }}
+            >
+              <BookmarkIcon />
+            </button>
+          </div>
+        )}
+
         {selected === null ? (
           <div className={styles.work}>
             <p className={styles.welcome}>
@@ -538,69 +649,6 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           </div>
         ) : isReading ? (
           <div className={styles.work}>
-            <div className={styles.toolbar}>
-              <button
-                type="button"
-                className={styles.pill}
-                aria-label="Stop reading"
-                title="Stop reading (Esc)"
-                onClick={stopReading}
-              >
-                <PowerIcon />
-              </button>
-              <Scrubber
-                total={snapshot.totalWords}
-                index={snapshot.index}
-                bookmarks={selected?.bookmarks.map((bookmark) => bookmark.index) ?? []}
-                onMove={(index) => {
-                  engine.scrubMove(index);
-                }}
-                onEnd={() => {
-                  if (!engine.getSnapshot().isScrubbing) return;
-                  engine.scrubEnd();
-                  // The state it ends in (paused or going on) is saved once,
-                  // like a pause made by hand.
-                  if (selected !== null) {
-                    store.setPaused(selected.id, engine.getSnapshot().status !== 'playing');
-                  }
-                }}
-              />
-              <button
-                type="button"
-                className={styles.pill}
-                aria-label="Bookmarks"
-                title="Bookmarks (B adds or removes one here)"
-                onClick={() => {
-                  setDialog({ kind: 'bookmarks' });
-                }}
-              >
-                <BookmarkIcon />
-              </button>
-              <span className={styles.spring} />
-              <span className={styles.readout}>{timeLeft(snapshot.remainingMs)} left</span>
-              <span className={styles.readout}>{snapshot.percent}%</span>
-              <button
-                type="button"
-                className={styles.pill}
-                aria-label={snapshot.status === 'playing' ? 'Pause' : 'Play'}
-                title={snapshot.status === 'playing' ? 'Pause (Space)' : 'Play (Space)'}
-                disabled={snapshot.status === 'finished'}
-                onClick={togglePause}
-              >
-                {snapshot.status === 'playing' ? <PauseIcon /> : <PlayIcon />}
-              </button>
-              <button
-                type="button"
-                className={styles.pill}
-                aria-label="Restart"
-                title="Restart (R)"
-                onClick={() => {
-                  engine.restart();
-                }}
-              >
-                <RestartIcon />
-              </button>
-            </div>
             <div
               className={styles.stage}
               style={
@@ -679,128 +727,166 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           </form>
         )}
 
-        {selected !== null && (
-          <div className={styles.band}>
-            <output className={styles.wpm} htmlFor="speed">
-              {selected.wpm} WPM
-            </output>
-            <div className={styles.speedRow}>
-              <button
-                type="button"
-                className={styles.square}
-                aria-label={`Back ${skipWords} words`}
-                title={`Back ${skipWords} words`}
-                disabled={!isReading}
-                onClick={() => {
-                  skip(-skipWords);
-                }}
-              >
-                {'<<'}
-              </button>
-              <input
-                id="speed"
-                type="range"
-                className={styles.slider}
-                aria-label="Speed"
-                min={WPM_MIN}
-                max={WPM_MAX}
-                step={WPM_STEP}
-                value={selected.wpm}
-                onChange={(event) => {
-                  changeWpm(selected, Number(event.target.value));
-                }}
-              />
-              <button
-                type="button"
-                className={styles.square}
-                aria-label={`Forward ${skipWords} words`}
-                title={`Forward ${skipWords} words`}
-                disabled={!isReading}
-                onClick={() => {
-                  skip(skipWords);
-                }}
-              >
-                {'>>'}
-              </button>
-            </div>
-            <div className={styles.chunkRow}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={selected.chunkingEnabled}
-                  onChange={(event) => {
-                    changeChunking(selected, {
-                      ...chunkingOf(selected),
-                      enabled: event.target.checked,
-                    });
+        {/* The desktop's footer: the font and background colours on the
+            left, the speed with the skip buttons and Group in the middle, the
+            word size and the highlight colour on the right. It is there with
+            no transcript open too, empty, so it lines up with the Space band. */}
+        <div className={styles.band}>
+          {selected !== null && (
+            <>
+              <div className={styles.bandSide}>
+                <ColorSwatch
+                  label="Font"
+                  value={selected.fontColor}
+                  onChange={(color) => {
+                    store.setFontColor(selected.id, color);
                   }}
-                />{' '}
-                Group
-              </label>
-              <button
-                type="button"
-                className={styles.square}
-                aria-label="Fewer words per group"
-                disabled={selected.chunkSize <= CHUNK_SIZE_RANGE[0]}
-                onClick={() => {
-                  changeChunking(selected, {
-                    ...chunkingOf(selected),
-                    size: selected.chunkSize - 1,
-                  });
-                }}
-              >
-                -
-              </button>
-              <output aria-label="Words per group">{selected.chunkSize}</output>
-              <button
-                type="button"
-                className={styles.square}
-                aria-label="More words per group"
-                disabled={selected.chunkSize >= CHUNK_SIZE_RANGE[1]}
-                onClick={() => {
-                  changeChunking(selected, {
-                    ...chunkingOf(selected),
-                    size: selected.chunkSize + 1,
-                  });
-                }}
-              >
-                +
-              </button>
-            </div>
-            <div className={styles.chunkRow}>
-              <span>Word size</span>
-              <button
-                type="button"
-                className={styles.square}
-                aria-label="Smaller words"
-                disabled={selected.fontSize <= FONT_SIZE_RANGE[0]}
-                onClick={() => {
-                  store.setFontSize(
-                    selected.id,
-                    Math.max(FONT_SIZE_RANGE[0], selected.fontSize - preferences.fontSizeStep),
-                  );
-                }}
-              >
-                -
-              </button>
-              <output aria-label="Word size">{selected.fontSize}px</output>
-              <button
-                type="button"
-                className={styles.square}
-                aria-label="Larger words"
-                disabled={selected.fontSize >= FONT_SIZE_RANGE[1]}
-                onClick={() => {
-                  store.setFontSize(
-                    selected.id,
-                    Math.min(FONT_SIZE_RANGE[1], selected.fontSize + preferences.fontSizeStep),
-                  );
-                }}
-              >
-                +
-              </button>
-            </div>
-          </div>
-        )}
+                />
+                <ColorSwatch
+                  label="Background"
+                  value={selected.backgroundColor}
+                  onChange={(color) => {
+                    store.setBackgroundColor(selected.id, color);
+                  }}
+                />
+              </div>
+              <div className={styles.bandMiddle}>
+                <output className={styles.wpm} htmlFor="speed">
+                  {selected.wpm} WPM
+                </output>
+                <div className={styles.speedRow}>
+                  <button
+                    type="button"
+                    className={styles.skipButton}
+                    aria-label={`Back ${skipWords} words`}
+                    title={`Back ${skipWords} words`}
+                    disabled={!isReading}
+                    onClick={() => {
+                      skip(-skipWords);
+                    }}
+                  >
+                    {'<<'}
+                  </button>
+                  <input
+                    id="speed"
+                    type="range"
+                    className={styles.slider}
+                    aria-label="Speed"
+                    min={WPM_MIN}
+                    max={WPM_MAX}
+                    step={WPM_STEP}
+                    value={selected.wpm}
+                    onChange={(event) => {
+                      changeWpm(selected, Number(event.target.value));
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className={styles.skipButton}
+                    aria-label={`Forward ${skipWords} words`}
+                    title={`Forward ${skipWords} words`}
+                    disabled={!isReading}
+                    onClick={() => {
+                      skip(skipWords);
+                    }}
+                  >
+                    {'>>'}
+                  </button>
+                </div>
+                <div className={styles.stepRow}>
+                  <label className={styles.switchLabel}>
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      className={styles.switch}
+                      checked={selected.chunkingEnabled}
+                      onChange={(event) => {
+                        changeChunking(selected, {
+                          ...chunkingOf(selected),
+                          enabled: event.target.checked,
+                        });
+                      }}
+                    />
+                    Group
+                  </label>
+                  <button
+                    type="button"
+                    className={styles.tiny}
+                    aria-label="Fewer words per group"
+                    disabled={selected.chunkSize <= CHUNK_SIZE_RANGE[0]}
+                    onClick={() => {
+                      changeChunking(selected, {
+                        ...chunkingOf(selected),
+                        size: selected.chunkSize - 1,
+                      });
+                    }}
+                  >
+                    -
+                  </button>
+                  <output aria-label="Words per group" className={styles.stepValue}>
+                    {selected.chunkSize}
+                  </output>
+                  <button
+                    type="button"
+                    className={styles.tiny}
+                    aria-label="More words per group"
+                    disabled={selected.chunkSize >= CHUNK_SIZE_RANGE[1]}
+                    onClick={() => {
+                      changeChunking(selected, {
+                        ...chunkingOf(selected),
+                        size: selected.chunkSize + 1,
+                      });
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+              <div className={styles.bandSide}>
+                <div className={styles.stepRow}>
+                  <button
+                    type="button"
+                    className={styles.tiny}
+                    aria-label="Smaller words"
+                    disabled={selected.fontSize <= FONT_SIZE_RANGE[0]}
+                    onClick={() => {
+                      store.setFontSize(
+                        selected.id,
+                        Math.max(FONT_SIZE_RANGE[0], selected.fontSize - preferences.fontSizeStep),
+                      );
+                    }}
+                  >
+                    -
+                  </button>
+                  <output aria-label="Word size" className={styles.sizeValue}>
+                    {selected.fontSize}px
+                  </output>
+                  <button
+                    type="button"
+                    className={styles.tiny}
+                    aria-label="Larger words"
+                    disabled={selected.fontSize >= FONT_SIZE_RANGE[1]}
+                    onClick={() => {
+                      store.setFontSize(
+                        selected.id,
+                        Math.min(FONT_SIZE_RANGE[1], selected.fontSize + preferences.fontSizeStep),
+                      );
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+                <ColorSwatch
+                  label="Highlight"
+                  value={selected.highlightColor}
+                  onChange={(color) => {
+                    store.setHighlightColor(selected.id, color);
+                  }}
+                />
+              </div>
+            </>
+          )}
+        </div>
       </main>
 
       {dialog.kind === 'addTranscript' && (

@@ -1,8 +1,9 @@
-/* The reading position: words above, slider, a strip of bookmark ticks below. */
+/* The reading position: words above, slider, a strip of bookmark ticks below.
+   It fills the slot the page gives it. */
 .scrubber {
   display: flex;
   flex-direction: column;
-  width: min(14rem, 100%);
+  width: 100%;
   min-width: 0;
 }
 

@@ -2,11 +2,20 @@
    laid out like the desktop app's main window. */
 
 .app {
+  /* The two bands at the bottom, the Space band and the footer, are the
+     same height so that they line up. */
+  --band-height: 5.75rem;
+
   display: grid;
   grid-template-columns: minmax(15rem, 23%) minmax(0, 1fr);
-  gap: 0.6rem;
   height: 100%;
-  background: var(--mocha);
+  background: var(--paper);
+}
+
+/* The line between the sidebar and the rest is the same as the lines under
+   the two headers. */
+.sidebar {
+  border-right: 3px solid var(--line);
 }
 
 .sidebar,
@@ -32,7 +41,7 @@
 .heading {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1.25rem;
+  font-size: 1.15rem;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -154,11 +163,12 @@
 
 /* The band at the bottom of the sidebar: the current Space. */
 .spaceBand {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  min-height: 6.5rem;
-  padding: 0.5rem 1rem;
+  height: var(--band-height);
+  padding: 0 1rem;
   background: var(--mocha);
   border-top: 3px solid var(--line);
 }
@@ -195,31 +205,54 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.4rem;
+  padding: 0.75rem 1.25rem 0;
 }
 
 .spring {
   flex: 1;
 }
 
+/* The position slider, beside Stop. On a narrow screen it gets a row of
+   its own under the buttons. */
+.scrubSlot {
+  flex: 0 1 14rem;
+  min-width: 8rem;
+  margin-left: 0.4rem;
+}
+
 .pill {
   display: grid;
   place-items: center;
-  min-width: 3.2rem;
-  height: 2.4rem;
+  min-width: 3rem;
+  height: 1.9rem;
+  padding: 0 0.6rem;
   background: var(--pill);
   border: 0;
-  border-radius: 1.2rem;
+  border-radius: 1rem;
 }
 
 .pill:hover:enabled {
   background: var(--pill-hover);
 }
 
+.pill svg {
+  width: 1.15rem;
+  height: 1.15rem;
+}
+
+/* The time left and the percent: shaped like the buttons, as on the
+   desktop, but only to read. */
 .readout {
-  padding: 0.3rem 0.8rem;
-  background: var(--taupe);
-  border-radius: 1.2rem;
+  display: grid;
+  place-items: center;
+  min-width: 3rem;
+  height: 1.9rem;
+  padding: 0 0.7rem;
+  box-sizing: border-box;
+  background: var(--pill);
+  border-radius: 1rem;
+  font-size: 0.85rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -311,29 +344,169 @@
   background: var(--blue-hover);
 }
 
-/* The band at the bottom of the right side: the speed. */
+/* The footer, in three equal columns as on the desktop: colours on the
+   left, the speed in the middle, the word size and highlight on the right. */
 .band {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 1fr minmax(0, 1.4fr) 1fr;
+  align-items: center;
+  gap: 0.5rem;
+  height: var(--band-height);
+  padding: 0 1rem;
+  background: var(--mocha);
+  border-top: 3px solid var(--line);
+  font-size: 0.85rem;
+}
+
+.bandSide {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 0.4rem;
-  min-height: 6.5rem;
-  padding: 0.5rem 1rem;
-  background: var(--mocha);
-  border-top: 3px solid var(--line);
+  gap: 0.45rem;
+}
+
+.bandMiddle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+  min-width: 0;
 }
 
 .wpm {
-  font-size: 1.05rem;
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
 .speedRow {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
-  width: min(30rem, 100%);
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* << and >>, 36 by 28 px on the desktop. */
+.skipButton {
+  flex: none;
+  width: 2.25rem;
+  height: 1.6rem;
+  padding: 0;
+  background: var(--ember);
+  border: 0;
+  border-radius: 0.6rem;
+  font-size: 0.85rem;
+}
+
+.skipButton:hover:enabled {
+  background: var(--ember-hover);
+}
+
+/* The small - and + buttons, 24 px square on the desktop. */
+.tiny {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  background: var(--ember);
+  border: 0;
+  border-radius: 0.5rem;
+  line-height: 1;
+}
+
+.tiny:hover:enabled {
+  background: var(--ember-hover);
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.stepValue {
+  min-width: 1rem;
+  text-align: center;
+}
+
+.sizeValue {
+  min-width: 2.6rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.swatchRow {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* A colour, as a rounded square with a light border, like the desktop's
+   swatch buttons. */
+.swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 0.5rem;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.swatch::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.swatch::-webkit-color-swatch {
+  border: 0;
+  border-radius: 0.35rem;
+}
+
+.swatch::-moz-color-swatch {
+  border: 0;
+  border-radius: 0.35rem;
+}
+
+/* The Group switch: a track with a round knob, like the desktop's. */
+.switchLabel {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: 0.4rem;
+  cursor: pointer;
+}
+
+.switch {
+  position: relative;
+  width: 2.1rem;
+  height: 1.05rem;
+  margin: 0;
+  background: var(--line);
+  border-radius: 0.6rem;
+  cursor: pointer;
+  appearance: none;
+}
+
+.switch::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1.15rem;
+  height: 1.15rem;
+  background: var(--ink);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  transition: left 0.12s;
+}
+
+.switch:checked {
+  background: var(--ember);
+}
+
+.switch:checked::before {
+  left: calc(100% - 1.15rem);
 }
 
 /* The slider is drawn by hand, because browsers pick their own colour for
@@ -390,8 +563,37 @@
     max-height: 14rem;
   }
 
-  .spaceBand {
+  .sidebar {
+    border-right: 0;
+    border-bottom: 3px solid var(--line);
+  }
+
+  .spaceBand,
+  .band {
+    height: auto;
     min-height: 4rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+  }
+
+  .scrubSlot {
+    order: 1;
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .band {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.6rem;
+  }
+
+  .bandSide {
+    flex-direction: row;
+    justify-content: center;
+    gap: 1.25rem;
   }
 }
 
@@ -414,11 +616,4 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
-}
-
-/* Chunking for the open transcript: on or off, and the fixed group size. */
-.chunkRow {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
 }
