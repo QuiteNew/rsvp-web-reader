@@ -103,6 +103,14 @@ export function HorizontalScrollbar({
           // This does not depend on pointer capture, which browsers handle
           // differently.
           function onMove(move: PointerEvent): void {
+            // No button held any more: the drag is over even though no
+            // pointerup came, for example after letting go outside the
+            // window. Firefox reports that as a move with no buttons at
+            // x 0, which would otherwise throw the flash back to the start.
+            if (move.buttons === 0) {
+              onEnd();
+              return;
+            }
             const width = trackWidth();
             if (width > 0) moveTo.current(startFirst + (move.clientX - startX) / width);
           }

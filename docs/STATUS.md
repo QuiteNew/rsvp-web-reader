@@ -397,11 +397,12 @@ In short:
   hand.
 - The design notes for chunking, the shortcuts and reader fit are in
   `reference/desktop-design/`.
-- `npm run check` passes with 1168 tests in the scratch copy (Node 22).
+- `npm run check` passes with 1170 tests in the scratch copy (Node 22).
   The browser tests (42 tests a browser) pass in Chrome in the workspace.
-  On the owner's laptop Firefox and WebKit ran out of time under load. The
-  config now runs fewer at once and allows 60 s a test. See the progress
-  file.
+  On the owner's laptop all three browsers passed before the scrollbar.
+  The scrollbar's thumb drag failed in Firefox once the drag left the
+  window; that is fixed and waits for the owner's Firefox run. See the
+  progress file.
 
 Open, for the owner:
 

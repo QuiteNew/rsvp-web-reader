@@ -580,3 +580,17 @@ bottom of the reader, there only when the widest flash of the transcript
     browser's own text selection on the press, which does not depend on
     pointer capture. Firefox could not be run here, so this fix is not
     proven on Firefox yet. The owner's next run is the check.
+- The owner's second run: WebKit passed, Firefox still failed the drag,
+  with the flash not moved at all. A one-off probe (not kept) logged the
+  events in Firefox on the owner's machine. A drag that stays inside the
+  window works. The test's drag ends 30 px past the 900 px window, and
+  there Firefox, under Playwright, sends one move on the document with no
+  button held and x 0, and no pointerup. The page took that x 0 as a real
+  position and slid the flash back to the start.
+- Fix: a move with no button held ends the drag without moving, since the
+  button must have come up somewhere we did not see (letting go outside
+  the window is the real case). Two unit tests in
+  `HorizontalScrollbar.test.tsx` drag the thumb in jsdom, and the second
+  one fails with the check taken out. The e2e test is unchanged: in
+  Firefox it now goes through this check. Passed in Chrome here; Firefox
+  and WebKit are the owner's run.
