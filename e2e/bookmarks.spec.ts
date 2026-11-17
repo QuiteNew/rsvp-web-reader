@@ -17,6 +17,28 @@ async function startPaused(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Pause' }).click();
 }
 
+// What is saved in the browser for the first transcript, read straight from
+// the database. A reload in the instant after a change can come before the
+// save has finished, so the tests wait for the save and then reload. The
+// script is text because it runs in the page, not here.
+const SAVED_TRANSCRIPT = `new Promise((resolve) => {
+  const open = indexedDB.open('rsvp-web-reader');
+  open.onerror = () => resolve(null);
+  open.onsuccess = () => {
+    const request = open.result.transaction('library').objectStore('library').get('current');
+    request.onerror = () => { open.result.close(); resolve(null); };
+    request.onsuccess = () => {
+      open.result.close();
+      const record = request.result;
+      resolve((record && record.data && record.data.transcripts && record.data.transcripts[0]) || null);
+    };
+  };
+})`;
+
+async function savedTranscript(page: Page): Promise<Record<string, unknown> | null> {
+  return page.evaluate<Record<string, unknown> | null>(SAVED_TRANSCRIPT);
+}
+
 async function goToWord(page: Page, index: number): Promise<void> {
   await page.getByRole('slider', { name: 'Position' }).focus();
   await page.keyboard.press('Home');
@@ -57,6 +79,9 @@ test('a bookmark is still there after a reload', async ({ page }) => {
   await page.getByRole('button', { name: 'Bookmarks' }).click();
   await page.getByRole('button', { name: 'Add bookmark here' }).click();
   await page.keyboard.press('Escape');
+  await expect
+    .poll(async () => ((await savedTranscript(page))?.bookmarks as unknown[] | undefined)?.length)
+    .toBe(1);
   await page.reload();
   await expect(page.getByTestId('bookmark-tick')).toHaveCount(1);
 });

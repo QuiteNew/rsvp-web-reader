@@ -33,6 +33,7 @@ import { Scrubber } from './Scrubber';
 import { Sidebar } from './Sidebar';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
+import { useShortcuts } from './useShortcuts';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
 
@@ -292,6 +293,40 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     engine.setChunking(choice.enabled, choice.size, choice.mode, choice.charTarget);
   }
 
+  function togglePause() {
+    if (snapshot.status === 'finished') return;
+    engine.togglePause();
+    // Saved, so the transcript comes back the way it was left.
+    if (selected !== null) store.setPaused(selected.id, snapshot.status === 'playing');
+  }
+
+  function stopReading() {
+    engine.unload();
+    if (selected !== null) store.setStopped(selected.id, true);
+    void store.flush();
+  }
+
+  // Add a bookmark at the current word, or remove the one that is there.
+  function toggleBookmarkHere() {
+    if (selected === null || bookmarkHere === null) return;
+    if (selected.bookmarks.some((bookmark) => bookmark.index === bookmarkHere.index)) {
+      store.removeBookmark(selected.id, bookmarkHere.index);
+    } else {
+      store.addBookmark(selected.id, bookmarkHere.index, bookmarkHere.snippet);
+    }
+  }
+
+  // The reading shortcuts: only while the reader is on screen and no dialog
+  // is open over it (Escape then closes the dialog, as it should).
+  useShortcuts(ready && isReading && dialog.kind === 'none', (action) => {
+    if (action === 'togglePause') togglePause();
+    else if (action === 'skipBack') engine.skip(-skipWords);
+    else if (action === 'skipForward') engine.skip(skipWords);
+    else if (action === 'restart') engine.restart();
+    else if (action === 'stop') stopReading();
+    else toggleBookmarkHere();
+  });
+
   if (!ready) {
     return (
       <div className={styles.app}>
@@ -393,12 +428,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 type="button"
                 className={styles.pill}
                 aria-label="Stop reading"
-                title="Stop reading"
-                onClick={() => {
-                  engine.unload();
-                  if (selected !== null) store.setStopped(selected.id, true);
-                  void store.flush();
-                }}
+                title="Stop reading (Esc)"
+                onClick={stopReading}
               >
                 <PowerIcon />
               </button>
@@ -423,7 +454,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 type="button"
                 className={styles.pill}
                 aria-label="Bookmarks"
-                title="Bookmarks"
+                title="Bookmarks (B adds or removes one here)"
                 onClick={() => {
                   setDialog({ kind: 'bookmarks' });
                 }}
@@ -437,15 +468,9 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 type="button"
                 className={styles.pill}
                 aria-label={snapshot.status === 'playing' ? 'Pause' : 'Play'}
-                title={snapshot.status === 'playing' ? 'Pause' : 'Play'}
+                title={snapshot.status === 'playing' ? 'Pause (Space)' : 'Play (Space)'}
                 disabled={snapshot.status === 'finished'}
-                onClick={() => {
-                  engine.togglePause();
-                  // Saved, so the transcript comes back the way it was left.
-                  if (selected !== null) {
-                    store.setPaused(selected.id, snapshot.status === 'playing');
-                  }
-                }}
+                onClick={togglePause}
               >
                 {snapshot.status === 'playing' ? <PauseIcon /> : <PlayIcon />}
               </button>
@@ -453,7 +478,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 type="button"
                 className={styles.pill}
                 aria-label="Restart"
-                title="Restart"
+                title="Restart (R)"
                 onClick={() => {
                   engine.restart();
                 }}
@@ -714,15 +739,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
             bookmarkHere !== null &&
             selected.bookmarks.some((bookmark) => bookmark.index === bookmarkHere.index)
           }
-          onToggleHere={() => {
-            // Add one at the current word, or remove the one that is there.
-            if (bookmarkHere === null) return;
-            if (selected.bookmarks.some((bookmark) => bookmark.index === bookmarkHere.index)) {
-              store.removeBookmark(selected.id, bookmarkHere.index);
-            } else {
-              store.addBookmark(selected.id, bookmarkHere.index, bookmarkHere.snippet);
-            }
-          }}
+          onToggleHere={toggleBookmarkHere}
           onJump={(index) => {
             // Go there and land paused, saved like a pause by hand, and
             // close: you have gone where you wanted.

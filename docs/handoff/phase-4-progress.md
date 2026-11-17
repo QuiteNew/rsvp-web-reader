@@ -23,8 +23,8 @@ that uses them. One commit per step.
 | 6   | The scrubber, with bookmark ticks                                     | Done    |
 | 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done    |
 | 8   | Chunking: per transcript, and the defaults for new ones               | Done    |
-| 9   | Keyboard shortcuts                                                    | Next    |
-| 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
+| 9   | Keyboard shortcuts                                                    | Done    |
+| 10  | Fitting wide flashes: try CSS first, show the owner                   | Next    |
 | 11  | The settings view for all of it, with search and reset                | Waiting |
 | 12  | The Normalize button (left over from phase 3)                         | Waiting |
 
@@ -286,3 +286,52 @@ chunking notes.
   only.
 - A long group can be wider than the reading row and is cut off at the
   sides. That is step 10 (fitting wide flashes).
+
+## Step 9, keyboard shortcuts, done on 2026-11-17
+
+Follows `reference/desktop-design/keyboard-shortcuts.md`.
+
+- Keys, as on the desktop: Space play or pause, Left and Right skip by the
+  skip count from Settings, R restart, Esc stop (back to the text), B add
+  or remove a bookmark at the current word.
+- Not bound: F (focus mode), because the web has no focus mode yet, and C
+  (centre a panned flash), which belongs to step 10.
+- `src/core/shortcuts.ts`: `shortcutFor(press, focus)` is the whole rule,
+  pure and unit tested. It is the web's version of the desktop's guard
+  (which only kept typing safe):
+  - with Ctrl, Cmd or Alt the key is the browser's (Ctrl+R reloads);
+  - nothing fires while typing;
+  - Space is left to a focused button, checkbox, radio button or dropdown,
+    so one press never does two things. This is the "known non-blocking
+    item" of the desktop note, settled here;
+  - the arrows are left to a focused slider, radio button or dropdown;
+  - a held key repeats for the arrows only.
+- `src/ui/useShortcuts.ts` listens on the document while the reader is on
+  screen and no dialog is open. With a dialog open, Escape closes the
+  dialog and reading goes on.
+- The buttons show their key in the tooltip ("Pause (Space)"). There is no
+  list of shortcuts on the page yet. That fits the settings view of
+  step 11.
+- A bug caught by the unit tests while writing: the key table was a plain
+  object, so a key named "constructor" found an inherited value. It is a
+  Map now.
+- Tests: 9 core tests, 11 App tests, 4 browser tests with real key
+  presses, Chrome only.
+- Found while running them: "chunking is kept over a reload" (step 8)
+  failed once in four runs. The Group switch was off after the reload. A
+  change is saved at once, but the write to IndexedDB finishes a moment
+  later, and a reload inside that moment loses it. The two reload tests of
+  steps 7 and 8 now wait until the database holds the change. The gap
+  itself is still there for a person who reloads in the same instant as a
+  change: it is small, it is not new in phase 4, and it cannot be closed
+  fully with IndexedDB. Open item for the owner, see below.
+
+### Open item: a change made in the instant before a reload
+
+Every change is written at once, and the page also saves when it is
+hidden or left. But IndexedDB writes are not finished when the call
+returns, and saves are done one after another, so a second change can wait
+behind the first. A reload or a closed tab inside that moment (some
+milliseconds) can lose the last change. Possible hardening for phase 7:
+do not queue behind an older write when the page is being left, and show
+"saving" until the write is done. Not done now.

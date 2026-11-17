@@ -1583,3 +1583,111 @@ describe('chunking', () => {
     expect(screen.getByLabelText('New transcripts')).toBeChecked();
   });
 });
+
+describe('keyboard shortcuts', () => {
+  function startReading() {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3 }));
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    return page;
+  }
+
+  function key(name: string, target: Element = document.body, more: KeyboardEventInit = {}) {
+    return fireEvent.keyDown(target, { key: name, ...more });
+  }
+
+  test('Space pauses and plays, and the choice is saved', () => {
+    const { store } = startReading();
+    key(' ');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(true);
+    key(' ');
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(false);
+  });
+
+  test('the arrows skip by the number of words set in Settings', () => {
+    startReading();
+    key(' ');
+    key('ArrowRight');
+    expect(word()).toBe('d');
+    key('ArrowRight');
+    expect(word()).toBe('g');
+    key('ArrowLeft');
+    expect(word()).toBe('d');
+  });
+
+  test('R starts again and B bookmarks the word, then takes it off', () => {
+    const { store } = startReading();
+    key(' ');
+    key('ArrowRight');
+    key('b');
+    expect(store.getSnapshot().transcripts[0]?.bookmarks.map((b) => b.index)).toEqual([3]);
+    key('B');
+    expect(store.getSnapshot().transcripts[0]?.bookmarks).toEqual([]);
+    key('r');
+    expect(word()).toBe('a');
+  });
+
+  test('Escape stops reading and shows the text again', () => {
+    const { store } = startReading();
+    key('Escape');
+    expect(screen.getByLabelText('Transcript text')).toHaveValue('a b c d e f g h');
+    expect(store.getSnapshot().transcripts[0]?.isStopped).toBe(true);
+  });
+
+  test('a used key does nothing else, an unused one is left alone', () => {
+    startReading();
+    expect(key(' ')).toBe(false); // preventDefault was called
+    expect(key('a')).toBe(true);
+  });
+
+  test("with Ctrl held the key is the browser's", () => {
+    startReading();
+    key(' ');
+    key('ArrowRight');
+    expect(key('r', document.body, { ctrlKey: true })).toBe(true);
+    expect(word()).toBe('d');
+  });
+
+  test('Space on a focused button presses that button only', () => {
+    startReading();
+    // The key goes to the Restart button: reading is not paused by it.
+    key(' ', screen.getByRole('button', { name: 'Restart' }));
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  test("the arrows on the position slider are the slider's", () => {
+    startReading();
+    key(' ');
+    key('ArrowRight', screen.getByRole('slider', { name: 'Position' }));
+    expect(word()).toBe('a');
+  });
+
+  test('nothing fires while the text is being typed', () => {
+    renderPage();
+    addTranscript('Notes');
+    const box = screen.getByLabelText('Transcript text');
+    expect(key(' ', box)).toBe(true);
+    expect(key('r', box)).toBe(true);
+  });
+
+  test('nothing fires behind an open dialog, and Escape closes the dialog only', () => {
+    startReading();
+    press('Settings');
+    key(' ');
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+    key('Escape');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByTestId('word')).toBeInTheDocument();
+  });
+
+  test('a held Space does not flicker between play and pause', () => {
+    startReading();
+    key(' ');
+    key(' ', document.body, { repeat: true });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+});
