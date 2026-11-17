@@ -2071,3 +2071,183 @@ describe('the Settings window', () => {
     delete document.documentElement.dataset.theme;
   });
 });
+
+// ---- test_normalize_in_app.py ----
+// The desktop's tests click the real button in the real app, with tkinter,
+// so they cannot be replayed. They are written again here under the same
+// names. The web keeps one text per transcript, where the desktop keeps a
+// text and a draft, so the draft checks become checks of the text.
+describe('test_normalize_in_app.py', () => {
+  const WRAPPED =
+    'The meeting started late\nbecause the speaker was\nstuck in traffic.\n\nSecond paragraph here.';
+  const NORMALIZED =
+    'The meeting started late because the speaker was stuck in traffic.\n\nSecond paragraph here.';
+  const CLEAN = 'Nothing in here needs tidying.';
+
+  function two(more: Partial<Library['transcripts'][number]> = {}) {
+    const page = renderPage({
+      ...EMPTY_LIBRARY,
+      nextId: 3,
+      transcripts: [
+        {
+          ...TRANSCRIPT_DEFAULTS,
+          ...LIGHT_READING,
+          id: 1,
+          title: 'Lecture',
+          space: 'General',
+          rawText: WRAPPED,
+          isStopped: true,
+          ...more,
+        },
+        {
+          ...TRANSCRIPT_DEFAULTS,
+          ...LIGHT_READING,
+          id: 2,
+          title: 'Other',
+          space: 'General',
+          rawText: CLEAN,
+          isStopped: true,
+        },
+      ],
+    });
+    press('Lecture');
+    return page;
+  }
+
+  const lecture = (page: Page) => page.store.getSnapshot().transcripts.find((t) => t.id === 1);
+  const box = () => screen.getByLabelText('Transcript text');
+  const icon = () =>
+    screen.queryByRole('button', { name: 'Revert to the original text' }) ? 'Revert' : 'Normalize';
+  function pressNormalize(): void {
+    fireEvent.click(
+      screen.getByRole('button', { name: /^(Normalize the text|Revert to the original text)$/ }),
+    );
+  }
+  function type(text: string): void {
+    fireEvent.change(box(), { target: { value: (box() as HTMLTextAreaElement).value + text } });
+  }
+  const undoInfo = (page: Page) => [lecture(page)?.preNormalizeText, lecture(page)?.normalizedText];
+
+  test('test_normalizing_tidies_the_text_and_keeps_the_way_back', () => {
+    const page = two();
+    expect(icon()).toBe('Normalize');
+    pressNormalize();
+    expect(box()).toHaveValue(NORMALIZED);
+    expect(icon()).toBe('Revert');
+    expect(undoInfo(page)).toEqual([WRAPPED, NORMALIZED]);
+    expect(lecture(page)?.rawText).toBe(NORMALIZED);
+  });
+
+  test('test_a_second_click_puts_the_original_back_and_forgets_it', () => {
+    const page = two();
+    pressNormalize();
+    pressNormalize();
+    expect(box()).toHaveValue(WRAPPED);
+    expect(icon()).toBe('Normalize');
+    expect(undoInfo(page)).toEqual(['', '']);
+    expect(lecture(page)?.rawText).toBe(WRAPPED);
+  });
+
+  test('test_text_that_needs_no_tidying_is_left_alone_and_nothing_is_kept', () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const page = two({ rawText: CLEAN });
+      pressNormalize();
+      expect(screen.getByText('Nothing to change')).toBeInTheDocument();
+      expect(box()).toHaveValue(CLEAN);
+      expect(icon()).toBe('Normalize');
+      expect(undoInfo(page)).toEqual(['', '']);
+      // The message goes after two seconds.
+      act(() => {
+        vi.advanceTimersByTime(2000);
+      });
+      expect(screen.queryByText('Nothing to change')).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test('test_normalizing_again_after_an_edit_goes_back_to_the_edited_text', () => {
+    const page = two();
+    pressNormalize();
+    type('\nand a wrapped line\nthat was added later.');
+    const edited = (box() as HTMLTextAreaElement).value;
+    pressNormalize();
+    const tidied = (box() as HTMLTextAreaElement).value;
+    expect(tidied).not.toBe(edited);
+    expect(undoInfo(page)).toEqual([edited, tidied]);
+    pressNormalize();
+    expect(box()).toHaveValue(edited);
+  });
+
+  test('test_revert_is_still_there_after_leaving_and_coming_back_with_the_text_as_it_was', () => {
+    const page = two();
+    pressNormalize();
+    press('Other');
+    expect(icon()).toBe('Normalize');
+    expect(undoInfo(page)).toEqual([WRAPPED, NORMALIZED]);
+    press('Lecture');
+    expect(box()).toHaveValue(NORMALIZED);
+    expect(icon()).toBe('Revert');
+    pressNormalize();
+    expect(box()).toHaveValue(WRAPPED);
+  });
+
+  test('test_spaces_and_blank_lines_added_at_the_end_dont_end_revert', () => {
+    const page = two();
+    pressNormalize();
+    type('   \n\n  ');
+    press('Other');
+    press('Lecture');
+    expect(undoInfo(page)).toEqual([WRAPPED, NORMALIZED]);
+    expect(icon()).toBe('Revert');
+  });
+
+  test('test_an_edit_ends_revert_and_the_edit_is_kept', () => {
+    const page = two();
+    pressNormalize();
+    type(' And one more thing.');
+    expect(icon()).toBe('Normalize');
+    press('Other');
+    const edited = `${NORMALIZED} And one more thing.`;
+    expect(undoInfo(page)).toEqual(['', '']);
+    expect(lecture(page)?.rawText).toBe(edited);
+    press('Lecture');
+    expect(box()).toHaveValue(edited);
+    expect(icon()).toBe('Normalize');
+  });
+
+  test('test_a_transcript_that_was_never_normalized_has_nothing_cleared', () => {
+    const page = two();
+    const cleared = vi.spyOn(page.store, 'setNormalization');
+    type(' An edit.');
+    press('Other');
+    press('Lecture');
+    expect(lecture(page)?.rawText).toBe(`${WRAPPED} An edit.`);
+    expect(cleared).not.toHaveBeenCalled();
+  });
+
+  test('test_start_reading_ends_revert_and_saves_the_tidied_text', () => {
+    const page = two();
+    pressNormalize();
+    press('Start reading');
+    press('Stop reading');
+    expect(lecture(page)?.rawText).toBe(NORMALIZED);
+    expect(undoInfo(page)).toEqual(['', '']);
+    expect(icon()).toBe('Normalize');
+  });
+
+  test('with "Split long paragraphs" on, a wall of prose is broken at sentence ends', () => {
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ split_long_paragraphs_enabled: true }),
+    );
+    const wall = Array.from(
+      { length: 12 },
+      (_, i) => `This is sentence number ${i + 1} of a long wall.`,
+    ).join(' ');
+    two({ rawText: wall });
+    pressNormalize();
+    expect((box() as HTMLTextAreaElement).value).toContain('\n\n');
+  });
+});

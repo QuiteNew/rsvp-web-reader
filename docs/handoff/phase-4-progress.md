@@ -26,7 +26,7 @@ that uses them. One commit per step.
 | 9   | Keyboard shortcuts                                                    | Done                       |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Part done, owner to decide |
 | 11  | The settings view for all of it, with search and reset                | Done                       |
-| 12  | The Normalize button (left over from phase 3)                         | Next                       |
+| 12  | The Normalize button (left over from phase 3)                         | Done                       |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -462,3 +462,38 @@ owner's go-ahead to keep its Apply model.
   window), 2 new browser tests. Taking out the search clearing, or the
   instant save of the skip amount, each failed a test. 37 e2e tests passed
   three times in Chrome only.
+
+## Step 12, the Normalize button, done on 2026-11-17
+
+The last step of the plan. The rules (`toggleNormalization`, `canRevert`)
+were ported in phase 3 with fixtures. This is the button, from the
+desktop's `gui/components/transcript_input.py` and the saving side of
+`gui/app.py` (`_handle_normalization_changed`, `_handle_draft_changed`).
+
+- A button left of Start reading. It shows a page with a tick (Normalize)
+  or a plain page (Revert), as the desktop's two icons do. Its name says
+  which: "Normalize the text" or "Revert to the original text".
+- A click saves the way back first, then the new text. Revert lasts only
+  while the text is what normalizing made, spaces at the ends aside. An
+  edit ends it, and so does Start reading. Text that needs no tidying is
+  left alone, nothing is kept, and "Nothing to change" shows for two
+  seconds beside Start reading.
+- "Split long paragraphs when normalizing" from Settings is used.
+- The web keeps one text per transcript where the desktop keeps a text and
+  a draft, so the desktop's draft checks became checks of the text.
+- Not here: the bold word starts button next to it (phase 6), and the
+  detached window.
+- Tests: the 9 tests of `test_normalize_in_app.py` that do not need the
+  detached window, written again under the same names (they click the
+  real tkinter app, so they cannot be replayed), and one for the split
+  setting. One browser test: normalize, reload, revert. Leaving out the
+  clear on Start reading, or comparing the text without the spaces at its
+  ends taken off, each failed a test. 38 e2e tests passed three times in
+  Chrome only.
+
+## Phase 4: what is left before the owner confirms it
+
+All twelve steps are done, except the choice in step 10 about a flash
+still too wide at 60 percent. The phase is done when the owner has read a
+long transcript with chunking on, used the scrubber and bookmarks by
+keyboard only, and confirmed it.

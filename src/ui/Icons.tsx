@@ -24,6 +24,10 @@ function Icon({ path, filled = false }: IconProps) {
   );
 }
 
+// The Normalize button: a page with a tick, and a plain page while it
+// offers to put the original back, as the desktop's two icons are.
+export const NormalizeIcon = () => <Icon path="M6 3h9l3 3v15H6zM9 13l2 2 4-4" />;
+export const RevertIcon = () => <Icon path="M6 3h9l3 3v15H6zM9 11h6M9 15h6" />;
 export const PowerIcon = () => <Icon path="M12 3v9M6.3 6.8a8 8 0 1 0 11.4 0" />;
 export const PauseIcon = () => <Icon path="M5 4h14v16H5zM10 9v6M14 9v6" />;
 export const PlayIcon = () => <Icon path="M8 5l11 7-11 7z" filled />;

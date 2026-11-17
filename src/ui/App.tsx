@@ -12,6 +12,8 @@ import { currentSpace, findTranscript } from '../core/library';
 import type { Library, Settings, Transcript } from '../core/models';
 import { pyRound } from '../core/pythonText';
 import { ReaderSession } from '../core/reader';
+import { canRevert, toggleNormalization } from '../core/normalizer';
+import { pyStrip } from '../core/pythonText';
 import { transcriptToReopen } from '../core/reopen';
 import { blendColors } from '../core/colors';
 import { fitCandidates } from '../core/fit';
@@ -28,7 +30,15 @@ import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { BookmarksDialog } from './BookmarksDialog';
 import { ChunkingDialog } from './ChunkingDialog';
-import { BookmarkIcon, PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
+import {
+  BookmarkIcon,
+  NormalizeIcon,
+  PauseIcon,
+  PlayIcon,
+  PowerIcon,
+  RestartIcon,
+  RevertIcon,
+} from './Icons';
 import { Scrubber } from './Scrubber';
 import { SettingsDialog } from './SettingsDialog';
 import { Sidebar } from './Sidebar';
@@ -47,6 +57,9 @@ function chunkingOf(transcript: Transcript): ChunkingChoice {
     charTarget: transcript.chunkCharTarget,
   };
 }
+
+// How long a short message beside Start reading stays, as on the desktop.
+const FEEDBACK_MS = 2000;
 
 // The colour of the surrounding-words line: the font colour dimmed toward
 // the background. A transcript with a colour that cannot be blended (the
@@ -135,6 +148,23 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   const settingsProblem = useSyncExternalStore(settings.subscribe, settings.saveProblem);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(NO_DIALOG);
+  // A short message beside Start reading, such as "Nothing to change".
+  const [feedback, setFeedback] = useState('');
+  const feedbackTimer = useRef<number | null>(null);
+  function showFeedback(message: string) {
+    if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    setFeedback(message);
+    feedbackTimer.current = window.setTimeout(() => {
+      feedbackTimer.current = null;
+      setFeedback('');
+    }, FEEDBACK_MS);
+  }
+  useEffect(
+    () => () => {
+      if (feedbackTimer.current !== null) window.clearTimeout(feedbackTimer.current);
+    },
+    [],
+  );
   // The Chunking window opens over Settings, which stays open under it.
   const [chunkingOpen, setChunkingOpen] = useState(false);
   const [problem, setProblem] = useState('');
@@ -213,6 +243,10 @@ export function App({ store, settings, health, ...parts }: AppProps) {
 
   // The word a new bookmark would go on. null when there is none, as at the end.
   const bookmarkHere = isReading ? engine.bookmarkTarget() : null;
+  // Whether the Normalize button offers to put the original text back.
+  const offersRevert =
+    selected !== null &&
+    canRevert(selected.rawText, selected.preNormalizeText, selected.normalizedText);
 
   // Remember where the open transcript is being read, word by word, so
   // that stopping and starting again picks up at the same place. Reading is
@@ -312,6 +346,9 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     setProblem('');
     store.setStopped(transcript.id, false);
     store.setPaused(transcript.id, false);
+    // Starting to read ends Normalize's way back, as on the desktop, where
+    // Start reading saves the text and an empty draft.
+    if (transcript.preNormalizeText !== '') store.setNormalization(transcript.id, '', '');
     engine.load(session);
   }
 
@@ -368,6 +405,42 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     else if (action === 'stop') stopReading();
     else toggleBookmarkHere();
   });
+
+  // A new text for the transcript, typed or from Normalize. As in the
+  // desktop's _handle_draft_changed: Normalize's way back lasts only while
+  // the text is still what normalizing made (spaces at the ends aside).
+  function changeText(transcript: Transcript, text: string) {
+    if (text === transcript.rawText) return;
+    store.setText(transcript.id, text);
+    // A changed text is read from its first word again.
+    store.setPosition(transcript.id, 0);
+    setProblem('');
+    if (
+      transcript.preNormalizeText !== '' &&
+      !canRevert(text, transcript.preNormalizeText, transcript.normalizedText)
+    ) {
+      store.setNormalization(transcript.id, '', '');
+    }
+  }
+
+  // One click of Normalize: tidy the text and keep the original, or, while
+  // the text is still the tidied one, put the original back. The way back
+  // is saved first, so the text change right after is not taken for an
+  // edit. As on the desktop, "Nothing to change" shows for two seconds when
+  // the text stays as it was.
+  function normalize(transcript: Transcript) {
+    const before = pyStrip(transcript.rawText);
+    const result = toggleNormalization(
+      transcript.rawText,
+      transcript.preNormalizeText,
+      transcript.normalizedText,
+      preferences.splitLongParagraphsEnabled,
+    );
+    store.setNormalization(transcript.id, result.preNormalizeText, result.normalizedText);
+    const now = findTranscript(store.getSnapshot(), transcript.id) ?? transcript;
+    changeText(now, result.text);
+    if (result.text === before) showFeedback('Nothing to change');
+  }
 
   if (!ready) {
     return (
@@ -572,10 +645,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               placeholder="Paste a transcript or any text here."
               value={selected.rawText}
               onChange={(event) => {
-                store.setText(selected.id, event.target.value);
-                // A changed text is read from its first word again.
-                store.setPosition(selected.id, 0);
-                setProblem('');
+                changeText(selected, event.target.value);
               }}
             />
             {problem !== '' && (
@@ -585,12 +655,26 @@ export function App({ store, settings, health, ...parts }: AppProps) {
             )}
             <div className={styles.startRow}>
               <button
+                type="button"
+                className={styles.normalize}
+                aria-label={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
+                title={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
+                onClick={() => {
+                  normalize(selected);
+                }}
+              >
+                {offersRevert ? <RevertIcon /> : <NormalizeIcon />}
+              </button>
+              <button
                 type="submit"
                 className={styles.start}
                 disabled={selected.rawText.trim() === ''}
               >
                 Start reading
               </button>
+              <span className={styles.feedback} role="status">
+                {feedback}
+              </span>
             </div>
           </form>
         )}
