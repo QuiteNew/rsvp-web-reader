@@ -257,6 +257,8 @@
 }
 
 .stage {
+  /* The reader's scrollbar sits along the bottom of this box. */
+  position: relative;
   flex: 1;
   min-height: 0;
   display: flex;

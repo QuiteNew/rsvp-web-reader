@@ -15,6 +15,8 @@ describe('shortcutFor', () => {
     expect(shortcutFor(press('Escape'), 'other')).toBe('stop');
     expect(shortcutFor(press('b'), 'other')).toBe('toggleBookmark');
     expect(shortcutFor(press('B'), 'other')).toBe('toggleBookmark');
+    expect(shortcutFor(press('c'), 'other')).toBe('centerPan');
+    expect(shortcutFor(press('C'), 'other')).toBe('centerPan');
   });
 
   test('other keys are nothing', () => {

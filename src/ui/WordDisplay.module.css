@@ -4,6 +4,10 @@
   position: relative;
   font-size: var(--size, 2.5rem);
   line-height: 1.2;
+  /* A flash wider than the row is cut off at the row's sides. The scrollbar
+     slides it (--pan) to show the hidden part. Sideways only, so a letter
+     moved up or down is not cut. */
+  overflow-x: clip;
 }
 
 /* The outer columns share what is left equally (1fr each, and minmax(0, ...)
@@ -16,12 +20,14 @@
   min-height: 1.2em;
   /* Keep the spaces inside a chunk of several words. */
   white-space: pre;
-  /* Cut off sideways only, so a letter moved up or down is not cut. */
-  overflow-x: clip;
+  transform: translateX(var(--pan, 0px));
 }
 
+/* Laid out from its right end, so text too long for it spills out to the
+   left, away from the focus letter, where the scrollbar can show it. */
 .before {
-  text-align: right;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .focus {
@@ -93,13 +99,14 @@
   font-size: var(--context-size);
   color: var(--context-color);
   white-space: pre;
-  overflow-x: clip;
   pointer-events: none;
+  transform: translateX(var(--pan, 0px));
 }
 
 .contextBefore {
+  display: flex;
+  justify-content: flex-end;
   padding-right: 10px;
-  text-align: right;
 }
 
 .contextAfter {
@@ -115,4 +122,33 @@
   visibility: hidden;
   white-space: pre;
   pointer-events: none;
+}
+
+/* The scrollbar along the bottom of the reading area, and the centre button
+   just above it at the left, 6 px in, as on the desktop. They are placed in
+   the reading area, which is the nearest positioned box. */
+.scrollArea {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.centre {
+  position: absolute;
+  left: 6px;
+  bottom: calc(100% + 6px);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  background: var(--ember);
+  border: 0;
+  border-radius: 4px;
+  color: var(--ink);
+}
+
+.centre:hover {
+  background: var(--ember-hover);
 }

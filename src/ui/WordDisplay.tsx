@@ -1,8 +1,10 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 
 import type { ChunkText, PeripheralContext } from '../core/reader';
-import { fitRenderSize, requiredWidth } from '../core/fit';
+import { FIT_SIDE_MARGIN_PX, fitRenderSize, requiredWidth } from '../core/fit';
 import { guideMarkLength, peripheralContextSize } from '../core/guideMarks';
+import { clampPan, panFromFraction, scrollbarFractions } from '../core/scroll';
+import { HorizontalScrollbar } from './HorizontalScrollbar';
 import styles from './WordDisplay.module.css';
 
 export interface GuideMarks {
@@ -30,6 +32,22 @@ interface WordDisplayProps {
   // The surrounding-words line and its dimmed colour. null shows none.
   readonly context: PeripheralContext | null;
   readonly contextColor: string;
+  // How far the flash is slid sideways, in px, when even the smallest size
+  // still leaves it wider than the row. Kept by the page, so the C key and a
+  // new session can set it back to 0.
+  readonly pan: number;
+  readonly onPanChange: (pan: number) => void;
+}
+
+// How far one step of the scrollbar slides the flash (an arrow key or a
+// wheel notch), as on the desktop. A click on the track moves a whole row.
+const SCROLL_UNIT_PX = 24;
+
+// The widest chunk's reach to the left and to the right of the focus
+// letter's middle, for each px of font size.
+interface Reaches {
+  readonly left: number;
+  readonly right: number;
 }
 
 // The flashing word. The focus letter sits in the middle column of a grid
@@ -52,12 +70,15 @@ export function WordDisplay({
   marks,
   context,
   contextColor,
+  pan,
+  onPanChange,
 }: WordDisplayProps) {
   const display = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLSpanElement>(null);
-  // The widest chunk's required width for each px of font size, and the
-  // width of the row. Both are measured on the page, so they start unknown.
-  const [requiredPerSize, setRequiredPerSize] = useState<number | null>(null);
+  // How far the widest chunk reaches each side, for each px of font size,
+  // and the width of the row. Both are measured on the page, so they start
+  // unknown.
+  const [reaches, setReaches] = useState<Reaches | null>(null);
   const [rowWidth, setRowWidth] = useState(0);
   // Counts up when the page's fonts have loaded, to measure again: the first
   // measure may have been taken in the stand-in font.
@@ -73,14 +94,23 @@ export function WordDisplay({
       return span.getBoundingClientRect().width;
     };
     let widest = 0;
+    let found: Reaches | null = null;
     for (const text of fitTexts) {
-      widest = Math.max(
-        widest,
-        requiredWidth(width(text.before), width(text.focus), width(text.after)),
-      );
+      const before = width(text.before);
+      const focus = width(text.focus);
+      const after = width(text.after);
+      const required = requiredWidth(before, focus, after);
+      if (required > widest) {
+        widest = required;
+        found = { left: before + focus / 2, right: after + focus / 2 };
+      }
     }
     span.textContent = '';
-    setRequiredPerSize(widest > 0 && chosenSize > 0 ? widest / chosenSize : null);
+    setReaches(
+      found !== null && chosenSize > 0
+        ? { left: found.left / chosenSize, right: found.right / chosenSize }
+        : null,
+    );
   }, [fitTexts, chosenSize, fontsLoaded]);
 
   // Follow the width of the row, and notice when the fonts arrive.
@@ -107,7 +137,27 @@ export function WordDisplay({
 
   // Everything below is drawn at the fitted size: the word, and the guide
   // marks and the surrounding words, which are sized from it.
+  const requiredPerSize = reaches === null ? null : 2 * Math.max(reaches.left, reaches.right);
   const fontSize = fitRenderSize(chosenSize, requiredPerSize, rowWidth);
+
+  // What still spills past each side at that size, as the desktop's
+  // _pan_overflows() works it out. Both are 0 when the widest chunk fits,
+  // and then there is no scrollbar.
+  const usable = rowWidth - 2 * FIT_SIDE_MARGIN_PX;
+  const half = usable / 2;
+  const overflowLeft =
+    usable > 1 && reaches !== null ? Math.max(0, reaches.left * fontSize - half) : 0;
+  const overflowRight =
+    usable > 1 && reaches !== null ? Math.max(0, reaches.right * fontSize - half) : 0;
+  const scrolls = overflowLeft + overflowRight > 0;
+  const shownPan = scrolls ? clampPan(pan, overflowLeft, overflowRight) : 0;
+  // When nothing spills any more, the pan goes back to the centre, so it does
+  // not come back by itself later.
+  useEffect(() => {
+    if (!scrolls && pan !== 0) onPanChange(0);
+  }, [scrolls, pan, onPanChange]);
+  const [first, last] = scrollbarFractions(usable, overflowLeft, overflowRight, shownPan);
+
   const hasFocus = (chunk?.focus ?? '') !== '';
   const style = {
     '--size': `${fontSize}px`,
@@ -118,39 +168,82 @@ export function WordDisplay({
     '--mark-color': marks.color,
     '--context-size': `${peripheralContextSize(fontSize)}px`,
     '--context-color': contextColor,
+    '--pan': `${shownPan}px`,
   } as CSSProperties;
   return (
-    <div className={styles.display} style={style} ref={display}>
-      <span
-        ref={ruler}
-        className={styles.ruler}
-        style={{ fontSize: `${chosenSize}px` }}
-        aria-hidden="true"
-      />
-      <div className={styles.row} data-testid="word">
-        <span className={styles.before}>{chunk?.before ?? ''}</span>
-        <span className={styles.focus}>{chunk?.focus ?? ''}</span>
-        <span className={styles.after}>{chunk?.after ?? ''}</span>
+    <>
+      <div className={styles.display} style={style} ref={display}>
+        <span
+          ref={ruler}
+          className={styles.ruler}
+          style={{ fontSize: `${chosenSize}px` }}
+          aria-hidden="true"
+        />
+        <div className={styles.row} data-testid="word">
+          <span className={styles.before}>{chunk?.before ?? ''}</span>
+          <span className={styles.focus}>{chunk?.focus ?? ''}</span>
+          <span className={styles.after}>{chunk?.after ?? ''}</span>
+        </div>
+        {context?.current != null && (
+          <div className={styles.context} data-testid="context" aria-hidden="true">
+            <span className={styles.contextBefore}>{context.before.join(' ')}</span>
+            <span>{context.current}</span>
+            <span className={styles.contextAfter}>{context.after.join(' ')}</span>
+          </div>
+        )}
+        {/* The marks show the fixed centre point, so they are hidden while the
+          flash is slid away from it, as on the desktop. */}
+        {marks.visible && shownPan === 0 && (
+          <div className={styles.marks} data-testid="guide-marks" aria-hidden="true">
+            <span className={`${styles.mark} ${styles.above}`} />
+            <span className={`${styles.mark} ${styles.below}`} />
+            {marks.horizontal && (
+              <>
+                <span className={`${styles.tick} ${styles.tickAbove}`} />
+                <span className={`${styles.tick} ${styles.tickBelow}`} />
+              </>
+            )}
+          </div>
+        )}
       </div>
-      {context?.current != null && (
-        <div className={styles.context} data-testid="context" aria-hidden="true">
-          <span className={styles.contextBefore}>{context.before.join(' ')}</span>
-          <span>{context.current}</span>
-          <span className={styles.contextAfter}>{context.after.join(' ')}</span>
+      {scrolls && (
+        <div className={styles.scrollArea}>
+          <button
+            type="button"
+            className={styles.centre}
+            aria-label="Centre the flash"
+            title="Centre the flash (C)"
+            onClick={() => {
+              onPanChange(0);
+            }}
+          >
+            <CrosshairIcon />
+          </button>
+          <HorizontalScrollbar
+            label="Slide the flash sideways"
+            first={first}
+            last={last}
+            onMoveTo={(fraction) => {
+              onPanChange(panFromFraction(fraction, usable, overflowLeft, overflowRight));
+            }}
+            onScroll={(amount, what) => {
+              const step = what === 'pages' ? usable : SCROLL_UNIT_PX;
+              onPanChange(clampPan(shownPan - amount * step, overflowLeft, overflowRight));
+            }}
+          />
         </div>
       )}
-      {marks.visible && (
-        <div className={styles.marks} data-testid="guide-marks" aria-hidden="true">
-          <span className={`${styles.mark} ${styles.above}`} />
-          <span className={`${styles.mark} ${styles.below}`} />
-          {marks.horizontal && (
-            <>
-              <span className={`${styles.tick} ${styles.tickAbove}`} />
-              <span className={`${styles.tick} ${styles.tickBelow}`} />
-            </>
-          )}
-        </div>
-      )}
-    </div>
+    </>
+  );
+}
+
+// The centre button's crosshair: a ring with a dot and four short arms.
+function CrosshairIcon() {
+  return (
+    <svg viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
+      <circle cx="6" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <circle cx="6" cy="6" r="1" fill="currentColor" />
+      <path d="M6 0v2.5M6 9.5V12M0 6h2.5M9.5 6H12" stroke="currentColor" strokeWidth="1.2" />
+    </svg>
   );
 }

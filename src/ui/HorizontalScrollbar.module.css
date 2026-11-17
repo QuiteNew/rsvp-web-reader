@@ -1,0 +1,22 @@
+/* A transparent track with a rounded grey thumb, like the desktop's
+   CTkScrollbar. The thumb runs from --first to --last of the track. */
+.track {
+  position: relative;
+  height: 12px;
+  cursor: default;
+  touch-action: none;
+}
+
+.thumb {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: calc(var(--first) * 100%);
+  width: calc((var(--last) - var(--first)) * 100%);
+  background: var(--scroll-thumb);
+  border-radius: 4px;
+}
+
+.track:hover .thumb {
+  background: var(--scroll-thumb-hover);
+}

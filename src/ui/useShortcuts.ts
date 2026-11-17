@@ -5,6 +5,7 @@ import { shortcutFor, type FocusKind, type ShortcutAction } from '../core/shortc
 // What kind of thing the key press went to, for the rule in core/shortcuts.
 function focusKind(target: EventTarget | null): FocusKind {
   if (!(target instanceof HTMLElement)) return 'other';
+  if (target.getAttribute('role') === 'scrollbar') return 'slider';
   if (target.isContentEditable || target instanceof HTMLTextAreaElement) return 'text';
   if (target instanceof HTMLSelectElement) return 'choice';
   if (target instanceof HTMLButtonElement || target instanceof HTMLAnchorElement) return 'button';

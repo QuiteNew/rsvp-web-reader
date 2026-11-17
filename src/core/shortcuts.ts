@@ -1,12 +1,12 @@
 // The reading shortcuts and when a key press is one. The keys are the
-// desktop's (its keyboard-shortcuts design note): Space, the arrows, R, Esc
-// and B. The rule for when they fire is the web's version of the desktop's
+// desktop's (its keyboard-shortcuts design note): Space, the arrows, R, Esc,
+// B, and C, which centres a flash panned with the scrollbar. The rule for when they fire is the web's version of the desktop's
 // guard, which only had to keep typing safe. A page also has to leave the
 // browser's own keys alone, and keys that already do something to the
 // control that has focus.
 
 export type ShortcutAction =
-  'togglePause' | 'skipBack' | 'skipForward' | 'restart' | 'stop' | 'toggleBookmark';
+  'togglePause' | 'skipBack' | 'skipForward' | 'restart' | 'stop' | 'toggleBookmark' | 'centerPan';
 
 /** A key press, as much of it as the rule needs. */
 export interface KeyPress {
@@ -24,7 +24,7 @@ export interface KeyPress {
  * - text: a place to type (a text box, a text area, an editable element)
  * - button: a button or a link, which Space presses
  * - toggle: a checkbox or a radio button, which Space switches
- * - slider: a range input, which the arrow keys move
+ * - slider: a range input or a scrollbar, which the arrow keys move
  * - choice: a dropdown, which both Space and the arrows work
  * - other: the page itself, or anything that takes no keys
  */
@@ -41,6 +41,8 @@ const KEYS: ReadonlyMap<string, ShortcutAction> = new Map([
   ['Escape', 'stop'],
   ['b', 'toggleBookmark'],
   ['B', 'toggleBookmark'],
+  ['c', 'centerPan'],
+  ['C', 'centerPan'],
 ]);
 
 /**

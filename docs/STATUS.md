@@ -4,22 +4,22 @@ Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
 Last updated: 2026-11-17. Phases 0 to 3 are done (phase 3 confirmed by
-the owner on 2026-11-16). Phase 4 is built: every step is done except the
-owner's choice in step 10, and it waits for the owner to try it and confirm. [handoff/phase-4-progress.md](handoff/phase-4-progress.md)
+the owner on 2026-11-16). Phase 4 is built: every step is done, and it waits
+for the owner to try it and confirm. [handoff/phase-4-progress.md](handoff/phase-4-progress.md)
 has the steps, what was checked and what is open.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                                                                                    |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                                                                                            |
-| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                                                                                    |
-| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                       |
-| 4     | The reading experience                 | Under way. Done: colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit of wide flashes, the Settings window, the Normalize button. Left: the owner's choice about the leftover past the fit floor, and the owner's confirmation. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md) |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                                                                                                                                                                                           |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                                 |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                                 |
+| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                         |
+| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                      |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                              |
+| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                      |
+| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                         |
+| 4     | The reading experience                 | Under way. Done: colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit of wide flashes, the Settings window, the Normalize button. Left: the owner's confirmation. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md) |
+| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                                                                                                                             |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                   |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                   |
 
 ## Phase 0: what was checked, and where
 
@@ -114,7 +114,7 @@ the session shows recorded after each step. The scenarios cover 25 sets of
 options (speed, length pacing, warm-up, fixed and adaptive chunking, speaker
 cues on automatic and on a custom list, odd start positions) over 27 texts.
 
-`npm run check` passes with 256 tests in the scratch copy (Node 22).
+`npm run check` passes with 1168 tests in the scratch copy (Node 22).
 
 Broken on purpose in two rounds, 57 breaks in all, one at a time, among
 them: a chunk crossing a sentence end or a speaker's turn, the chunk limits
@@ -227,7 +227,7 @@ Nothing is saved yet, and there are no shortcuts, themes or settings.
 Checked:
 
 - 21 component tests on a fake clock, one of them under React strict mode.
-  `npm run check` passes with 342 tests in the scratch copy (Node 22).
+  `npm run check` passes with 1168 tests in the scratch copy (Node 22).
 - By hand in the assistant's workspace, in real Chrome against the built
   site under `/rsvp-web-reader/`, at 1000 px and 360 px wide: 16 words,
   among them a one-letter word, a 34-letter word and an emoji. The middle of
@@ -334,7 +334,7 @@ button, the bookmark, detached window and focus buttons, the two blue
 buttons under the text box, the colour pickers, the word size and Group
 controls, renaming or moving a transcript, and the dark theme.
 
-Checked: `npm run check` passes with 371 tests in the scratch copy (Node
+Checked: `npm run check` passes with 1168 tests in the scratch copy (Node
 22). The browser tests, now six, pass in the workspace's Chrome three times
 in a row, and one of them checks that the Quicksand font loads from the
 site itself. Looked at by eye in Chrome at 1300 px and 380 px wide. Not run:
@@ -387,7 +387,8 @@ In short:
   letter offset; the surrounding-words line; the position slider with
   bookmark ticks; bookmarks; chunking, fixed and adaptive, per transcript
   and as defaults; the reading shortcuts (Space, the arrows, R, Esc, B);
-  a Word size stepper; auto-fit of a flash that is too wide; the Settings
+  a Word size stepper; auto-fit of a flash that is too wide, and the desktop's scrollbar for one
+  still too wide at 60 percent; the Settings
   window with search, Reset and Apply, as on the desktop; the Normalize
   button with Revert.
 - Numbers taken from tkinter files (guide marks, the scrubber, the
@@ -396,16 +397,14 @@ In short:
   hand.
 - The design notes for chunking, the shortcuts and reader fit are in
   `reference/desktop-design/`.
-- `npm run check` passes with 1148 tests in the scratch copy (Node 22).
-  The browser tests (38 tests a browser) pass in Chrome in the workspace.
+- `npm run check` passes with 1168 tests in the scratch copy (Node 22).
+  The browser tests (42 tests a browser) pass in Chrome in the workspace.
   On the owner's laptop Firefox and WebKit ran out of time under load. The
   config now runs fewer at once and allows 60 s a test. See the progress
   file.
 
 Open, for the owner:
 
-- What to do with a flash still too wide at 60 percent: leave it cut off,
-  port the desktop's scrollbar, or something of the web's own.
 - A change made in the same instant as a reload can be lost, because the
   browser's database finishes writing a moment later. Small, not new.
   Suggested for phase 7.

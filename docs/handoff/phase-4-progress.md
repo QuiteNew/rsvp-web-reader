@@ -13,20 +13,20 @@ behaviour being right and tested, not at the final look.
 The pure parts come first, each proven against the desktop, then the UI
 that uses them. One commit per step.
 
-| #   | What                                                                  | State                      |
-| --- | --------------------------------------------------------------------- | -------------------------- |
-| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done                       |
-| 2   | `settings_search` (36 lines), the same way                            | Done                       |
-| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done                       |
-| 4   | Guide marks and the focus letter offset                               | Done                       |
-| 5   | The surrounding-words line (a new snapshot field in the engine)       | Done                       |
-| 6   | The scrubber, with bookmark ticks                                     | Done                       |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done                       |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Done                       |
-| 9   | Keyboard shortcuts                                                    | Done                       |
-| 10  | Fitting wide flashes: try CSS first, show the owner                   | Part done, owner to decide |
-| 11  | The settings view for all of it, with search and reset                | Done                       |
-| 12  | The Normalize button (left over from phase 3)                         | Done                       |
+| #   | What                                                                  | State |
+| --- | --------------------------------------------------------------------- | ----- |
+| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done  |
+| 2   | `settings_search` (36 lines), the same way                            | Done  |
+| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done  |
+| 4   | Guide marks and the focus letter offset                               | Done  |
+| 5   | The surrounding-words line (a new snapshot field in the engine)       | Done  |
+| 6   | The scrubber, with bookmark ticks                                     | Done  |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done  |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Done  |
+| 9   | Keyboard shortcuts                                                    | Done  |
+| 10  | Fitting wide flashes: try CSS first, show the owner                   | Done  |
+| 11  | The settings view for all of it, with search and reset                | Done  |
+| 12  | The Normalize button (left over from phase 3)                         | Done  |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -290,8 +290,8 @@ Follows `reference/desktop-design/keyboard-shortcuts.md`.
 - Keys, as on the desktop: Space play or pause, Left and Right skip by the
   skip count from Settings, R restart, Esc stop (back to the text), B add
   or remove a bookmark at the current word.
-- Not bound: F (focus mode), because the web has no focus mode yet, and C
-  (centre a panned flash), which belongs to step 10.
+- Not bound: F (focus mode), because the web has no focus mode yet. C
+  (centre a panned flash) came with the scrollbar in step 10.
 - `src/core/shortcuts.ts`: `shortcutFor(press, focus)` is the whole rule,
   pure and unit tested. It is the web's version of the desktop's guard
   (which only kept typing safe):
@@ -535,3 +535,48 @@ it. Menus and functions that are not built yet come later.
   the footer with nothing open). The keyboard bookmark test now tabs past
   Play and Restart to reach Bookmarks. 38 e2e tests passed in Chrome.
   Looked at by eye in Chrome at 1000 and 390 px wide, light and dark.
+
+## Step 10, the rest: the scrollbar for a flash too wide to fit, 2026-11-17
+
+The owner chose the desktop's answer: a horizontal scrollbar along the
+bottom of the reader, there only when the widest flash of the transcript
+(with its grouping) still spills out at the 60 percent floor.
+
+- `src/core/scroll.ts` is `core/scroll.py` (committed on its own, with
+  fixture `scroll.json` and the desktop's `test_scroll.py` replayed).
+- `WordDisplay` now measures how far the widest chunk reaches on each side
+  of the focus letter, not only its width, and works out the overflow on
+  each side at the fitted size, as `_pan_overflows()` does. The flash and
+  the surrounding words slide by the pan (`--pan`). The reading area cuts
+  off what is outside it. The part before the focus letter spills to the
+  left, so it can be slid into view too.
+- `HorizontalScrollbar.tsx`: a track and a rounded grey thumb, in the Tk
+  terms first and last, so the desktop's arithmetic is used as it is. Drag
+  the thumb, click the track (a whole row), the wheel or arrow keys (24 px,
+  `SCROLL_UNIT_PX`), Page Up and Page Down, Home and End.
+- The centre button (20 px, ember, a crosshair) sits 6 px above the
+  scrollbar at the left, and C does the same, as on the desktop. While the
+  flash is slid, the guide marks are hidden.
+- The pan is kept by the page, not saved. A new reading session starts
+  centred, and when nothing spills any more the pan goes back to 0.
+- Tests: 4 App tests (no scrollbar when it fits, keys slide it and stop at
+  the end, marks hidden and C and the button centre it, a new session
+  starts centred). 3 browser tests at the largest word size with two
+  13-letter words to a group: the end of the flash comes into view with
+  End, C and the button centre it, a drag of the thumb slides it, and the
+  scrollbar goes when Group is off. Hiding the marks and the C key were
+  each taken out once, and a test failed.
+- Not ported: the desktop's note about the words "tearing" during a drag.
+  That was a Tk drawing problem.
+- The owner's first run on all three browsers had two failures, both
+  read from the page snapshots Playwright saved:
+  - WebKit: the test pressed Tab before C. Tab went to the Font colour
+    square, which Playwright's WebKit on Windows draws as a text box, so
+    "c" was typed into it. A test mistake: C is now pressed while the
+    scrollbar has the keyboard. Not load.
+  - Firefox: the thumb drag did not move the flash at all (the scrollbar
+    had taken the focus). The drag followed the pointer on the thumb with
+    pointer capture. It now follows it on the whole window and stops the
+    browser's own text selection on the press, which does not depend on
+    pointer capture. Firefox could not be run here, so this fix is not
+    proven on Firefox yet. The owner's next run is the check.

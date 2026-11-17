@@ -268,6 +268,17 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     [engine, fitKey],
   );
 
+  // How far a flash too wide for the row is slid sideways with the
+  // scrollbar. It is not saved: like the desktop, every new reading session
+  // starts centred.
+  const [pan, setPan] = useState(0);
+  const panKey = `${selected?.id ?? ''}|${isReading ? snapshot.totalWords : ''}`;
+  const [panFor, setPanFor] = useState(panKey);
+  if (panFor !== panKey) {
+    setPanFor(panKey);
+    setPan(0);
+  }
+
   // The word a new bookmark would go on. null when there is none, as at the end.
   const bookmarkHere = isReading ? engine.bookmarkTarget() : null;
   // Whether the Normalize button offers to put the original text back.
@@ -433,6 +444,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     else if (action === 'skipForward') skip(skipWords);
     else if (action === 'restart') engine.restart();
     else if (action === 'stop') stopReading();
+    else if (action === 'centerPan') setPan(0);
     else toggleBookmarkHere();
   });
 
@@ -672,6 +684,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 offsetPx={preferences.highlightOffsetPx}
                 context={snapshot.context}
                 contextColor={dimmed(selected)}
+                pan={pan}
+                onPanChange={setPan}
                 marks={{
                   visible: snapshot.status === 'playing',
                   horizontal: preferences.guideMarkHorizontalEnabled,

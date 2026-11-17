@@ -1821,6 +1821,67 @@ describe('fitting a wide flash', () => {
     expect(size()).toBe('32px');
   });
 
+  const word_ = () => screen.getByTestId('word');
+  const panOf = () => word_().parentElement?.style.getPropertyValue('--pan');
+  const scrollbar = () => screen.queryByRole('scrollbar', { name: 'Slide the flash sideways' });
+
+  test('a flash that fits has no scrollbar', () => {
+    measuring(300);
+    read('a bb ccc');
+    expect(scrollbar()).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Centre the flash' })).toBeNull();
+  });
+
+  test('one still too wide at 60 percent gets the scrollbar, and the keys slide it', () => {
+    measuring(60);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    const bar = scrollbar();
+    expect(bar).not.toBeNull();
+    expect(panOf()).toBe('0px');
+    if (bar === null) return;
+    fireEvent.keyDown(bar, { key: 'End' });
+    const end = Number.parseFloat(panOf() ?? '0');
+    // Slid left, to show the end of the word.
+    expect(end).toBeLessThan(0);
+    fireEvent.keyDown(bar, { key: 'ArrowLeft' });
+    expect(Number.parseFloat(panOf() ?? '0')).toBe(end + 24);
+    fireEvent.keyDown(bar, { key: 'End' });
+    fireEvent.keyDown(bar, { key: 'ArrowRight' });
+    // It stops at the end.
+    expect(Number.parseFloat(panOf() ?? '0')).toBe(end);
+  });
+
+  test('while slid, the guide marks are hidden, and C or the centre button bring them back', () => {
+    measuring(60);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    expect(screen.getByTestId('guide-marks')).toBeInTheDocument();
+    const bar = scrollbar();
+    if (bar === null) throw new Error('no scrollbar');
+    fireEvent.keyDown(bar, { key: 'End' });
+    expect(screen.queryByTestId('guide-marks')).toBeNull();
+    fireEvent.keyDown(document.body, { key: 'c' });
+    expect(panOf()).toBe('0px');
+    expect(screen.getByTestId('guide-marks')).toBeInTheDocument();
+    fireEvent.keyDown(bar, { key: 'End' });
+    press('Centre the flash');
+    expect(panOf()).toBe('0px');
+  });
+
+  test('a new session starts centred, and the scrollbar goes when everything fits', () => {
+    measuring(60);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    const bar = scrollbar();
+    if (bar === null) throw new Error('no scrollbar');
+    fireEvent.keyDown(bar, { key: 'End' });
+    press('Stop reading');
+    press('Start reading');
+    expect(panOf()).toBe('0px');
+    press('Stop reading');
+    fireEvent.change(screen.getByLabelText('Transcript text'), { target: { value: 'a b c' } });
+    press('Start reading');
+    expect(scrollbar()).toBeNull();
+  });
+
   test('the guide marks and the surrounding words are sized from the fitted size', () => {
     measuring(60);
     read('a abcdefghijklmnopqrstuvwxyz b');

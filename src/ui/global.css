@@ -35,6 +35,10 @@
   --card-current: #f3dfc6;
   --text-box: #fafafa;
   --on-blue: #fff;
+  /* The reader's scrollbar, grey as the desktop's (CTkScrollbar's own
+     colours, not the palette). */
+  --scroll-thumb: #8c8c8c;
+  --scroll-thumb-hover: #6e6e6e;
 
   --font-heading: 'Fredoka', system-ui, sans-serif;
   --font-body: 'Quicksand', system-ui, sans-serif;
@@ -62,6 +66,8 @@
   --blue: #7c93a3;
   --blue-hover: #6b7f8c;
   --on-blue: #1d1712;
+  --scroll-thumb: #696969;
+  --scroll-thumb-hover: #878787;
   --pill: #4a3826;
   --pill-hover: #5a4631;
   --card: #261e16;
