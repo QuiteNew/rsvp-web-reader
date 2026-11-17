@@ -25,7 +25,7 @@ that uses them. One commit per step.
 | 8   | Chunking: per transcript, and the defaults for new ones               | Done                       |
 | 9   | Keyboard shortcuts                                                    | Done                       |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Part done, owner to decide |
-| 11  | The settings view for all of it, with search and reset                | Next                       |
+| 11  | The settings view for all of it, with search and reset                | 11a done, 11b next         |
 | 12  | The Normalize button (left over from phase 3)                         | Waiting                    |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
@@ -395,3 +395,23 @@ Changed in `playwright.config.ts`: at most 4 workers on a local machine
 here, because the workspace cannot download those browsers. The owner's
 next run is the check. If a test still runs out of time with 4 workers on
 a quiet machine, that is worth a real look.
+
+## Step 11a, the reading settings reach the reader, done on 2026-11-17
+
+Step 11 is split. The settings view (11b) would have shown four switches
+that did nothing, because the page never used them. This part connects
+them, the way the desktop's `canvas.py` and `reader_display.py` do:
+
+- Length pacing and the warm-up: a session is made with them
+  (`sessionFor` now takes the settings), and a change reaches the session
+  being read at once (`engine.setLengthPacingEnabled`,
+  `engine.setWarmUpEnabled`).
+- Rewind on resume: sent to the engine as `resumeRewindWords`, 0 when the
+  switch is off.
+- Pause when skipping: the skip buttons and the arrow keys call
+  `engine.skip(delta, pauseOnSkip)`, and the pause is saved, as the
+  desktop's `Canvas._skip` does.
+- Tests: 6 App tests. Taking the setting out of `sessionFor`, or the
+  `pauseOnSkip` out of the skip, each made a test fail.
+- Not yet testable on the page: changing one of these while reading. The
+  switches come with 11b, and its tests cover that.

@@ -1808,3 +1808,68 @@ describe('fitting a wide flash', () => {
     expect(display?.style.getPropertyValue('--context-size')).toBe('10px');
   });
 });
+
+describe('the reading settings reach the reader', () => {
+  function startReading(saved: Record<string, unknown>, text = 'a b c d e f g h') {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3, ...saved }));
+    const page = renderPage();
+    addTranscript('Notes');
+    paste(text);
+    press('Start reading');
+    return page;
+  }
+
+  test('with "pause when skipping" on, a skip pauses, and that is saved', () => {
+    const { store } = startReading({ pause_on_skip: true });
+    press('Forward 3 words');
+    expect(word()).toBe('d');
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(true);
+  });
+
+  test('with it off, a skip keeps reading', () => {
+    startReading({ pause_on_skip: false });
+    press('Forward 3 words');
+    expect(screen.getByRole('button', { name: 'Pause' })).toBeInTheDocument();
+  });
+
+  test('with the rewind on, resuming steps back that many words first', () => {
+    startReading({ resume_rewind_enabled: true, resume_rewind_words: 2 });
+    press('Pause');
+    press('Forward 3 words');
+    expect(word()).toBe('d');
+    press('Play');
+    expect(word()).toBe('b');
+  });
+
+  test('with the rewind off, resuming goes on from the same word', () => {
+    startReading({ resume_rewind_enabled: false, resume_rewind_words: 2 });
+    press('Pause');
+    press('Forward 3 words');
+    press('Play');
+    expect(word()).toBe('d');
+  });
+
+  test('the warm-up holds the first words longer', () => {
+    const plain = startReading({ warm_up_enabled: false });
+    wait(plain, WORD_MS);
+    expect(word()).toBe('b');
+    cleanup();
+    window.localStorage.clear();
+    const warm = startReading({ warm_up_enabled: true });
+    wait(warm, WORD_MS);
+    expect(word()).toBe('a');
+  });
+
+  test('length pacing holds a long word longer', () => {
+    const text = 'extraordinarily b c';
+    const plain = startReading({ length_pacing_enabled: false }, text);
+    wait(plain, WORD_MS);
+    expect(word()).toBe('b');
+    cleanup();
+    window.localStorage.clear();
+    const paced = startReading({ length_pacing_enabled: true }, text);
+    wait(paced, WORD_MS);
+    expect(word()).toBe('extraordinarily');
+  });
+});

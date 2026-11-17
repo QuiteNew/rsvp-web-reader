@@ -91,10 +91,13 @@ function timeLeft(remainingMs: number): string {
 
 // A session for this transcript, at the word it was left on, or null when
 // its text has no words. One that was read to the end starts again from
-// the first word.
-function sessionFor(transcript: Transcript): ReaderSession | null {
+// the first word. Length pacing and the warm-up are settings for every
+// transcript, so they come from the settings, as on the desktop.
+function sessionFor(transcript: Transcript, preferences: Settings): ReaderSession | null {
   const session = new ReaderSession(transcript.rawText, {
     wpm: transcript.wpm,
+    lengthPacingEnabled: preferences.lengthPacingEnabled,
+    warmUpEnabled: preferences.warmUpEnabled,
     chunkEnabled: transcript.chunkingEnabled,
     chunkSize: transcript.chunkSize,
     chunkMode: transcript.chunkMode,
@@ -164,9 +167,20 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     engine.setPeripheralContext(showContext);
   }, [engine, showContext]);
   const scrubPause = preferences.scrubPauseEnabled;
+  const rewindWords = preferences.resumeRewindEnabled ? preferences.resumeRewindWords : 0;
   useEffect(() => {
-    engine.setBehaviour({ scrubPauseEnabled: scrubPause });
-  }, [engine, scrubPause]);
+    engine.setBehaviour({ scrubPauseEnabled: scrubPause, resumeRewindWords: rewindWords });
+  }, [engine, scrubPause, rewindWords]);
+  // Length pacing and the warm-up reach the session being read at once.
+  // A session made later is made with them (sessionFor).
+  const lengthPacing = preferences.lengthPacingEnabled;
+  const warmUp = preferences.warmUpEnabled;
+  useEffect(() => {
+    engine.setLengthPacingEnabled(lengthPacing);
+  }, [engine, lengthPacing]);
+  useEffect(() => {
+    engine.setWarmUpEnabled(warmUp);
+  }, [engine, warmUp]);
   const lightDefaults = {
     font: preferences.defaultFontColor,
     highlight: preferences.defaultHighlightColor,
@@ -265,7 +279,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     settings.set('lastTranscriptId', id);
     const transcript = id === null ? null : findTranscript(store.getSnapshot(), id);
     if (transcript === null || transcript.isStopped) return;
-    const session = sessionFor(transcript);
+    const session = sessionFor(transcript, settings.getSnapshot());
     if (session === null) return;
     engine.load(session, true);
     store.setPaused(transcript.id, true);
@@ -289,14 +303,14 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     if (last === null) return;
     if (last.space !== currentSpace(library)) store.switchToSpace(last.space);
     if (last.isStopped) return;
-    const session = sessionFor(last);
+    const session = sessionFor(last, settings.getSnapshot());
     if (session === null) return;
     engine.load(session, true);
     store.setPaused(last.id, true);
   }, [ready, store, settings, engine]);
 
   function startReading(transcript: Transcript) {
-    const session = sessionFor(transcript);
+    const session = sessionFor(transcript, settings.getSnapshot());
     if (session === null) {
       // Only spaces, or only timestamps, which are taken out before reading.
       setProblem('There are no words to read in that text.');
@@ -319,6 +333,13 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   function changeChunking(transcript: Transcript, choice: ChunkingChoice) {
     store.setChunking(transcript.id, choice);
     engine.setChunking(choice.enabled, choice.size, choice.mode, choice.charTarget);
+  }
+
+  // Skip by words. With "Pause playback when skipping" on it also pauses,
+  // and the state it ends in is saved, as the desktop's _skip does.
+  function skip(delta: number) {
+    engine.skip(delta, preferences.pauseOnSkip);
+    if (selected !== null && preferences.pauseOnSkip) store.setPaused(selected.id, true);
   }
 
   function togglePause() {
@@ -348,8 +369,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   // is open over it (Escape then closes the dialog, as it should).
   useShortcuts(ready && isReading && dialog.kind === 'none', (action) => {
     if (action === 'togglePause') togglePause();
-    else if (action === 'skipBack') engine.skip(-skipWords);
-    else if (action === 'skipForward') engine.skip(skipWords);
+    else if (action === 'skipBack') skip(-skipWords);
+    else if (action === 'skipForward') skip(skipWords);
     else if (action === 'restart') engine.restart();
     else if (action === 'stop') stopReading();
     else toggleBookmarkHere();
@@ -594,7 +615,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 title={`Back ${skipWords} words`}
                 disabled={!isReading}
                 onClick={() => {
-                  engine.skip(-skipWords);
+                  skip(-skipWords);
                 }}
               >
                 {'<<'}
@@ -619,7 +640,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 title={`Forward ${skipWords} words`}
                 disabled={!isReading}
                 onClick={() => {
-                  engine.skip(skipWords);
+                  skip(skipWords);
                 }}
               >
                 {'>>'}
