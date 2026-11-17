@@ -2060,6 +2060,43 @@ def build_settings_view(core):
     }
 
 
+def build_scroll(core):
+    """core/scroll.py, the pan arithmetic of the reader's horizontal
+    scrollbar. Minus zero is written as zero: it comes out of -0.0 in Python
+    and of -0 in JavaScript in different places, and the scrollbar cannot
+    tell the two apart."""
+    import core.scroll as scroll
+
+    def plain(value):
+        if isinstance(value, (list, tuple)):
+            return [plain(item) for item in value]
+        if isinstance(value, float) and value == 0:
+            return 0.0
+        return value
+
+    def case(function, *arguments):
+        arguments_out, result = call(function, *arguments)[:2]
+        return [arguments_out, plain(result)]
+
+    rng = random.Random(11)
+    sizes = [0, 0.0, 1, 7.5, 20, 30, 40, 50, 100, 250.25, 1000]
+    pans = [-999, -50, -40, -25.5, -10, -0.0, 0, 3, 10, 20, 30, 999]
+    fractions = [-0.5, 0, 0.0, 0.1, 0.25, 1 / 3, 0.5, 0.75, 1, 1.0, 1.5]
+    cases = {"pan_range": [], "clamp_pan": [], "scrollbar_fractions": [], "pan_from_fraction": []}
+    for left in sizes:
+        for right in sizes:
+            cases["pan_range"].append(case(scroll.pan_range, left, right))
+    for _ in range(400):
+        left, right = rng.choice(sizes), rng.choice(sizes)
+        viewport = rng.choice(sizes + [-5])
+        cases["clamp_pan"].append(case(scroll.clamp_pan, rng.choice(pans), left, right))
+        cases["scrollbar_fractions"].append(case(scroll.scrollbar_fractions, viewport, left, right, rng.choice(pans)))
+        cases["pan_from_fraction"].append(case(scroll.pan_from_fraction, rng.choice(fractions), viewport, left, right))
+    shapes = {name: plain for name in cases}
+    cases["desktop_tests"] = record_desktop_tests("test_scroll.py", scroll, shapes)
+    return cases
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -2113,6 +2150,7 @@ MODULES = {
     "settings_search": build_settings_search,
     "theme": build_theme,
     "settings_view": build_settings_view,
+    "scroll": build_scroll,
     "case": build_case,
     "storage": build_storage,
     "bundle": build_bundle,
