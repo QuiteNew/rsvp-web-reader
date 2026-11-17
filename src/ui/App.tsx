@@ -7,7 +7,7 @@ import {
   type CSSProperties,
 } from 'react';
 
-import { APP_NAME, APP_VERSION, REPO_URL } from '../core/appInfo';
+import { APP_NAME } from '../core/appInfo';
 import { currentSpace, findTranscript } from '../core/library';
 import type { Library, Settings, Transcript } from '../core/models';
 import { pyRound } from '../core/pythonText';
@@ -17,28 +17,20 @@ import { blendColors } from '../core/colors';
 import { fitCandidates } from '../core/fit';
 import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
-import {
-  CHUNK_SIZE_RANGE,
-  FONT_SIZE_RANGE,
-  GUIDE_MARK_LENGTH_PERCENT_RANGE,
-  GUIDE_MARK_THICKNESS_RANGE,
-  HIGHLIGHT_OFFSET_RANGE,
-  WPM_RANGE,
-} from '../core/settings';
+import { CHUNK_SIZE_RANGE, FONT_SIZE_RANGE, WPM_RANGE } from '../core/settings';
 import { formatDuration } from '../core/timing';
 import { WPM_KEY_STEP } from '../core/wpmStep';
 import type { ChunkingChoice, StorageHealth } from '../store/contract';
 import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './App.module.css';
-import { DataSettings } from './DataSettings';
 import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { BookmarksDialog } from './BookmarksDialog';
 import { ChunkingDialog } from './ChunkingDialog';
 import { BookmarkIcon, PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
-import { RangeSetting } from './RangeSetting';
 import { Scrubber } from './Scrubber';
+import { SettingsDialog } from './SettingsDialog';
 import { Sidebar } from './Sidebar';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
@@ -79,7 +71,6 @@ type OpenDialog =
   | { readonly kind: 'spaces' }
   | { readonly kind: 'settings' }
   | { readonly kind: 'bookmarks' }
-  | { readonly kind: 'chunking' }
   | { readonly kind: 'deleteTranscript'; readonly transcript: Transcript };
 
 const NO_DIALOG: OpenDialog = { kind: 'none' };
@@ -144,6 +135,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   const settingsProblem = useSyncExternalStore(settings.subscribe, settings.saveProblem);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [dialog, setDialog] = useState<OpenDialog>(NO_DIALOG);
+  // The Chunking window opens over Settings, which stays open under it.
+  const [chunkingOpen, setChunkingOpen] = useState(false);
   const [problem, setProblem] = useState('');
 
   const space = currentSpace(library);
@@ -838,7 +831,23 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           onClose={closeDialog}
         />
       )}
-      {dialog.kind === 'chunking' && (
+      {dialog.kind === 'settings' && (
+        <SettingsDialog
+          settings={settings}
+          library={library}
+          store={store}
+          onConfigureChunking={() => {
+            setChunkingOpen(true);
+          }}
+          onImported={() => {
+            // The open transcript may be gone, or have another id.
+            open(null);
+            closeDialog();
+          }}
+          onClose={closeDialog}
+        />
+      )}
+      {chunkingOpen && dialog.kind === 'settings' && (
         <ChunkingDialog
           current={selected === null ? null : chunkingOf(selected)}
           defaults={{
@@ -858,144 +867,10 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               defaultChunkCharTarget: choice.charTarget,
             });
           }}
-          onClose={closeDialog}
+          onClose={() => {
+            setChunkingOpen(false);
+          }}
         />
-      )}
-      {dialog.kind === 'settings' && (
-        <Dialog title="Settings" onClose={closeDialog}>
-          <label className={dialogStyles.note}>
-            <input
-              type="checkbox"
-              checked={preferences.reopenLastTranscript}
-              onChange={(event) => {
-                settings.set('reopenLastTranscript', event.target.checked);
-              }}
-            />{' '}
-            Reopen the last transcript when the page opens
-          </label>
-          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-            It comes back at the same word and paused, so nothing starts playing on its own. Turn
-            this off to start with no transcript open.
-          </p>
-          <label className={dialogStyles.note}>
-            Appearance{' '}
-            <select
-              value={preferences.appearanceMode}
-              onChange={(event) => {
-                settings.set('appearanceMode', event.target.value as Settings['appearanceMode']);
-              }}
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-              <option value="system">System</option>
-            </select>
-          </label>
-          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-            System follows your browser's own light or dark choice. Reading colours you picked by
-            hand stay as they are.
-          </p>
-          <label className={dialogStyles.note}>
-            <input
-              type="checkbox"
-              checked={preferences.scrubPauseEnabled}
-              onChange={(event) => {
-                settings.set('scrubPauseEnabled', event.target.checked);
-              }}
-            />{' '}
-            Stay paused after moving the position slider
-          </label>
-          <label className={dialogStyles.note}>
-            <input
-              type="checkbox"
-              checked={preferences.peripheralContextEnabled}
-              onChange={(event) => {
-                settings.set('peripheralContextEnabled', event.target.checked);
-              }}
-            />{' '}
-            Show the surrounding words
-          </label>
-          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-            A dim line under the word with the word before it and the two after it, so the corner of
-            your eye keeps the thread.
-          </p>
-          <button
-            type="button"
-            className={dialogStyles.action}
-            onClick={() => {
-              setDialog({ kind: 'chunking' });
-            }}
-          >
-            Configure chunking...
-          </button>
-          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-            Flash several words at once: for the open transcript, or for new ones.
-          </p>
-          <fieldset className={dialogStyles.group}>
-            <legend>Guide marks</legend>
-            <label className={dialogStyles.note}>
-              <input
-                type="checkbox"
-                checked={preferences.guideMarkHorizontalEnabled}
-                onChange={(event) => {
-                  settings.set('guideMarkHorizontalEnabled', event.target.checked);
-                }}
-              />{' '}
-              Show the horizontal lines too
-            </label>
-            <RangeSetting
-              label="Mark thickness"
-              range={GUIDE_MARK_THICKNESS_RANGE}
-              value={preferences.guideMarkThicknessPx}
-              onChange={(value) => {
-                settings.set('guideMarkThicknessPx', value);
-              }}
-            />
-            <RangeSetting
-              label="Mark length"
-              range={GUIDE_MARK_LENGTH_PERCENT_RANGE}
-              value={preferences.guideMarkLengthPercent}
-              unit="%"
-              onChange={(value) => {
-                settings.set('guideMarkLengthPercent', value);
-              }}
-            />
-            <RangeSetting
-              label="Focus letter height"
-              range={HIGHLIGHT_OFFSET_RANGE}
-              value={preferences.highlightOffsetPx}
-              onChange={(value) => {
-                settings.set('highlightOffsetPx', value);
-              }}
-            />
-            <label className={dialogStyles.note}>
-              Mark colour{' '}
-              <input
-                type="color"
-                value={preferences.guideMarkColor}
-                onChange={(event) => {
-                  settings.setGuideMarkColor(event.target.value.toUpperCase());
-                }}
-              />
-            </label>
-            <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-              The marks show only while words go by. A colour you pick stays in both themes.
-            </p>
-          </fieldset>
-          <DataSettings
-            library={library}
-            store={store}
-            settings={settings}
-            onImported={() => {
-              // The open transcript may be gone, or have another id.
-              open(null);
-              closeDialog();
-            }}
-          />
-          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
-            {APP_NAME}, version {APP_VERSION}. An early build.{' '}
-            <a href={REPO_URL}>Source on GitHub</a>
-          </p>
-        </Dialog>
       )}
     </div>
   );

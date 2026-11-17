@@ -25,8 +25,8 @@ that uses them. One commit per step.
 | 8   | Chunking: per transcript, and the defaults for new ones               | Done                       |
 | 9   | Keyboard shortcuts                                                    | Done                       |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Part done, owner to decide |
-| 11  | The settings view for all of it, with search and reset                | 11a done, 11b next         |
-| 12  | The Normalize button (left over from phase 3)                         | Waiting                    |
+| 11  | The settings view for all of it, with search and reset                | Done                       |
+| 12  | The Normalize button (left over from phase 3)                         | Next                       |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -415,3 +415,50 @@ them, the way the desktop's `canvas.py` and `reader_display.py` do:
   `pauseOnSkip` out of the skip, each made a test fail.
 - Not yet testable on the page: changing one of these while reading. The
   switches come with 11b, and its tests cover that.
+
+## Step 11b, the Settings window, done on 2026-11-17
+
+Ported from the desktop's `gui/components/settings_window.py`, with the
+owner's go-ahead to keep its Apply model.
+
+- `src/core/settingsView.ts` holds the Defaults tab as data (each entry's
+  name, keywords, description, in the desktop's order), the search layout
+  (`defaultsLayout`, a port of `_layout_defaults`), the form
+  (`formFromSettings`, `resetDefaultsForm`) and the checks Apply makes
+  (`checkSettingsForm`, a port of `_handle_apply`: the three typed numbers
+  in the desktop's order, then the letter shift, with the desktop's
+  messages).
+- New fixture `settings_view.json` (29 cases). The fixture script reads
+  `_build_defaults_tab` with `ast` (the file imports tkinter): it runs the
+  string assignments, so the descriptions come out as drawn, and records
+  every `_defaults_item` call with the texts shown in it. The test checks
+  the web's entries against it.
+- Where the web words it differently, on purpose, it is listed in
+  `WEB_WORDING` (the desktop's detached window and "launch the app"), and
+  the test checks the desktop still has those words. Left out:
+  "Configure speaker cues" (phase 6), listed in `NOT_YET`.
+- `src/ui/SettingsDialog.tsx`: tabs Defaults, Appearance and Data. The
+  desktop's Layout (window sizes), Profiles (phase 6) and Stats tabs are
+  not here. Storage is Data (export and import).
+- Nothing is saved until Apply. A wrong number stops Apply: the message is
+  shown, the window stays open, the search is cleared and the box gets the
+  cursor with its text selected. The skip amount and pause when skipping
+  are saved at once, as the desktop's note says. Closing drops the rest.
+- Reset to Original Defaults puts the Defaults tab back. As on the
+  desktop, it saves the two skip settings at once and the rest on Apply.
+  It also sets the guide mark colour to the original one, which in the dark
+  theme then counts as picked by hand. That is the desktop's behaviour,
+  kept, and pointed out to the owner.
+- The Chunking window opens over Settings, which stays open. `Dialog` now
+  keeps a stack, so Escape closes only the window on top.
+- The theme is on the Appearance tab and now waits for Apply too.
+- Different from the desktop, on purpose: there is one Close (the title
+  bar ✕), not a second Close button by Apply. A colour from the browser's
+  picker is lowercase, as Tk's picker gives it.
+- A small difference that cannot be avoided: Python's `isdigit()` lets
+  "²" through and `int()` then fails, so the desktop applies nothing and
+  shows nothing. The web shows "must be a whole number".
+- Tests: 28 core tests, 11 new App tests (24 older ones moved to the new
+  window), 2 new browser tests. Taking out the search clearing, or the
+  instant save of the skip amount, each failed a test. 37 e2e tests passed
+  three times in Chrome only.

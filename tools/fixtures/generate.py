@@ -1970,6 +1970,96 @@ def build_theme(core):
     }
 
 
+def build_settings_view(core):
+    """The words of the Settings window's Defaults tab, read out of
+    gui/components/settings_window.py. That file imports tkinter and cannot be
+    imported here, so the body of _build_defaults_tab is walked statement by
+    statement with ast: string assignments (and `low, high = X_RANGE`) are run
+    so the descriptions built from them come out as they are drawn, and every
+    self._defaults_item(...) call starts a new entry. For each entry it keeps
+    the name, keywords, description and searchable flag the search uses, and
+    the plain texts shown in it (labels, notes, switch and button texts)."""
+    import ast
+    import core.settings_store as settings_store
+
+    path = Path(core.__file__).resolve().parents[1] / "gui" / "components" / "settings_window.py"
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    env = {name: getattr(settings_store, name) for name in dir(settings_store) if name.endswith("_RANGE")}
+    constants = {}
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            try:
+                constants[node.targets[0].id] = eval(compile(ast.Expression(node.value), "settings_window.py", "eval"), dict(env))
+            except Exception:
+                pass
+    env.update({k: v for k, v in constants.items() if isinstance(v, str)})
+
+    def value(node):
+        try:
+            return eval(compile(ast.Expression(node), "settings_window.py", "eval"), dict(env))
+        except Exception:
+            return None
+
+    def is_item_call(node):
+        return (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                and node.func.attr == "_defaults_item")
+
+    window = next(n for n in ast.walk(tree) if isinstance(n, ast.ClassDef) and n.name == "SettingsWindow")
+    method = next(n for n in window.body if isinstance(n, ast.FunctionDef) and n.name == "_build_defaults_tab")
+    entries = []
+    loose = []
+    for statement in method.body:
+        if isinstance(statement, ast.Assign):
+            target = statement.targets[0]
+            if isinstance(target, ast.Tuple) and all(isinstance(e, ast.Name) for e in target.elts):
+                found = value(statement.value)
+                if isinstance(found, tuple) and len(found) == len(target.elts):
+                    env.update(zip((e.id for e in target.elts), found))
+                continue
+            if isinstance(target, ast.Name) and is_item_call(statement.value):
+                call = statement.value
+                positional = [value(a) for a in call.args[1:]]
+                named = {k.arg: value(k.value) for k in call.keywords}
+                parts = positional + [""] * (3 - len(positional))
+                entries.append({
+                    "name": named.get("name", parts[0]),
+                    "keywords": named.get("keywords", parts[1]),
+                    "description": named.get("description", parts[2]),
+                    "searchable": named.get("searchable", True),
+                    "texts": [],
+                })
+                continue
+            if isinstance(target, ast.Name):
+                found = value(statement.value)
+                if isinstance(found, str):
+                    env[target.id] = found
+        texts = []
+        for node in ast.walk(statement):
+            if isinstance(node, ast.Call):
+                for keyword in node.keywords:
+                    if keyword.arg == "text":
+                        found = value(keyword.value)
+                        if isinstance(found, str) and found:
+                            texts.append(found)
+                if isinstance(node.func, ast.Attribute) and node.func.attr in ("_styled_switch", "_styled_button", "_color_row"):
+                    if len(node.args) > 1:
+                        found = value(node.args[1])
+                        if isinstance(found, str) and found:
+                            texts.append(found)
+        (entries[-1]["texts"] if entries else loose).extend(texts)
+    if len(entries) < 20:
+        raise SystemExit(f"settings_window.py: found only {len(entries)} Defaults entries")
+    # The reset button's text is in its own small method.
+    reset_row = next(n for n in window.body if isinstance(n, ast.FunctionDef) and n.name == "_reset_row")
+    for node in ast.walk(reset_row):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute) and node.func.attr == "_styled_button":
+            loose.append(value(node.args[1]))
+    return {
+        "entry": [[[index], entry] for index, entry in enumerate(entries)],
+        "loose_text": [[[index], text] for index, text in enumerate(loose)],
+    }
+
+
 def build_case(core):
     """Not a desktop module: what Python's own str.lower() and str.casefold()
     do to every single character, so the port's tables can be checked whole.
@@ -2022,6 +2112,7 @@ MODULES = {
     "reopen": build_reopen,
     "settings_search": build_settings_search,
     "theme": build_theme,
+    "settings_view": build_settings_view,
     "case": build_case,
     "storage": build_storage,
     "bundle": build_bundle,

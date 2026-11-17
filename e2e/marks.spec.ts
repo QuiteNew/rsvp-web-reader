@@ -44,8 +44,8 @@ test('the marks go when reading is paused', async ({ page }) => {
 test('the horizontal lines are wide, and cross the ends of the marks', async ({ page }) => {
   await startReading(page);
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByLabel('Show the horizontal lines too').check();
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByLabel('Show horizontal guide lines').check();
+  await page.getByRole('button', { name: 'Apply' }).click();
   const marks = page.getByTestId('guide-marks').locator('span');
   await expect(marks).toHaveCount(4);
   const [above, tick] = await Promise.all([marks.nth(0).boundingBox(), marks.nth(2).boundingBox()]);
@@ -60,8 +60,8 @@ test('the surrounding words sit under the marks, with the middle word under the 
 }) => {
   await startReading(page);
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByLabel('Show the surrounding words').check();
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByLabel('Show surrounding words').check();
+  await page.getByRole('button', { name: 'Apply' }).click();
   await page.getByRole('button', { name: 'Pause' }).click();
   const line = page.getByTestId('context');
   await expect(line).toBeVisible();

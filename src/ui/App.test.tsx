@@ -50,6 +50,12 @@ function press(name: string): void {
   fireEvent.click(screen.getByRole('button', { name }));
 }
 
+// Opens Settings, on another tab than Defaults when asked.
+function openSettings(tab?: 'Appearance' | 'Data'): void {
+  press('Settings');
+  if (tab !== undefined) fireEvent.click(screen.getByRole('tab', { name: tab }));
+}
+
 // Types into the one text field of the open dialog and presses its button.
 function answerDialog(value: string, button = 'Create'): void {
   const dialog = screen.getByRole('dialog');
@@ -111,7 +117,7 @@ describe('the empty page', () => {
 
   test('Settings shows the version and the link to the source', () => {
     renderPage();
-    press('Settings');
+    openSettings('Data');
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
     expect(dialog).toHaveTextContent(`version ${APP_VERSION}`);
     expect(within(dialog).getByRole('link', { name: 'Source on GitHub' })).toHaveAttribute(
@@ -634,7 +640,7 @@ describe('export and import', () => {
 
   test('Settings says where the data lives', () => {
     renderPage();
-    press('Settings');
+    openSettings('Data');
     const dialog = screen.getByRole('dialog', { name: 'Settings' });
     expect(dialog.textContent).toContain('saved in this browser, on this device only');
   });
@@ -649,7 +655,7 @@ describe('export and import', () => {
     const clicked = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ default_wpm: 450 }));
     renderPage(SAVED);
-    press('Settings');
+    openSettings('Data');
     press('Export to a file');
     expect(clicked).toHaveBeenCalledTimes(1);
     expect(created).toHaveBeenCalledTimes(1);
@@ -657,7 +663,7 @@ describe('export and import', () => {
 
   test('a file that is not an export shows the desktop message and changes nothing', async () => {
     const { store } = renderPage(SAVED);
-    press('Settings');
+    openSettings('Data');
     chooseFile('not json');
     expect((await screen.findByRole('alert')).textContent).toBe(
       "That file isn't valid JSON, so it can't be an RSVP Reader export.",
@@ -667,7 +673,7 @@ describe('export and import', () => {
 
   test('Replace takes the file in place of what was here, and its settings', async () => {
     const { store, persistence } = renderPage(SAVED);
-    press('Settings');
+    openSettings('Data');
     chooseFile(THEIR_FILE);
     const group = await screen.findByRole('group', { name: 'Import' });
     expect(group.textContent).toContain('1 transcript in 2 Spaces');
@@ -684,7 +690,7 @@ describe('export and import', () => {
   test('Add keeps what was here, gives new ids and leaves the settings', async () => {
     window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ default_wpm: 300 }));
     const { store } = renderPage(SAVED);
-    press('Settings');
+    openSettings('Data');
     chooseFile(THEIR_FILE);
     const group = await screen.findByRole('group', { name: 'Import' });
     fireEvent.click(within(group).getByRole('button', { name: 'Add to what is here' }));
@@ -703,7 +709,7 @@ describe('export and import', () => {
 
   test('Cancel leaves everything as it was', async () => {
     const { store } = renderPage(SAVED);
-    press('Settings');
+    openSettings('Data');
     chooseFile(THEIR_FILE);
     const group = await screen.findByRole('group', { name: 'Import' });
     fireEvent.click(within(group).getByRole('button', { name: 'Cancel' }));
@@ -938,12 +944,11 @@ describe('coming back after a reload', () => {
     addAndType('Lecture', TEXT);
     press('Start reading');
     press('Settings');
-    const reopen = screen.getByRole('checkbox', {
-      name: 'Reopen the last transcript when the page opens',
-    });
+    const reopen = screen.getByRole('checkbox', { name: 'Reopen the last transcript at launch' });
     expect(reopen).toBeChecked();
     fireEvent.click(reopen);
     expect(reopen).not.toBeChecked();
+    press('Apply');
     expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
       reopen_last_transcript: false,
       last_transcript_id: 1,
@@ -957,6 +962,7 @@ describe('coming back after a reload', () => {
     press('Lecture');
     press('Settings');
     fireEvent.click(screen.getByRole('checkbox', { name: /Reopen the last transcript/ }));
+    press('Apply');
     cleanup();
     await reload(second, () => {});
     expect(word()).toBe('one');
@@ -1026,8 +1032,9 @@ describe('the theme', () => {
   });
 
   function pickAppearance(value: string): void {
-    press('Settings');
-    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value } });
+    openSettings('Appearance');
+    fireEvent.change(screen.getByLabelText('Colour theme'), { target: { value } });
+    press('Apply');
   }
 
   function render_(library: Library = EMPTY_LIBRARY) {
@@ -1084,7 +1091,7 @@ describe('the theme', () => {
       highlightColor: DARK.highlight,
       backgroundColor: DARK.background,
     });
-    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } });
+    pickAppearance('light');
     expect(store.getSnapshot().transcripts[0]).toMatchObject({
       ...LIGHT_READING,
     });
@@ -1115,7 +1122,6 @@ describe('the theme', () => {
   test('a new transcript gets the dark reading colours in Dark', () => {
     const { store } = render_();
     pickAppearance('dark');
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     addTranscript('Night');
     expect(store.getSnapshot().transcripts[0]).toMatchObject({
       fontColor: DARK.font,
@@ -1128,8 +1134,10 @@ describe('the theme', () => {
     const { settings } = render_();
     pickAppearance('dark');
     expect(settings.saved().guide_mark_color).toBe('#F2E8DC');
-    settings.setGuideMarkColor('#112233');
-    fireEvent.change(screen.getByLabelText('Appearance'), { target: { value: 'light' } });
+    act(() => {
+      settings.setGuideMarkColor('#112233');
+    });
+    pickAppearance('light');
     expect(settings.saved().guide_mark_color).toBe('#112233');
   });
 });
@@ -1143,10 +1151,16 @@ describe('the guide marks', () => {
     return page;
   }
 
+  function setBox(name: RegExp, value: string): void {
+    press('Settings');
+    fireEvent.change(screen.getByRole('textbox', { name }), { target: { value } });
+    press('Apply');
+  }
+
   function setSlider(name: RegExp, value: number): void {
     press('Settings');
     fireEvent.change(screen.getByRole('slider', { name }), { target: { value: String(value) } });
-    press('Close');
+    press('Apply');
   }
 
   test('they show while words go by and are gone when paused', () => {
@@ -1162,16 +1176,16 @@ describe('the guide marks', () => {
     startReading();
     expect(screen.getByTestId('guide-marks').children).toHaveLength(2);
     press('Settings');
-    fireEvent.click(screen.getByLabelText('Show the horizontal lines too'));
-    press('Close');
+    fireEvent.click(screen.getByLabelText('Show horizontal guide lines'));
+    press('Apply');
     expect(screen.getByTestId('guide-marks').children).toHaveLength(4);
   });
 
   test('thickness, length and the focus letter height reach the page', () => {
     startReading();
-    setSlider(/Mark thickness/, 5);
+    setBox(/Thickness of the vertical guide marks/, '5');
     setSlider(/Mark length/, 60);
-    setSlider(/Focus letter height/, -2);
+    setBox(/Shift the highlighted letter/, '-2');
     const display = screen.getByTestId('word').parentElement;
     expect(display?.style.getPropertyValue('--mark-thickness')).toBe('5px');
     // the default 32 px font at 60 percent, 19.2 rounded
@@ -1185,7 +1199,7 @@ describe('the guide marks', () => {
     expect(display()?.style.getPropertyValue('--mark-color')).toBe('#3B2E27');
     press('Settings');
     fireEvent.change(screen.getByLabelText('Mark colour'), { target: { value: '#112233' } });
-    press('Close');
+    press('Apply');
     expect(display()?.style.getPropertyValue('--mark-color')).toBe('#112233');
   });
 
@@ -1209,8 +1223,8 @@ describe('the surrounding-words line', () => {
 
   function switchOn(): void {
     press('Settings');
-    fireEvent.click(screen.getByLabelText('Show the surrounding words'));
-    press('Close');
+    fireEvent.click(screen.getByLabelText('Show surrounding words'));
+    press('Apply');
   }
 
   test('it is off until switched on', () => {
@@ -1253,8 +1267,8 @@ describe('the surrounding-words line', () => {
     startReading();
     switchOn();
     press('Settings');
-    fireEvent.click(screen.getByLabelText('Show the surrounding words'));
-    press('Close');
+    fireEvent.click(screen.getByLabelText('Show surrounding words'));
+    press('Apply');
     expect(screen.queryByTestId('context')).toBeNull();
   });
 });
@@ -1468,9 +1482,16 @@ describe('chunking', () => {
 
   const first = (store: { getSnapshot(): Library }) => store.getSnapshot().transcripts[0];
 
+  // A button of the Chunking window, which is open over Settings.
+  function inChunking(name: string): void {
+    fireEvent.click(
+      within(screen.getByRole('dialog', { name: 'Chunking' })).getByRole('button', { name }),
+    );
+  }
+
   function openChunking(): void {
     press('Settings');
-    press('Configure chunking...');
+    press('Configure chunking…');
   }
 
   test('Group flashes two words at once, and is saved with the transcript', () => {
@@ -1538,7 +1559,7 @@ describe('chunking', () => {
       target: { value: '15' },
     });
     expect(first(store)?.chunkingEnabled).toBe(false);
-    press('Apply');
+    inChunking('Apply');
     expect(screen.getByText('Applied to this transcript.')).toBeInTheDocument();
     expect(first(store)).toMatchObject({
       chunkingEnabled: true,
@@ -1557,10 +1578,11 @@ describe('chunking', () => {
     fireEvent.change(screen.getByRole('slider', { name: /Words per group/ }), {
       target: { value: '4' },
     });
-    press('Apply');
+    inChunking('Apply');
     expect(screen.getByText('Applied to new transcripts.')).toBeInTheDocument();
     expect(first(store)?.chunkingEnabled).toBe(false);
     expect(window.localStorage.getItem(SETTINGS_KEY)).toContain('"default_chunk_size":4');
+    inChunking('Close');
     press('Close');
     addTranscript('Later');
     const later = store.getSnapshot().transcripts.find((t) => t.title === 'Later');
@@ -1871,5 +1893,181 @@ describe('the reading settings reach the reader', () => {
     const paced = startReading({ length_pacing_enabled: true }, text);
     wait(paced, WORD_MS);
     expect(word()).toBe('extraordinarily');
+  });
+});
+
+describe('the Settings window', () => {
+  const saved = () =>
+    JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<string, unknown>;
+
+  function startReading(more: Record<string, unknown> = {}) {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3, ...more }));
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('extraordinarily b c d e f g h');
+    press('Start reading');
+    return page;
+  }
+
+  test('nothing is saved until Apply, and closing drops the changes', () => {
+    renderPage();
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Slow down for long words'));
+    fireEvent.change(screen.getByRole('slider', { name: /Speed/ }), { target: { value: '450' } });
+    expect(screen.getByText('450 WPM')).toBeInTheDocument();
+    expect(saved().length_pacing_enabled).toBeUndefined();
+    press('Close');
+    press('Settings');
+    expect(screen.getByLabelText('Slow down for long words')).not.toBeChecked();
+    expect(screen.getByText('300 WPM')).toBeInTheDocument();
+  });
+
+  test('Apply saves everything and closes the window', () => {
+    renderPage();
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Slow down for long words'));
+    fireEvent.change(screen.getByRole('slider', { name: /Speed/ }), { target: { value: '450' } });
+    fireEvent.change(screen.getByRole('textbox', { name: /each time \+\/- is clicked/ }), {
+      target: { value: ' 7 ' },
+    });
+    press('Apply');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(saved()).toMatchObject({
+      length_pacing_enabled: true,
+      default_wpm: 450,
+      font_size_step: 7,
+    });
+  });
+
+  test('a setting applied while reading reaches the words on screen', () => {
+    const page = startReading();
+    press('Pause');
+    press('Restart');
+    press('Pause');
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Slow down for long words'));
+    press('Apply');
+    press('Play');
+    wait(page, WORD_MS);
+    // A long word is held longer now.
+    expect(word()).toBe('extraordinarily');
+  });
+
+  test('a wrong number is named, the window stays open and nothing is saved', () => {
+    renderPage();
+    press('Settings');
+    fireEvent.click(screen.getByLabelText('Slow down for long words'));
+    const box = screen.getByRole('textbox', { name: /Thickness of the vertical guide marks/ });
+    fireEvent.change(box, { target: { value: '9' } });
+    press('Apply');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The guide mark thickness must be between 2 and 6.',
+    );
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(saved().length_pacing_enabled).toBeUndefined();
+    expect(box).toHaveFocus();
+  });
+
+  test('a wrong number hidden by a search, or on another tab, is shown again', () => {
+    renderPage();
+    press('Settings');
+    fireEvent.change(screen.getByRole('textbox', { name: /Words to rewind on resume/ }), {
+      target: { value: 'abc' },
+    });
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), {
+      target: { value: 'surrounding' },
+    });
+    expect(screen.queryByRole('textbox', { name: /Words to rewind/ })).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Appearance' }));
+    press('Apply');
+    expect(screen.getByRole('searchbox', { name: 'Search settings' })).toHaveValue('');
+    expect(screen.getByRole('textbox', { name: /Words to rewind/ })).toHaveFocus();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Words to rewind on resume must be a whole number.',
+    );
+  });
+
+  test('the search shows what it finds, and says when it finds nothing', () => {
+    renderPage();
+    press('Settings');
+    const search = screen.getByRole('searchbox', { name: 'Search settings' });
+    fireEvent.change(search, { target: { value: 'colour' } });
+    expect(screen.getAllByTestId(/^setting-/).map((entry) => entry.dataset.testid)).toEqual([
+      'setting-fontColor',
+      'setting-highlightColor',
+      'setting-backgroundColor',
+      'setting-guideMarkColor',
+    ]);
+    expect(screen.getByText('Clear the search to show the reset button.')).toBeInTheDocument();
+    fireEvent.change(search, { target: { value: 'bearings' } });
+    expect(screen.getByText('No settings match your search.')).toBeInTheDocument();
+    press('Descriptions');
+    expect(screen.getAllByTestId(/^setting-/).map((entry) => entry.dataset.testid)).toEqual([
+      'setting-scrubPause',
+    ]);
+  });
+
+  test('the skip settings are saved at once, without Apply', () => {
+    renderPage();
+    press('Settings');
+    fireEvent.change(screen.getByRole('slider', { name: /Skip amount/ }), {
+      target: { value: '7' },
+    });
+    fireEvent.click(screen.getByLabelText('Pause playback when skipping'));
+    expect(saved()).toMatchObject({ skip_word_count: 7, pause_on_skip: true });
+    press('Close');
+    press('Settings');
+    expect(screen.getByText('7 words')).toBeInTheDocument();
+  });
+
+  test('Reset puts the original values in the window, and saves them on Apply', () => {
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ default_wpm: 600, warm_up_enabled: true, skip_word_count: 9 }),
+    );
+    renderPage();
+    press('Settings');
+    press('Reset to Original Defaults');
+    expect(screen.getByText('300 WPM')).toBeInTheDocument();
+    expect(screen.getByLabelText('Ease in at the start of reading')).not.toBeChecked();
+    // The skip amount is saved straight away, the rest waits for Apply.
+    expect(saved()).toMatchObject({ skip_word_count: 10, default_wpm: 600 });
+    press('Apply');
+    expect(saved()).toMatchObject({ default_wpm: 300, warm_up_enabled: false });
+  });
+
+  test('Reset in Dark gives the guide marks the original colour as a colour picked by hand', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ appearance_mode: 'dark' }));
+    renderPage();
+    expect(saved().guide_mark_color).toBe('#F2E8DC');
+    press('Settings');
+    press('Reset to Original Defaults');
+    press('Apply');
+    // As on the desktop: the reset colour differs from the dark one, so it
+    // no longer follows the theme.
+    expect(saved()).toMatchObject({
+      guide_mark_color: '#3B2E27',
+      guide_mark_color_is_default: false,
+    });
+  });
+
+  test('the Chunking window opens over Settings, and Escape closes only it', () => {
+    renderPage();
+    press('Settings');
+    press('Configure chunking…');
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+  });
+
+  test('the theme is on its own tab and waits for Apply too', () => {
+    renderPage();
+    openSettings('Appearance');
+    fireEvent.change(screen.getByLabelText('Colour theme'), { target: { value: 'dark' } });
+    expect(document.documentElement.dataset.theme).toBe('light');
+    press('Apply');
+    expect(document.documentElement.dataset.theme).toBe('dark');
+    delete document.documentElement.dataset.theme;
   });
 });

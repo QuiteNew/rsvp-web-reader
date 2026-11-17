@@ -115,6 +115,7 @@ test('an export file brings everything back after it is deleted', async ({ page 
   await addTranscript(page, 'Café notes', 'one two three');
 
   await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: 'Data' }).click();
   const downloading = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Export to a file' }).click();
   const download = await downloading;
@@ -136,6 +137,7 @@ test('an export file brings everything back after it is deleted', async ({ page 
   await expect(card(page, 'Café notes')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('tab', { name: 'Data' }).click();
   await page.getByLabel('Import from a file').setInputFiles(path);
   await page.getByRole('button', { name: 'Replace everything' }).click();
   await expect(card(page, 'Café notes')).toBeVisible();
@@ -168,7 +170,7 @@ test('with reopening switched off in Settings, a reload opens nothing', async ({
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('checkbox', { name: /Reopen the last transcript/ }).uncheck();
-  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name: 'Apply' }).click();
   await page.reload();
 
   // The transcript is still in the list, and nothing is open.

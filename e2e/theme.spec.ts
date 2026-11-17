@@ -6,8 +6,9 @@ import { expect, test, type Page } from '@playwright/test';
 
 async function pickAppearance(page: Page, label: string): Promise<void> {
   await page.getByRole('button', { name: 'Settings' }).click();
-  await page.getByLabel('Appearance').selectOption({ label });
-  await page.getByRole('button', { name: 'Close' }).click();
+  await page.getByRole('tab', { name: 'Appearance' }).click();
+  await page.getByLabel('Colour theme').selectOption({ label });
+  await page.getByRole('button', { name: 'Apply' }).click();
 }
 
 test('the page starts light', async ({ page }) => {

@@ -6,22 +6,30 @@ interface DialogProps {
   readonly title: string;
   readonly onClose: () => void;
   readonly children: ReactNode;
+  // A wider window, for Settings.
+  readonly wide?: boolean;
 }
+
+// The dialogs open now, the newest last. A dialog can open over another
+// (Chunking over Settings), and Escape is for the one on top only.
+const openDialogs: string[] = [];
 
 // A small window over the page, like the desktop app's pop-up windows.
 // Escape and a click beside it both close it.
-export function Dialog({ title, onClose, children }: DialogProps) {
+export function Dialog({ title, onClose, children, wide = false }: DialogProps) {
   const titleId = useId();
 
   useEffect(() => {
+    openDialogs.push(titleId);
     function onKey(event: KeyboardEvent) {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape' && openDialogs.at(-1) === titleId) onClose();
     }
     document.addEventListener('keydown', onKey);
     return () => {
       document.removeEventListener('keydown', onKey);
+      openDialogs.splice(openDialogs.indexOf(titleId), 1);
     };
-  }, [onClose]);
+  }, [onClose, titleId]);
 
   return (
     <div
@@ -30,7 +38,12 @@ export function Dialog({ title, onClose, children }: DialogProps) {
         if (event.target === event.currentTarget) onClose();
       }}
     >
-      <div className={styles.window} role="dialog" aria-modal="true" aria-labelledby={titleId}>
+      <div
+        className={wide ? `${styles.window} ${styles.wide}` : styles.window}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <div className={styles.titleBar}>
           <span id={titleId}>{title}</span>
           <button type="button" className={styles.close} aria-label="Close" onClick={onClose}>
