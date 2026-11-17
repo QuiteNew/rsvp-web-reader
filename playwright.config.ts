@@ -18,6 +18,14 @@ export default defineConfig({
   forbidOnly: isCI,
   // No retries. A test that passes only the second time is hiding something.
   retries: 0,
+  // Three browsers at once are heavy for one machine. With Playwright's
+  // default (half the processor threads, 10 on the owner's laptop) a
+  // Firefox test that takes 3 s alone took up to 28 s, and some ran out of
+  // the 30 s a test gets. Fewer at a time keeps each one quick. CI keeps
+  // Playwright's default.
+  workers: isCI ? undefined : 4,
+  // Room for a slow machine. A test that hangs still fails, a minute later.
+  timeout: 60_000,
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: SITE,

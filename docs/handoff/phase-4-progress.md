@@ -33,13 +33,9 @@ the design notes below.
 
 ## Asked of the owner
 
-The brief says three design notes for this phase are kept outside the
-desktop repository. Asked for on 2026-11-16, to go into
-`reference/desktop-design/`:
-
-- chunking (step 8)
-- the keyboard shortcuts (step 9)
-- reader fit and scroll (step 10)
+The three design notes for this phase (chunking, the keyboard shortcuts,
+reader fit and scroll) were asked for on 2026-11-16 and copied into
+`reference/desktop-design/` on 2026-11-17. They are tracked in the repo.
 
 ## Step 1, colours, done on 2026-11-16
 
@@ -380,3 +376,22 @@ cannot be read in one glance by panning anyway. Choices:
    Both differ from the desktop.
 
 Until decided, `scroll.py` is not ported and C is not bound.
+
+## The browser tests under load, 2026-11-17
+
+The owner ran `npm run e2e` twice after step 10, on all three browsers.
+94 and 103 of 105 passed. Every failure, 13 in all, was "Test timeout of
+30000ms exceeded", none was a wrong value, and the page snapshots show each
+test still going the right way when the time ran out. The first run was on
+a laptop under heavy load, the second at about 40 percent.
+
+Why it is load and not the page: the same tests pass in Chromium in 2 to
+8 s, and the Firefox ones that passed took 9 to 28 s, right under the 30 s
+limit. Playwright ran 10 workers (half the laptop's threads), three
+browsers at a time.
+
+Changed in `playwright.config.ts`: at most 4 workers on a local machine
+(CI keeps the default) and 60 s a test. Not verified on Firefox or WebKit
+here, because the workspace cannot download those browsers. The owner's
+next run is the check. If a test still runs out of time with 4 workers on
+a quiet machine, that is worth a real look.
