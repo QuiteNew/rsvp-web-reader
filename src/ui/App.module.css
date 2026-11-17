@@ -387,3 +387,10 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* Chunking for the open transcript: on or off, and the fixed group size. */
+.chunkRow {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}

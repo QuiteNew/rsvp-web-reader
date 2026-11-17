@@ -1454,3 +1454,132 @@ describe('bookmarks', () => {
     expect(screen.getByRole('button', { name: 'Add bookmark here' })).toBeDisabled();
   });
 });
+
+describe('chunking', () => {
+  function startReading() {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3 }));
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    press('Pause');
+    return page;
+  }
+
+  const first = (store: { getSnapshot(): Library }) => store.getSnapshot().transcripts[0];
+
+  function openChunking(): void {
+    press('Settings');
+    press('Configure chunking...');
+  }
+
+  test('Group flashes two words at once, and is saved with the transcript', () => {
+    const { store } = startReading();
+    expect(word()).toBe('a');
+    fireEvent.click(screen.getByLabelText('Group'));
+    expect(word()).toBe('a b');
+    expect(first(store)?.chunkingEnabled).toBe(true);
+    fireEvent.click(screen.getByLabelText('Group'));
+    expect(word()).toBe('a');
+  });
+
+  test('the size goes from 2 to 5 and no further, and is kept while Group is off', () => {
+    const { store } = startReading();
+    expect(screen.getByRole('button', { name: 'Fewer words per group' })).toBeDisabled();
+    press('More words per group');
+    expect(first(store)?.chunkSize).toBe(3);
+    expect(word()).toBe('a');
+    fireEvent.click(screen.getByLabelText('Group'));
+    expect(word()).toBe('a b c');
+    press('More words per group');
+    press('More words per group');
+    expect(word()).toBe('a b c d e');
+    expect(screen.getByRole('button', { name: 'More words per group' })).toBeDisabled();
+  });
+
+  test('grouping keeps the word being read and snaps to the start of its group', () => {
+    startReading();
+    press('Forward 3 words');
+    expect(word()).toBe('d');
+    fireEvent.click(screen.getByLabelText('Group'));
+    expect(word()).toBe('c d');
+    expect(screen.getByText('word 3 of 8')).toBeInTheDocument();
+  });
+
+  test('a transcript that has chunking on is read in groups from the start', () => {
+    renderPage({
+      ...EMPTY_LIBRARY,
+      nextId: 2,
+      transcripts: [
+        {
+          ...TRANSCRIPT_DEFAULTS,
+          id: 1,
+          title: 'Grouped',
+          space: 'General',
+          rawText: 'a b c d e f g h',
+          isStopped: true,
+          chunkingEnabled: true,
+          chunkSize: 3,
+        },
+      ],
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Grouped' }));
+    press('Start reading');
+    expect(word()).toBe('a b c');
+  });
+
+  test('the Chunking window changes this transcript only on Apply, and at once', () => {
+    const { store } = startReading();
+    openChunking();
+    expect(screen.getByLabelText('This transcript')).toBeChecked();
+    fireEvent.click(screen.getByLabelText('Group words together'));
+    fireEvent.change(screen.getByLabelText('Group size'), { target: { value: 'adaptive' } });
+    fireEvent.change(screen.getByRole('slider', { name: /Group width/ }), {
+      target: { value: '15' },
+    });
+    expect(first(store)?.chunkingEnabled).toBe(false);
+    press('Apply');
+    expect(screen.getByText('Applied to this transcript.')).toBeInTheDocument();
+    expect(first(store)).toMatchObject({
+      chunkingEnabled: true,
+      chunkMode: 'adaptive',
+      chunkCharTarget: 15,
+    });
+    // Adaptive: up to 15 characters, and never more than 6 words.
+    expect(word()).toBe('a b c d e f');
+  });
+
+  test('applied to new transcripts, it leaves the open one alone and seeds the next', () => {
+    const { store } = startReading();
+    openChunking();
+    fireEvent.click(screen.getByLabelText('New transcripts'));
+    fireEvent.click(screen.getByLabelText('Group words together'));
+    fireEvent.change(screen.getByRole('slider', { name: /Words per group/ }), {
+      target: { value: '4' },
+    });
+    press('Apply');
+    expect(screen.getByText('Applied to new transcripts.')).toBeInTheDocument();
+    expect(first(store)?.chunkingEnabled).toBe(false);
+    expect(window.localStorage.getItem(SETTINGS_KEY)).toContain('"default_chunk_size":4');
+    press('Close');
+    addTranscript('Later');
+    const later = store.getSnapshot().transcripts.find((t) => t.title === 'Later');
+    expect(later).toMatchObject({ chunkingEnabled: true, chunkSize: 4 });
+  });
+
+  test('switching the target shows what that target holds', () => {
+    startReading();
+    fireEvent.click(screen.getByLabelText('Group'));
+    openChunking();
+    expect(screen.getByLabelText('Group words together')).toBeChecked();
+    fireEvent.click(screen.getByLabelText('New transcripts'));
+    expect(screen.getByLabelText('Group words together')).not.toBeChecked();
+  });
+
+  test('with no transcript open it sets the defaults only', () => {
+    renderPage();
+    openChunking();
+    expect(screen.queryByLabelText('This transcript')).toBeNull();
+    expect(screen.getByLabelText('New transcripts')).toBeChecked();
+  });
+});

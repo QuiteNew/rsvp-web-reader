@@ -10,6 +10,7 @@ import { blendColors } from '../core/colors';
 import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
 import {
+  CHUNK_SIZE_RANGE,
   GUIDE_MARK_LENGTH_PERCENT_RANGE,
   GUIDE_MARK_THICKNESS_RANGE,
   HIGHLIGHT_OFFSET_RANGE,
@@ -17,7 +18,7 @@ import {
 } from '../core/settings';
 import { formatDuration } from '../core/timing';
 import { WPM_KEY_STEP } from '../core/wpmStep';
-import type { StorageHealth } from '../store/contract';
+import type { ChunkingChoice, StorageHealth } from '../store/contract';
 import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './App.module.css';
@@ -25,6 +26,7 @@ import { DataSettings } from './DataSettings';
 import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { BookmarksDialog } from './BookmarksDialog';
+import { ChunkingDialog } from './ChunkingDialog';
 import { BookmarkIcon, PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
 import { RangeSetting } from './RangeSetting';
 import { Scrubber } from './Scrubber';
@@ -33,6 +35,16 @@ import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
+
+// The chunking a transcript has now, in the shape the store takes.
+function chunkingOf(transcript: Transcript): ChunkingChoice {
+  return {
+    enabled: transcript.chunkingEnabled,
+    size: transcript.chunkSize,
+    mode: transcript.chunkMode,
+    charTarget: transcript.chunkCharTarget,
+  };
+}
 
 // The colour of the surrounding-words line: the font colour dimmed toward
 // the background. A transcript with a colour that cannot be blended (the
@@ -57,6 +69,7 @@ type OpenDialog =
   | { readonly kind: 'spaces' }
   | { readonly kind: 'settings' }
   | { readonly kind: 'bookmarks' }
+  | { readonly kind: 'chunking' }
   | { readonly kind: 'deleteTranscript'; readonly transcript: Transcript };
 
 const NO_DIALOG: OpenDialog = { kind: 'none' };
@@ -70,7 +83,13 @@ function timeLeft(remainingMs: number): string {
 // its text has no words. One that was read to the end starts again from
 // the first word.
 function sessionFor(transcript: Transcript): ReaderSession | null {
-  const session = new ReaderSession(transcript.rawText, { wpm: transcript.wpm });
+  const session = new ReaderSession(transcript.rawText, {
+    wpm: transcript.wpm,
+    chunkEnabled: transcript.chunkingEnabled,
+    chunkSize: transcript.chunkSize,
+    chunkMode: transcript.chunkMode,
+    chunkCharTarget: transcript.chunkCharTarget,
+  });
   if (session.totalWords === 0) return null;
   if (transcript.position > 0 && transcript.position < session.totalWords) {
     session.seekTo(transcript.position);
@@ -263,6 +282,14 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   function changeWpm(transcript: Transcript, wpm: number) {
     store.setWpm(transcript.id, wpm);
     engine.setWpm(wpm);
+  }
+
+  // A change to the open transcript's chunking: saved, and the words on
+  // screen are grouped again at once. The reader keeps its word and snaps to
+  // the start of the group that holds it.
+  function changeChunking(transcript: Transcript, choice: ChunkingChoice) {
+    store.setChunking(transcript.id, choice);
+    engine.setChunking(choice.enabled, choice.size, choice.mode, choice.charTarget);
   }
 
   if (!ready) {
@@ -544,6 +571,50 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 {'>>'}
               </button>
             </div>
+            <div className={styles.chunkRow}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={selected.chunkingEnabled}
+                  onChange={(event) => {
+                    changeChunking(selected, {
+                      ...chunkingOf(selected),
+                      enabled: event.target.checked,
+                    });
+                  }}
+                />{' '}
+                Group
+              </label>
+              <button
+                type="button"
+                className={styles.square}
+                aria-label="Fewer words per group"
+                disabled={selected.chunkSize <= CHUNK_SIZE_RANGE[0]}
+                onClick={() => {
+                  changeChunking(selected, {
+                    ...chunkingOf(selected),
+                    size: selected.chunkSize - 1,
+                  });
+                }}
+              >
+                -
+              </button>
+              <output aria-label="Words per group">{selected.chunkSize}</output>
+              <button
+                type="button"
+                className={styles.square}
+                aria-label="More words per group"
+                disabled={selected.chunkSize >= CHUNK_SIZE_RANGE[1]}
+                onClick={() => {
+                  changeChunking(selected, {
+                    ...chunkingOf(selected),
+                    size: selected.chunkSize + 1,
+                  });
+                }}
+              >
+                +
+              </button>
+            </div>
           </div>
         )}
       </main>
@@ -668,6 +739,29 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           onClose={closeDialog}
         />
       )}
+      {dialog.kind === 'chunking' && (
+        <ChunkingDialog
+          current={selected === null ? null : chunkingOf(selected)}
+          defaults={{
+            enabled: preferences.defaultChunkingEnabled,
+            size: preferences.defaultChunkSize,
+            mode: preferences.defaultChunkMode,
+            charTarget: preferences.defaultChunkCharTarget,
+          }}
+          onApplyCurrent={(choice) => {
+            if (selected !== null) changeChunking(selected, choice);
+          }}
+          onApplyDefaults={(choice) => {
+            settings.update({
+              defaultChunkingEnabled: choice.enabled,
+              defaultChunkSize: choice.size,
+              defaultChunkMode: choice.mode,
+              defaultChunkCharTarget: choice.charTarget,
+            });
+          }}
+          onClose={closeDialog}
+        />
+      )}
       {dialog.kind === 'settings' && (
         <Dialog title="Settings" onClose={closeDialog}>
           <label className={dialogStyles.note}>
@@ -724,6 +818,18 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
             A dim line under the word with the word before it and the two after it, so the corner of
             your eye keeps the thread.
+          </p>
+          <button
+            type="button"
+            className={dialogStyles.action}
+            onClick={() => {
+              setDialog({ kind: 'chunking' });
+            }}
+          >
+            Configure chunking...
+          </button>
+          <p className={`${dialogStyles.note} ${dialogStyles.quiet}`}>
+            Flash several words at once: for the open transcript, or for new ones.
           </p>
           <fieldset className={dialogStyles.group}>
             <legend>Guide marks</legend>

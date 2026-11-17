@@ -22,8 +22,8 @@ that uses them. One commit per step.
 | 5   | The surrounding-words line (a new snapshot field in the engine)       | Done    |
 | 6   | The scrubber, with bookmark ticks                                     | Done    |
 | 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done    |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Next    |
-| 9   | Keyboard shortcuts                                                    | Waiting |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Done    |
+| 9   | Keyboard shortcuts                                                    | Next    |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
 | 11  | The settings view for all of it, with search and reset                | Waiting |
 | 12  | The Normalize button (left over from phase 3)                         | Waiting |
@@ -257,3 +257,32 @@ Committed together with step 3b.
   everything back" timed out at 30 s. It did not happen again in 30
   repeats of that file, and this step does not touch what it tests, but
   the cause is not known. Watch for it.
+
+## Step 8, chunking, done on 2026-11-17
+
+The design notes are now in `reference/desktop-design/` (chunking v1 and v2,
+keyboard shortcuts, reader fit and scroll). This step follows the two
+chunking notes.
+
+- The core was already there from phase 2 (`ReaderSession` grouping, fixed
+  and adaptive, proven by fixtures) and phase 3 (`setChunking` in the
+  library rules, the defaults in settings). This step is the page only.
+- The session is now built with the transcript's own chunking
+  (`sessionFor` in `App.tsx`). Before, the page always read one word.
+- The band under the reader has the quick control of the v1 note: a
+  "Group" switch and a 2 to 5 stepper for the open transcript. The size
+  is saved while Group is off, as in the desktop's footer.
+- Settings has "Configure chunking...", which opens `ChunkingDialog`, the
+  v2 note's window: Apply to "This transcript" or "New transcripts", on or
+  off, Fixed or Adaptive, words per group (2 to 5), group width (15 to
+  60). Nothing changes until Apply. The texts are the desktop's.
+- A change to the open transcript is saved and the live reader is grouped
+  again at once (`engine.setChunking`), keeping the word and snapping to
+  the start of its group.
+- Not built: the detached window (the web has none).
+- Tests: 8 App tests, 3 browser tests (the focus letter of a group's first
+  word is on the same spot as for a single word; reading stops on group
+  starts; kept over a reload). 28 e2e tests passed three times in Chrome
+  only.
+- A long group can be wider than the reading row and is cut off at the
+  sides. That is step 10 (fitting wide flashes).
