@@ -21,8 +21,8 @@ that uses them. One commit per step.
 | 4   | Guide marks and the focus letter offset                               | Done    |
 | 5   | The surrounding-words line (a new snapshot field in the engine)       | Done    |
 | 6   | The scrubber, with bookmark ticks                                     | Done    |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Next    |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Waiting |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done    |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Next    |
 | 9   | Keyboard shortcuts                                                    | Waiting |
 | 10  | Fitting wide flashes: try CSS first, show the owner                   | Waiting |
 | 11  | The settings view for all of it, with search and reset                | Waiting |
@@ -223,3 +223,37 @@ Committed together with step 3b.
   going, after it has left the first word. I could not run Firefox here, so
   the second fix is reasoned from the numbers and checked in Chrome only.
   Run `npm run e2e` again.
+
+## Step 7, bookmarks, done on 2026-11-17
+
+- A Bookmarks button in the reading toolbar opens `BookmarksDialog`: a
+  button that adds a bookmark at the current word or removes the one
+  there (off when there is no word, as at the end), and the list. A row
+  goes to its word, lands paused (saved like a pause by hand) and closes
+  the dialog. Each row has a pencil to name it and a ✕ to delete it.
+- Different from the desktop on purpose: it renames with a double click
+  on the row. Here it is a pencil button, so the keyboard can reach it.
+  Enter saves the name (trimmed, and an empty name clears the label so the
+  snippet shows again), Escape gives up the name without closing the
+  dialog.
+- `src/core/bookmarkList.ts`: the row's name (label, else snippet, cut to
+  44 characters with "…", counted as Python counts) and its "word X of Y".
+  From `bookmarks_popover.py`, which is tkinter: no fixture, expected
+  values worked out by hand.
+- The rules themselves (`addBookmark`, `removeBookmark`,
+  `setBookmarkLabel`, one per word, sorted) are from phase 3 and are
+  proven by the store fixtures. The snippet is the engine's
+  `bookmarkTarget()`.
+- Focus starts on the add button when the dialog opens. Focus does not go
+  back to the Bookmarks button when the dialog closes, and Tab can leave
+  the dialog. That is the dialog focus work already listed for phase 7.
+- The `B` shortcut for "bookmark here" is step 9.
+- Tests: 6 hand-checked core tests, 7 App tests, 3 browser tests: the
+  whole add, leave, come back flow with the keyboard only; a bookmark
+  kept over a reload; and a click on the slider above a tick lands on the
+  tick's word (this fails when the tick ignores the thumb's width,
+  checked by changing the CSS). 25 e2e tests, Chrome only here: 4 of 5
+  full runs passed. In one run `saving.spec.ts` "an export file brings
+  everything back" timed out at 30 s. It did not happen again in 30
+  repeats of that file, and this step does not touch what it tests, but
+  the cause is not known. Watch for it.

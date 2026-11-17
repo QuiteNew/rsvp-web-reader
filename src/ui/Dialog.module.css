@@ -159,3 +159,35 @@
   align-items: center;
   gap: 0.5rem;
 }
+
+/* The bookmarks list: a row is the name, then where it is in the text. */
+.listTop {
+  margin-top: 1rem;
+}
+
+.bookmarkName {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  font-family: var(--font-body);
+  font-size: 1rem;
+  color: var(--ink);
+}
+
+.bookmarkText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookmarkPosition {
+  flex: none;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.renameForm {
+  flex: 1;
+  min-width: 0;
+}

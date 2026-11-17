@@ -24,7 +24,8 @@ import styles from './App.module.css';
 import { DataSettings } from './DataSettings';
 import { Dialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
-import { PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
+import { BookmarksDialog } from './BookmarksDialog';
+import { BookmarkIcon, PauseIcon, PlayIcon, PowerIcon, RestartIcon } from './Icons';
 import { RangeSetting } from './RangeSetting';
 import { Scrubber } from './Scrubber';
 import { Sidebar } from './Sidebar';
@@ -55,6 +56,7 @@ type OpenDialog =
   | { readonly kind: 'newSpace' }
   | { readonly kind: 'spaces' }
   | { readonly kind: 'settings' }
+  | { readonly kind: 'bookmarks' }
   | { readonly kind: 'deleteTranscript'; readonly transcript: Transcript };
 
 const NO_DIALOG: OpenDialog = { kind: 'none' };
@@ -154,6 +156,8 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     settings.resyncGuideMarkColorDefault(themeGuideMarkColor(isDark));
   }, [settings, isDark]);
   const isReading = snapshot.status !== 'empty';
+  // The word a new bookmark would go on. null when there is none, as at the end.
+  const bookmarkHere = isReading ? engine.bookmarkTarget() : null;
 
   // Remember where the open transcript is being read, word by word, so
   // that stopping and starting again picks up at the same place. Reading is
@@ -388,6 +392,17 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                   }
                 }}
               />
+              <button
+                type="button"
+                className={styles.pill}
+                aria-label="Bookmarks"
+                title="Bookmarks"
+                onClick={() => {
+                  setDialog({ kind: 'bookmarks' });
+                }}
+              >
+                <BookmarkIcon />
+              </button>
               <span className={styles.spring} />
               <span className={styles.readout}>{timeLeft(snapshot.remainingMs)} left</span>
               <span className={styles.readout}>{snapshot.percent}%</span>
@@ -619,6 +634,40 @@ export function App({ store, settings, health, ...parts }: AppProps) {
         </Dialog>
       )}
 
+      {dialog.kind === 'bookmarks' && selected !== null && isReading && (
+        <BookmarksDialog
+          bookmarks={selected.bookmarks}
+          totalWords={snapshot.totalWords}
+          canBookmarkHere={bookmarkHere !== null}
+          isHereBookmarked={
+            bookmarkHere !== null &&
+            selected.bookmarks.some((bookmark) => bookmark.index === bookmarkHere.index)
+          }
+          onToggleHere={() => {
+            // Add one at the current word, or remove the one that is there.
+            if (bookmarkHere === null) return;
+            if (selected.bookmarks.some((bookmark) => bookmark.index === bookmarkHere.index)) {
+              store.removeBookmark(selected.id, bookmarkHere.index);
+            } else {
+              store.addBookmark(selected.id, bookmarkHere.index, bookmarkHere.snippet);
+            }
+          }}
+          onJump={(index) => {
+            // Go there and land paused, saved like a pause by hand, and
+            // close: you have gone where you wanted.
+            engine.jumpTo(index);
+            store.setPaused(selected.id, true);
+            closeDialog();
+          }}
+          onDelete={(index) => {
+            store.removeBookmark(selected.id, index);
+          }}
+          onRename={(index, label) => {
+            store.setBookmarkLabel(selected.id, index, label);
+          }}
+          onClose={closeDialog}
+        />
+      )}
       {dialog.kind === 'settings' && (
         <Dialog title="Settings" onClose={closeDialog}>
           <label className={dialogStyles.note}>

@@ -1347,3 +1347,110 @@ describe('the position slider', () => {
     expect(slider()).toBeDisabled();
   });
 });
+
+describe('bookmarks', () => {
+  function startReading() {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ skip_word_count: 3 }));
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    press('Pause');
+    return page;
+  }
+
+  const saved = (store: { getSnapshot(): Library }) =>
+    store.getSnapshot().transcripts[0]?.bookmarks ?? [];
+
+  test('the list starts empty', () => {
+    startReading();
+    press('Bookmarks');
+    expect(screen.getByText('No bookmarks yet.')).toBeInTheDocument();
+  });
+
+  test('one is added at the current word, and removed again there', () => {
+    const { store } = startReading();
+    press('Forward 3 words');
+    press('Bookmarks');
+    press('Add bookmark here');
+    expect(saved(store).map((bookmark) => bookmark.index)).toEqual([3]);
+    expect(screen.getByRole('button', { name: /^Go to .*, word 4 of 8$/ })).toBeInTheDocument();
+    expect(screen.getAllByTestId('bookmark-tick')).toHaveLength(1);
+    press('Remove bookmark here');
+    expect(saved(store)).toEqual([]);
+    expect(screen.queryAllByTestId('bookmark-tick')).toHaveLength(0);
+  });
+
+  test('picking one goes to its word, paused, and closes the list', () => {
+    const { store } = startReading();
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.addBookmark(id, 5, 'f g h');
+    });
+    press('Play');
+    press('Bookmarks');
+    press('Go to f g h, word 6 of 8');
+    expect(word()).toBe('f');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(store.getSnapshot().transcripts[0]?.isPaused).toBe(true);
+  });
+
+  test('one is given a name, and an empty name brings the snippet back', () => {
+    const { store } = startReading();
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.addBookmark(id, 2, 'c d e');
+    });
+    press('Bookmarks');
+    press('Rename c d e');
+    const input = screen.getByRole('textbox');
+    fireEvent.change(input, { target: { value: '  The good part ' } });
+    fireEvent.submit(input);
+    expect(saved(store)[0]?.label).toBe('The good part');
+    expect(
+      screen.getByRole('button', { name: 'Go to The good part, word 3 of 8' }),
+    ).toBeInTheDocument();
+    press('Rename The good part');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: '' } });
+    fireEvent.submit(screen.getByRole('textbox'));
+    expect(saved(store)[0]?.label).toBe('');
+    expect(screen.getByRole('button', { name: 'Go to c d e, word 3 of 8' })).toBeInTheDocument();
+  });
+
+  test('Escape while naming gives up the name only, not the list', () => {
+    const { store } = startReading();
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.addBookmark(id, 2, 'c d e');
+    });
+    press('Bookmarks');
+    press('Rename c d e');
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'never' } });
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Escape' });
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(saved(store)[0]?.label).toBe('');
+  });
+
+  test('one is deleted from the list', () => {
+    const { store } = startReading();
+    const id = store.getSnapshot().transcripts[0]?.id ?? -1;
+    act(() => {
+      store.addBookmark(id, 2, 'c d e');
+      store.addBookmark(id, 6, 'g h');
+    });
+    press('Bookmarks');
+    press('Delete c d e');
+    expect(saved(store).map((bookmark) => bookmark.index)).toEqual([6]);
+  });
+
+  test('at the end there is no word to bookmark', () => {
+    const page = startReading();
+    press('Play');
+    wait(page, WORD_MS * 8);
+    expect(screen.getByText('End of the text.')).toBeVisible();
+    press('Bookmarks');
+    expect(screen.getByRole('button', { name: 'Add bookmark here' })).toBeDisabled();
+  });
+});
