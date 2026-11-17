@@ -106,3 +106,13 @@
   padding-left: 10px;
   text-align: left;
 }
+
+/* Used only to measure text. Never seen, and takes no room. */
+.ruler {
+  position: absolute;
+  left: 0;
+  top: 0;
+  visibility: hidden;
+  white-space: pre;
+  pointer-events: none;
+}

@@ -1691,3 +1691,120 @@ describe('keyboard shortcuts', () => {
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
   });
 });
+
+describe('the word size', () => {
+  function startReading() {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    return page;
+  }
+
+  const size = () => screen.getByTestId('word').parentElement?.style.getPropertyValue('--size');
+
+  test('the stepper changes it by the step from Settings and saves it', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ font_size_step: 4 }));
+    const { store } = startReading();
+    expect(screen.getByLabelText('Word size')).toHaveTextContent('32px');
+    press('Larger words');
+    expect(store.getSnapshot().transcripts[0]?.fontSize).toBe(36);
+    expect(size()).toBe('36px');
+    press('Smaller words');
+    press('Smaller words');
+    expect(store.getSnapshot().transcripts[0]?.fontSize).toBe(28);
+  });
+
+  test('it stops at 16 and at 96', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ font_size_step: 10 }));
+    const { store } = startReading();
+    press('Smaller words');
+    press('Smaller words');
+    expect(store.getSnapshot().transcripts[0]?.fontSize).toBe(16);
+    expect(screen.getByRole('button', { name: 'Smaller words' })).toBeDisabled();
+    for (let step = 0; step < 8; step += 1) press('Larger words');
+    expect(store.getSnapshot().transcripts[0]?.fontSize).toBe(96);
+    expect(screen.getByRole('button', { name: 'Larger words' })).toBeDisabled();
+  });
+});
+
+describe('fitting a wide flash', () => {
+  // jsdom measures nothing, so the widths are handed to it here: every
+  // character is half the font size wide, and the row is 300 px.
+  function measuring(rowWidth: number) {
+    vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(rowWidth);
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockImplementation(function (
+      this: HTMLElement,
+    ) {
+      const px = Number.parseFloat(this.style.fontSize || '0');
+      return { width: (this.textContent.length * px) / 2 } as DOMRect;
+    });
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  const size = () => screen.getByTestId('word').parentElement?.style.getPropertyValue('--size');
+
+  function read(text: string) {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste(text);
+    press('Start reading');
+    return page;
+  }
+
+  test('a transcript whose widest word fits is drawn at the chosen size', () => {
+    measuring(300);
+    read('a bb ccc');
+    expect(size()).toBe('32px');
+  });
+
+  test('one long word makes the whole transcript smaller, the saved size stays', () => {
+    measuring(300);
+    // "abcdefghijklmnopqrstuvwxyz": the focus letter is early, so 20 or so
+    // characters trail it. Wider than the row at 32 px.
+    const { store } = read('a abcdefghijklmnopqrstuvwxyz b');
+    const drawn = Number.parseFloat(size() ?? '0');
+    expect(drawn).toBeLessThan(32);
+    expect(drawn).toBeGreaterThanOrEqual(19);
+    expect(store.getSnapshot().transcripts[0]?.fontSize).toBe(32);
+    expect(screen.getByLabelText('Word size')).toHaveTextContent('32px');
+  });
+
+  test('it is one size for the session, not one per word', () => {
+    measuring(300);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    const first = size();
+    press('Pause');
+    press('Forward 10 words');
+    expect(size()).toBe(first);
+  });
+
+  test('never under 60 percent of the chosen size', () => {
+    measuring(60);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    expect(size()).toBe('19px');
+  });
+
+  test('grouping words is fitted again', () => {
+    measuring(300);
+    read('aaaa bbbb cccc dddd eeee ffff');
+    expect(size()).toBe('32px');
+    fireEvent.click(screen.getByLabelText('Group'));
+    for (let step = 0; step < 3; step += 1) press('More words per group');
+    expect(Number.parseFloat(size() ?? '0')).toBeLessThan(32);
+    fireEvent.click(screen.getByLabelText('Group'));
+    expect(size()).toBe('32px');
+  });
+
+  test('the guide marks and the surrounding words are sized from the fitted size', () => {
+    measuring(60);
+    read('a abcdefghijklmnopqrstuvwxyz b');
+    const display = screen.getByTestId('word').parentElement;
+    // 19 px: marks 35 percent is 6.65, so the 8 px minimum. Context is half, 9.5 to 10.
+    expect(display?.style.getPropertyValue('--mark-length')).toBe('8px');
+    expect(display?.style.getPropertyValue('--context-size')).toBe('10px');
+  });
+});

@@ -8,7 +8,12 @@
 // holds while the tab is hidden.
 
 import { pyRound, pyStrip } from '../core/pythonText';
-import { assembleChunkText, type PeripheralContext, type ReaderSession } from '../core/reader';
+import {
+  assembleChunkText,
+  type ChunkText,
+  type PeripheralContext,
+  type ReaderSession,
+} from '../core/reader';
 import type { ChunkMode } from '../core/models';
 import type {
   BookmarkTarget,
@@ -219,6 +224,10 @@ export class ReaderLoop implements ReaderEngine {
   setPeripheralContext(enabled: boolean, before = 1, after = 2): void {
     this.peripheral = { enabled, before: Math.max(0, before), after: Math.max(0, after) };
     this.changed();
+  }
+
+  chunkTexts(): ChunkText[] {
+    return this.session?.chunkTexts() ?? [];
   }
 
   bookmarkTarget(): BookmarkTarget | null {

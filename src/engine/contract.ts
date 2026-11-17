@@ -162,6 +162,10 @@ export interface ReaderEngine {
   jumpTo(index: number): void;
   // null when there is no live word: empty or finished.
   bookmarkTarget(): BookmarkTarget | null;
+  // The text of every chunk of the session, in order, for fitting the font
+  // to the widest one. Empty with no session. It changes only on a load or
+  // when the words are grouped again.
+  chunkTexts(): ChunkText[];
 
   // Changes that reach into the session. Each one makes a new snapshot.
   // A new speed or pacing choice starts with the next word, and the word

@@ -13,20 +13,20 @@ behaviour being right and tested, not at the final look.
 The pure parts come first, each proven against the desktop, then the UI
 that uses them. One commit per step.
 
-| #   | What                                                                  | State   |
-| --- | --------------------------------------------------------------------- | ------- |
-| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done    |
-| 2   | `settings_search` (36 lines), the same way                            | Done    |
-| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done    |
-| 4   | Guide marks and the focus letter offset                               | Done    |
-| 5   | The surrounding-words line (a new snapshot field in the engine)       | Done    |
-| 6   | The scrubber, with bookmark ticks                                     | Done    |
-| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done    |
-| 8   | Chunking: per transcript, and the defaults for new ones               | Done    |
-| 9   | Keyboard shortcuts                                                    | Done    |
-| 10  | Fitting wide flashes: try CSS first, show the owner                   | Next    |
-| 11  | The settings view for all of it, with search and reset                | Waiting |
-| 12  | The Normalize button (left over from phase 3)                         | Waiting |
+| #   | What                                                                  | State                      |
+| --- | --------------------------------------------------------------------- | -------------------------- |
+| 1   | `colors`: `blend_colors`, with fixtures and the desktop tests         | Done                       |
+| 2   | `settings_search` (36 lines), the same way                            | Done                       |
+| 3   | Themes: the palette, Light, Dark and System, colours follow the theme | Done                       |
+| 4   | Guide marks and the focus letter offset                               | Done                       |
+| 5   | The surrounding-words line (a new snapshot field in the engine)       | Done                       |
+| 6   | The scrubber, with bookmark ticks                                     | Done                       |
+| 7   | Bookmarks: toggle, list, rename, delete, jump                         | Done                       |
+| 8   | Chunking: per transcript, and the defaults for new ones               | Done                       |
+| 9   | Keyboard shortcuts                                                    | Done                       |
+| 10  | Fitting wide flashes: try CSS first, show the owner                   | Part done, owner to decide |
+| 11  | The settings view for all of it, with search and reset                | Next                       |
+| 12  | The Normalize button (left over from phase 3)                         | Waiting                    |
 
 Steps 3 to 7 need nothing but the desktop code. Steps 8, 9 and 10 need
 the design notes below.
@@ -335,3 +335,48 @@ behind the first. A reload or a closed tab inside that moment (some
 milliseconds) can lose the last change. Possible hardening for phase 7:
 do not queue behind an older write when the page is being left, and show
 "saving" until the write is done. Not done now.
+
+## Step 10, fitting wide flashes: auto-fit done on 2026-11-17, panning open
+
+Follows `reference/desktop-design/reader-fit-and-scroll-design.md`.
+
+The plan said "try CSS first". Plain CSS cannot do this: it has no way to
+shrink text until it fits, and the fit has to be one size for the whole
+transcript, from its widest chunk. So the desktop's auto-fit was ported, and
+only the measuring is left to the browser.
+
+- `src/core/fit.ts`: `fitCandidates` (the 12 longest chunks by characters
+  on their wider side), `requiredWidth` (twice the longer side around the
+  focus letter) and `fitRenderSize` (the largest size that fits, never
+  under 60 percent of the chosen size, 8 px clear on each side). From
+  `reader_display.py`, which is tkinter: no fixture, values by hand.
+- `ReaderEngine.chunkTexts()` hands out the session's chunk texts
+  (`ReaderSession.chunkTexts` is from phase 2).
+- `WordDisplay` measures the candidates with an unseen span in the word's
+  own font, follows the row's width with a ResizeObserver, and measures
+  again when the web fonts have loaded. The guide marks and the
+  surrounding words are sized from the fitted size, as on the desktop.
+- Render only: the saved Word size is never changed.
+- New on the page: a Word size stepper under the reader (16 to 96, by the
+  step from Settings), as in the desktop's footer. It was missing, and the
+  fit cannot be judged without it.
+- Letter spacing is not on the page yet, so it is not in the measure.
+- Tests: 12 core tests by hand, 2 engine tests, 8 App tests (widths
+  handed to jsdom), 3 browser tests with real text widths (a wide group
+  is drawn smaller and nothing is cut off; a narrower window is fitted
+  again). 35 e2e tests passed three times in Chrome only.
+
+### For the owner to decide: what is left over past the floor
+
+When the widest chunk does not fit even at 60 percent, the sides are cut
+off, as before. The desktop adds a horizontal scrollbar, a centre button
+and the C key for that case (`core/scroll.py`, pure, with tests). Its own
+note calls it an edge-case fallback and says a flash wider than the window
+cannot be read in one glance by panning anyway. Choices:
+
+1. Leave it cut off. Nothing more to build.
+2. Port the scrollbar, the centre button and C as on the desktop.
+3. Lower the floor on the web, or let a group that is still too wide wrap.
+   Both differ from the desktop.
+
+Until decided, `scroll.py` is not ported and C is not bound.

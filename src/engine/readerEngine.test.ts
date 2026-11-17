@@ -130,6 +130,29 @@ describe('snapshots', () => {
   });
 });
 
+describe('the text of every chunk, for fitting the font', () => {
+  test('is empty with nothing loaded', () => {
+    expect(makeRig().engine.chunkTexts()).toEqual([]);
+  });
+
+  test('has one entry per word, and per group after the words are grouped', () => {
+    const rig = loaded();
+    expect(rig.engine.chunkTexts().map((t) => t.before + t.focus + t.after)).toEqual([
+      'one',
+      'two',
+      'three',
+      'four',
+      'five',
+    ]);
+    rig.engine.setChunking(true, 2);
+    expect(rig.engine.chunkTexts().map((t) => t.before + t.focus + t.after)).toEqual([
+      'one two',
+      'three four',
+      'five',
+    ]);
+  });
+});
+
 describe('the surrounding-words line', () => {
   test('it is off until asked for, and the snapshot has none', () => {
     const rig = loaded();

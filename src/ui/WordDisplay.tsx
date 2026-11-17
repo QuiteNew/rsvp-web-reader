@@ -1,6 +1,7 @@
-import type { CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 
 import type { ChunkText, PeripheralContext } from '../core/reader';
+import { fitRenderSize, requiredWidth } from '../core/fit';
 import { guideMarkLength, peripheralContextSize } from '../core/guideMarks';
 import styles from './WordDisplay.module.css';
 
@@ -16,7 +17,13 @@ export interface GuideMarks {
 interface WordDisplayProps {
   // The text to show, split around its focus letter. null shows nothing.
   readonly chunk: ChunkText | null;
+  // The Word size chosen for the transcript. The word is drawn smaller when
+  // the widest chunk would not fit the row, never larger.
   readonly fontSize: number;
+  // The longest chunks of the transcript, measured here to find the widest.
+  // Pass the same list while the chunks are the same: it is measured again
+  // whenever the list is a new one.
+  readonly fitTexts: readonly ChunkText[];
   // The focus letter only, moved up (positive) or down (negative), in px.
   readonly offsetPx: number;
   readonly marks: GuideMarks;
@@ -39,12 +46,68 @@ interface WordDisplayProps {
 // to read words out one by one at reading speed.
 export function WordDisplay({
   chunk,
-  fontSize,
+  fontSize: chosenSize,
+  fitTexts,
   offsetPx,
   marks,
   context,
   contextColor,
 }: WordDisplayProps) {
+  const display = useRef<HTMLDivElement>(null);
+  const ruler = useRef<HTMLSpanElement>(null);
+  // The widest chunk's required width for each px of font size, and the
+  // width of the row. Both are measured on the page, so they start unknown.
+  const [requiredPerSize, setRequiredPerSize] = useState<number | null>(null);
+  const [rowWidth, setRowWidth] = useState(0);
+  // Counts up when the page's fonts have loaded, to measure again: the first
+  // measure may have been taken in the stand-in font.
+  const [fontsLoaded, setFontsLoaded] = useState(0);
+
+  // Find the widest of the candidate chunks, in real pixels, at the chosen
+  // size. The ruler is an unseen span with the word's own font.
+  useLayoutEffect(() => {
+    const span = ruler.current;
+    if (span === null) return;
+    const width = (text: string): number => {
+      span.textContent = text;
+      return span.getBoundingClientRect().width;
+    };
+    let widest = 0;
+    for (const text of fitTexts) {
+      widest = Math.max(
+        widest,
+        requiredWidth(width(text.before), width(text.focus), width(text.after)),
+      );
+    }
+    span.textContent = '';
+    setRequiredPerSize(widest > 0 && chosenSize > 0 ? widest / chosenSize : null);
+  }, [fitTexts, chosenSize, fontsLoaded]);
+
+  // Follow the width of the row, and notice when the fonts arrive.
+  useEffect(() => {
+    const element = display.current;
+    if (element === null) return undefined;
+    setRowWidth(element.clientWidth);
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            setRowWidth(element.clientWidth);
+          });
+    observer?.observe(element);
+    let live = true;
+    void document.fonts?.ready.then(() => {
+      if (live) setFontsLoaded((count) => count + 1);
+    });
+    return () => {
+      live = false;
+      observer?.disconnect();
+    };
+  }, []);
+
+  // Everything below is drawn at the fitted size: the word, and the guide
+  // marks and the surrounding words, which are sized from it.
+  const fontSize = fitRenderSize(chosenSize, requiredPerSize, rowWidth);
   const hasFocus = (chunk?.focus ?? '') !== '';
   const style = {
     '--size': `${fontSize}px`,
@@ -57,7 +120,13 @@ export function WordDisplay({
     '--context-color': contextColor,
   } as CSSProperties;
   return (
-    <div className={styles.display} style={style}>
+    <div className={styles.display} style={style} ref={display}>
+      <span
+        ref={ruler}
+        className={styles.ruler}
+        style={{ fontSize: `${chosenSize}px` }}
+        aria-hidden="true"
+      />
       <div className={styles.row} data-testid="word">
         <span className={styles.before}>{chunk?.before ?? ''}</span>
         <span className={styles.focus}>{chunk?.focus ?? ''}</span>

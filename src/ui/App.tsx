@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type CSSProperties,
+} from 'react';
 
 import { APP_NAME, APP_VERSION, REPO_URL } from '../core/appInfo';
 import { currentSpace, findTranscript } from '../core/library';
@@ -7,10 +14,12 @@ import { pyRound } from '../core/pythonText';
 import { ReaderSession } from '../core/reader';
 import { transcriptToReopen } from '../core/reopen';
 import { blendColors } from '../core/colors';
+import { fitCandidates } from '../core/fit';
 import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
 import {
   CHUNK_SIZE_RANGE,
+  FONT_SIZE_RANGE,
   GUIDE_MARK_LENGTH_PERCENT_RANGE,
   GUIDE_MARK_THICKNESS_RANGE,
   HIGHLIGHT_OFFSET_RANGE,
@@ -176,6 +185,25 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     settings.resyncGuideMarkColorDefault(themeGuideMarkColor(isDark));
   }, [settings, isDark]);
   const isReading = snapshot.status !== 'empty';
+  // The longest chunks of the transcript being read, for fitting the font.
+  // They change only when the words are grouped again: another transcript,
+  // another text, or a change to its chunking.
+  const fitKey =
+    selected === null || !isReading
+      ? ''
+      : [
+          selected.id,
+          snapshot.totalWords,
+          selected.chunkingEnabled,
+          selected.chunkSize,
+          selected.chunkMode,
+          selected.chunkCharTarget,
+        ].join('|');
+  const fitTexts = useMemo(
+    () => (fitKey === '' ? [] : fitCandidates(engine.chunkTexts())),
+    [engine, fitKey],
+  );
+
   // The word a new bookmark would go on. null when there is none, as at the end.
   const bookmarkHere = isReading ? engine.bookmarkTarget() : null;
 
@@ -501,6 +529,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               <WordDisplay
                 chunk={snapshot.chunk}
                 fontSize={selected?.fontSize ?? 40}
+                fitTexts={fitTexts}
                 offsetPx={preferences.highlightOffsetPx}
                 context={snapshot.context}
                 contextColor={dimmed(selected)}
@@ -635,6 +664,38 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                     ...chunkingOf(selected),
                     size: selected.chunkSize + 1,
                   });
+                }}
+              >
+                +
+              </button>
+            </div>
+            <div className={styles.chunkRow}>
+              <span>Word size</span>
+              <button
+                type="button"
+                className={styles.square}
+                aria-label="Smaller words"
+                disabled={selected.fontSize <= FONT_SIZE_RANGE[0]}
+                onClick={() => {
+                  store.setFontSize(
+                    selected.id,
+                    Math.max(FONT_SIZE_RANGE[0], selected.fontSize - preferences.fontSizeStep),
+                  );
+                }}
+              >
+                -
+              </button>
+              <output aria-label="Word size">{selected.fontSize}px</output>
+              <button
+                type="button"
+                className={styles.square}
+                aria-label="Larger words"
+                disabled={selected.fontSize >= FONT_SIZE_RANGE[1]}
+                onClick={() => {
+                  store.setFontSize(
+                    selected.id,
+                    Math.min(FONT_SIZE_RANGE[1], selected.fontSize + preferences.fontSizeStep),
+                  );
                 }}
               >
                 +
