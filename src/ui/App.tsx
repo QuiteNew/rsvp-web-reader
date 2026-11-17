@@ -44,6 +44,7 @@ import { SettingsDialog } from './SettingsDialog';
 import { Sidebar } from './Sidebar';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
+import { usePointerLetsGoOfFocus } from './usePointerLetsGoOfFocus';
 import { useShortcuts } from './useShortcuts';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
@@ -423,6 +424,9 @@ export function App({ store, settings, health, ...parts }: AppProps) {
 
   // The reading shortcuts: only while the reader is on screen and no dialog
   // is open over it (Escape then closes the dialog, as it should).
+  // A click leaves no control holding the keyboard, as on the desktop.
+  usePointerLetsGoOfFocus();
+
   useShortcuts(ready && isReading && dialog.kind === 'none', (action) => {
     if (action === 'togglePause') togglePause();
     else if (action === 'skipBack') skip(-skipWords);

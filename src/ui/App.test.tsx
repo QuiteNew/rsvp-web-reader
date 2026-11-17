@@ -2289,3 +2289,61 @@ describe('the layout of the desktop', () => {
     expect(document.querySelector('[class*="band"]')).not.toBeNull();
   });
 });
+
+describe('a click does not keep the keyboard', () => {
+  function startReading() {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste('a b c d e f g h');
+    press('Start reading');
+    return page;
+  }
+
+  // What a mouse click does to the focus, and then the pointer letting go.
+  async function clickWithPointer(element: HTMLElement): Promise<void> {
+    element.focus();
+    fireEvent.pointerUp(element);
+    fireEvent.click(element);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+
+  test('after a click on a footer button, Space pauses', async () => {
+    startReading();
+    await clickWithPointer(screen.getByRole('button', { name: 'More words per group' }));
+    expect(document.activeElement).toBe(document.body);
+    fireEvent.keyDown(document.body, { key: ' ' });
+    expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
+  });
+
+  test('after a click on the speed slider or the Group switch, too', async () => {
+    startReading();
+    await clickWithPointer(screen.getByRole('slider', { name: 'Speed' }));
+    expect(document.activeElement).toBe(document.body);
+    await clickWithPointer(screen.getByRole('switch', { name: 'Group' }));
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  test('a text box, a colour square and anything in a dialog keep it', async () => {
+    renderPage();
+    addTranscript('Notes');
+    const box = screen.getByLabelText('Transcript text');
+    await clickWithPointer(box);
+    expect(box).toHaveFocus();
+    const font = screen.getByLabelText('Font');
+    await clickWithPointer(font);
+    expect(font).toHaveFocus();
+    press('Settings');
+    const reopen = screen.getByLabelText('Reopen the last transcript at launch');
+    await clickWithPointer(reopen);
+    expect(reopen).toHaveFocus();
+  });
+
+  test('a control reached with the keyboard keeps it', () => {
+    startReading();
+    const plus = screen.getByRole('button', { name: 'More words per group' });
+    plus.focus();
+    expect(plus).toHaveFocus();
+  });
+});
