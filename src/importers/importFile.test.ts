@@ -8,7 +8,7 @@ type Answer = { text: string } | { error: string };
 
 // File types whose importer comes with a later step of phase 5. Their
 // recorded cases are left out until then, and listed so it is plain which.
-const LATER = new Set(['.html', '.htm', '.docx', '.pdf']);
+const LATER = new Set(['.docx', '.pdf']);
 
 function suffixOf(name: string): string {
   const dot = name.lastIndexOf('.');

@@ -10,16 +10,25 @@ export default defineConfig({
   base: BASE_PATH,
   plugins: [react()],
   test: {
-    // Two groups of tests. The logic layers run in plain Node, which is fast
-    // and proves they need no browser. Only the React components get a
-    // pretend browser (jsdom).
+    // Three groups of tests. The logic layers run in plain Node, which is
+    // fast and proves they need no browser. The importers and the React
+    // components get a pretend browser (jsdom): the importers need its
+    // DOMParser. The real browsers are in e2e/.
     projects: [
       {
         extends: true,
         test: {
           name: 'logic',
           environment: 'node',
-          include: ['src/{core,engine,store,importers}/**/*.test.ts'],
+          include: ['src/{core,engine,store}/**/*.test.ts'],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'importers',
+          environment: 'jsdom',
+          include: ['src/importers/**/*.test.ts'],
         },
       },
       {

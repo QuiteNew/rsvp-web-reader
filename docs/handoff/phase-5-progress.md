@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 to 4 of the plan done, below     |
+| 5. Build                     | Steps 2 to 5 of the plan done, below     |
 
 ## Step 1: what the desktop app does
 
@@ -305,8 +305,8 @@ fixed there, and not decided for the web yet:
   without a `<meta charset>` is read as Latin-1, so "Café" becomes
   "CafÃ©". Pages saved by a browser usually declare one, so the common
   case is fine. A page with an XML declaration that names ISO-8859-1 gives
-  "Caf�". To decide at the HTML step: copy this, or read such a page
-  as UTF-8 when it is valid UTF-8.
+  "Caf�". Decided at the HTML step (step 5): the web app reads such a
+  page as UTF-8 when it is valid UTF-8.
 - A file named only `.txt` is refused as "Unsupported file type: .txt",
   because to Python a name that starts with a dot has no extension. Harmless,
   and the port copies it.
@@ -377,3 +377,66 @@ because a case needs it.
 
 The reader's own download is the same file as before, byte for byte
 (nothing imports the new layer yet).
+
+### Build step 5: HTML (2026-11-18)
+
+`src/importers/importHtml.ts` ports `import_html` on the browser's own
+`DOMParser`, so no library is added. Same steps as the desktop: drop
+`script`, `style`, `noscript`, `head` and `template`, start a line at `<br>`
+and at the edges of block elements, and squeeze the spaces in each line
+with Python's list of spaces.
+
+The owner's choice on the character set (2026-11-18: "We could go with
+both, implement whichever is easier"): reading a page that names no
+encoding like a text file was the simpler one, because `decodeText()`
+already does it. So: a byte order mark first, then a `<meta charset>` or
+`<meta http-equiv>` tag, else UTF-8 when the bytes are valid UTF-8, else
+Windows-1252. The desktop reads that last kind as Latin-1.
+
+The importer tests now run in jsdom (a third Vitest group, `importers`),
+because Node has no `DOMParser`.
+
+Compared with the desktop on 67 pages, the 13 recorded desktop tests that
+call `import_html`, and the saved web page from step 3. Everything matched
+except eight pages, all listed in `importHtml.test.ts`:
+
+- Four about the character set, all from the choice above: UTF-8 and
+  Windows-1252 pages that name no encoding, a page whose encoding is named
+  only in an XML declaration (a browser does not look there either; the
+  desktop gave "Caf�"), and a page that names an encoding nobody knows.
+- One from the parser: a `<noscript>` before the page's body, with plain
+  text in it. The browser's HTML parser moves that text out into the body,
+  so it is kept. lxml keeps it inside, and it is dropped. Saved pages
+  usually put `<style>` or `<link>` in such a `<noscript>`, which stay
+  inside.
+- Three where the desktop crashes (see below), and the web app reads the
+  text.
+
+The same pages were also run in real Chrome, and gave exactly the same
+answers as jsdom. Firefox and Safari come with the browser tests in step 9.
+
+Broken on purpose, to see a test fail: keeping the text after a dropped
+element, JavaScript's whitespace, keeping `noscript`, no `<meta>` lookup, a
+UTF-16 label taken as UTF-16, and leaving out `dd`, `figcaption`, `th`,
+`hr`, `nav` or `h6` from the block list. Each failed a test. Leaving out
+`tfoot` failed none: inside a table the rows and cells already start lines,
+and a browser moves text that is loose in a table out of it, so it cannot
+make a difference.
+
+Found in the desktop app, for the owner. Not fixed there. The port copies
+the first one, as PORTING.md says, until the desktop changes:
+
+- **Text right after a dropped element is lost.** lxml counts the text
+  after an element as part of it, so removing a `<script>`, `<style>`,
+  `<noscript>` or `<template>` removes that text too. `<p>a<script>x</script>b</p>`
+  gives "a". A page whose body starts with a `<script>` followed by loose
+  text loses that text entirely.
+- **A control character inside a block crashes the import.** lxml refuses a
+  form feed, a vertical tab or U+001C to U+001F when the desktop adds its
+  line marks, and raises an error the desktop does not catch, so no message
+  is shown (the "Importing" notice is likely left open). A form feed in a
+  `<p>` is enough. The web app has no such limit and reads the text, with
+  those characters as spaces, as Python counts them.
+
+The desktop's "Couldn't open NAME as HTML" message cannot happen in the
+web app: the browser's parser reads anything.

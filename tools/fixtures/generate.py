@@ -2264,6 +2264,37 @@ HTML_FILES = [
     b"<blockquote>Quoted</blockquote><p><![CDATA[cdata]]></p>",
     b"<svg><text>svg text</text></svg><p>after svg</p>",
     b"<!DOCTYPE html><html lang=en><body>Doctype</body></html>",
+    # Text right after an element that is dropped. lxml drops it too,
+    # because to lxml that text belongs to the element.
+    b"<p>a<script>x</script>b</p>",
+    b"<div>a<noscript>n</noscript>tail</div><p>c<style>s</style> d <b>e</b></p>",
+    b"<p>a<template>t</template>after</p>",
+    b"<body><script>x</script>Loose text after a script<p>p</p></body>",
+    # Badly nested or misplaced markup, where parsers can build different trees.
+    b"<b>bold<p>para</b>after",
+    b"<p>x</p><head><title>late head</title></head>y",
+    b"<table><tr><td>a<td>b</table>text after",
+    b"<p>a<div>b</div>c</p>",
+    b"text<p>p</p>tail",
+    b"<title>Title only in a fragment</title>body text",
+    b"<ul><li>one<li>two</ul><p>a&nbsp;b&#160;c</p>",
+    # Every block element on its own, with text on both sides.
+] + [
+    f"a<{tag}>{tag}</{tag}>b".encode("ascii")
+    for tag in ["p", "div", "li", "ul", "ol", "h1", "h2", "h3", "h4", "h5", "h6", "blockquote", "pre",
+                "section", "article", "header", "footer", "main", "aside", "nav", "figure", "figcaption",
+                "dl", "dt", "dd"]
+] + [
+    b"a<hr>b",
+    b"<table><thead><tr><th>h</th></tr></thead><tbody><tr><td>d</td></tr></tbody>"
+    b"<tfoot><tr><td>f</td></tr></tfoot></table>after",
+    # Spaces that Python and JavaScript count differently.
+    "<meta charset=utf-8><p>a\x85d\ufeffe\u00a0f\u3000g</p>".encode("utf-8"),
+    # Control characters inside a block: lxml refuses them when the desktop
+    # adds its line marks, and the import crashes.
+    b"<p>a\x1cb\x1fc</p>",
+    b"<p>page one\x0cpage two</p>",
+    b"<div>outside a block\x0b<span>ok</span></div>",
     b"<!-- only a comment -->",
     b"<!DOCTYPE html>",
     b"<html></html>",
@@ -2278,6 +2309,13 @@ HTML_FILES = [
     "<html><body><p>Caf\u00e9 \u201cq\u201d with no charset</p></body></html>".encode("cp1252"),
     b"\xef\xbb\xbf" + "<p>Caf\u00e9 after a byte order mark</p>".encode("utf-8"),
     "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><html><body><p>Caf\u00e9</p></body></html>".encode("latin-1"),
+    "<meta charset=\"iso-8859-1\"><p>Caf\u00e9</p>".encode("latin-1"),
+    "<META CHARSET=UTF-8><p>Caf\u00e9 unquoted, capitals</p>".encode("utf-8"),
+    "<meta http-equiv=\"content-type\" content=\"text/html;charset=windows-1252\"><p>\u201cq\u201d</p>".encode("cp1252"),
+    "<meta charset=\"utf-8\"><p>Caf\u00e9 with a bad byte</p>".encode("utf-8") + b"\xe9",
+    "<meta charset=\"no-such-encoding\"><p>Caf\u00e9</p>".encode("utf-8"),
+    "<html><body><p>Plain ASCII, no charset</p></body></html>".encode("utf-8"),
+    "<p>Caf\u00e9</p><meta charset=\"windows-1252\">".encode("utf-8"),
 ]
 
 TEXT_BYTES = [
@@ -2358,13 +2396,16 @@ IMPORTER_TESTS_LEFT_OUT = {"test_an_html_file_the_parser_fails_on_otherwise_coul
 
 def import_answer(function, path):
     """What an importer gives for a file: {"text": ...}, or {"error": ...}
-    with the message the desktop shows."""
+    with the message the desktop shows, or {"crash": ...} with the name of
+    an exception the desktop does not catch, so the app shows no message."""
     from core.importers import TranscriptImportError
 
     try:
         return {"text": function(str(path))}
     except TranscriptImportError as error:
         return {"error": str(error)}
+    except Exception as error:
+        return {"crash": type(error).__name__}
 
 
 def import_from_bytes(function, name, data):

@@ -16,18 +16,21 @@ import {
   type ImportResult,
 } from '../core/importers';
 import { decodeText } from './decodeText';
+import { importHtml } from './importHtml';
 
 type Importer = (bytes: Uint8Array) => string;
 
-// HTML, Word and PDF are added here in their own steps of phase 5. Until
-// then those files are refused as an unsupported type. Nothing offers
-// importing yet, so nobody can meet that.
+// Word and PDF are added here in their own steps of phase 5. Until then
+// those files are refused as an unsupported type. Nothing offers importing
+// yet, so nobody can meet that.
 const IMPORTERS: ReadonlyMap<string, Importer> = new Map<string, Importer>([
   ['.txt', decodeText],
   ['.srt', (bytes) => importSrt(decodeText(bytes))],
   ['.vtt', (bytes) => importVtt(decodeText(bytes))],
   ['.md', (bytes) => importMd(decodeText(bytes))],
   ['.markdown', (bytes) => importMd(decodeText(bytes))],
+  ['.html', importHtml],
+  ['.htm', importHtml],
 ]);
 
 export async function importFile(file: File): Promise<ImportResult> {
