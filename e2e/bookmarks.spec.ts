@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { letTheClickSettle } from './helpers.js';
+
 // Bookmarks in a real browser. The first test uses the keyboard only once
 // reading is paused, because the phase is done when bookmarks work that way.
 // The second checks what unit tests cannot: that a tick sits where the
@@ -15,6 +17,7 @@ async function startPaused(page: Page): Promise<void> {
   await page.getByLabel('Transcript text').fill(TEXT);
   await page.getByRole('button', { name: 'Start reading' }).click();
   await page.getByRole('button', { name: 'Pause' }).click();
+  await letTheClickSettle(page);
 }
 
 // What is saved in the browser for the first transcript, read straight from
@@ -40,6 +43,8 @@ async function savedTranscript(page: Page): Promise<Record<string, unknown> | nu
 }
 
 async function goToWord(page: Page, index: number): Promise<void> {
+  // Nearly every call comes straight after a click, so let it settle first.
+  await letTheClickSettle(page);
   await page.getByRole('slider', { name: 'Position' }).focus();
   await page.keyboard.press('Home');
   for (let step = 0; step < index; step += 1) await page.keyboard.press('ArrowRight');

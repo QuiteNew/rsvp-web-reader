@@ -434,8 +434,7 @@ export function SettingsDialog({
             onImported={onImported}
           />
           <p className={quiet}>
-            {APP_NAME}, version {APP_VERSION}. An early build.{' '}
-            <a href={REPO_URL}>Source on GitHub</a>
+            {APP_NAME}, version {APP_VERSION}. <a href={REPO_URL}>Source on GitHub</a>
           </p>
         </div>
       )}

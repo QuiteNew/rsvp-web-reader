@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { letTheClickSettle } from './helpers.js';
+
 // Chunking in a real browser: the group is on one line with the first word's
 // focus letter on the spot it has for a single word, and the choice is kept.
 
@@ -13,6 +15,7 @@ async function startPaused(page: Page): Promise<void> {
   await page.getByLabel('Transcript text').fill(TEXT);
   await page.getByRole('button', { name: 'Start reading' }).click();
   await page.getByRole('button', { name: 'Pause' }).click();
+  await letTheClickSettle(page);
   await page.getByRole('slider', { name: 'Position' }).focus();
   await page.keyboard.press('Home');
   await expect(page.getByTestId('word')).toHaveText('w0');

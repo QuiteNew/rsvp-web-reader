@@ -1,7 +1,8 @@
 # Phase 7: offline and polish
 
-Install and offline use, accessibility, browser checks, a help page, and
-the first real release, `v1.0.0`.
+Install and offline use, accessibility, browser checks, a help page, and the
+release after `v1.0.0`. The first release, `v1.0.0`, was decided at the end of
+phase 4 (see "The first release" in STATUS.md).
 
 ## Ask the owner first
 
@@ -45,10 +46,9 @@ copying with bold.
 
 ## Housekeeping
 
-- The release guard from the desktop pipeline: a release starts only from
-  a pushed version tag, the tag equals `APP_VERSION`, and the tagged commit
-  is on `main`. Add the test that fails when the version falls behind the
-  newest tag.
+- The release guard from the desktop pipeline is done: it came with `v1.0.0`
+  (`.github/workflows/release.yml` and the version test). Check that it
+  still holds after the changes of this phase.
 - CI: cancel older runs on a new push, skip runs for docs-only changes,
   build the site on pull requests.
 - The 7 moderate `npm audit` findings noted in STATUS.md: look at each,
@@ -60,4 +60,5 @@ copying with bold.
 ## Done when
 
 The site installs, reads offline, passes the checks in three browsers, and
-the owner has tagged `v1.0.0`.
+the owner has tagged the next release (`v1.1.0`, or whatever the owner
+chooses).

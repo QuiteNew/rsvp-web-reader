@@ -3,23 +3,27 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-17. Phases 0 to 3 are done (phase 3 confirmed by
-the owner on 2026-11-16). Phase 4 is built: every step is done, and it waits
-for the owner to try it and confirm. [handoff/phase-4-progress.md](handoff/phase-4-progress.md)
-has the steps, what was checked and what is open.
+Last updated: 2026-11-17. Phases 0 to 4 are done (phase 4 confirmed by
+the owner on 2026-11-17). Phase 5 has started with research, not code:
+[handoff/phase-5-progress.md](handoff/phase-5-progress.md) has what the
+desktop app does, the options tested on made files, and the questions
+that wait for the owner's decision. The first release, `v1.0.0`, is
+prepared: the version, the README, [RELEASING.md](../RELEASING.md) and the
+release workflow are in place, and it waits for the owner's tag. See "The
+first release" below for what it does not have.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                         |
-| ----- | -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                      |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                              |
-| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                      |
-| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                         |
-| 4     | The reading experience                 | Under way. Done: colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit of wide flashes, the Settings window, the Normalize button. Left: the owner's confirmation. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md) |
-| 5     | Importing files                        | Not started. Undecided on purpose                                                                                                                                                                                                                                                                                             |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                   |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                   |
+| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                                                                                          |
+| ----- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                                                                                       |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                                                                                               |
+| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                                                                                       |
+| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                          |
+| 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md) Version 1.0.0 is prepared, see "The first release" |
+| 5     | Importing files                        | Under way: researched and tested, waiting for the owner to decide. Nothing chosen or installed. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md)                                                                                                                                                                                                                                 |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                                    |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## Phase 0: what was checked, and where
 
@@ -274,9 +278,12 @@ run**, because the workspace cannot download Playwright's browsers. Their
 first run is the owner's `npm run e2e` or the CI job. Treat a failure there
 as news, not as a flaky test.
 
-CI has a second job, `e2e`, and the deploy now waits for both jobs. It
-installs the browsers on every run, which takes a minute or two. Caching
-them is possible later if it gets annoying.
+This used to say that CI has a second job, `e2e`, and that the deploy waits
+for it. That was wrong: `.github/workflows/ci.yml` has the `check` and
+`deploy` jobs only, so the everyday CI run does no browser tests. They run
+by hand (`npm run e2e`) and in the Release workflow, which installs the
+three browsers. Adding them to the everyday run is possible, and would add a
+minute or two to every push.
 
 Not used: Playwright's clock control. The tests are short enough in real
 time, and real time is what they are there to check.
@@ -410,23 +417,48 @@ Open, for the owner:
   browser's database finishes writing a moment later. Small, not new.
   Suggested for phase 7.
 
+## The first release
+
+`v1.0.0` was decided on 2026-11-17, at the end of phase 4, because the brief
+says the first public version could ship after phase 4 or 5 and leaves it to
+the owner. It is prepared in one commit: `APP_VERSION` and `package.json` at
+1.0.0, the README laid out like the desktop one, `RELEASING.md`,
+`.github/workflows/release.yml`, and a test that fails when the version is
+behind the newest release tag. The tag itself is the owner's to push.
+
+What 1.0.0 does not have, written down so nobody assumes it does:
+
+- No offline use and no install as an app (phase 7). The brief says the site
+  must work offline, so this is the main gap.
+- No file import (phase 5), no reading profiles, letter spacing, dyslexia
+  font, bold starts or speaker cues (phase 6).
+- No note for people with a seizure or photosensitivity condition, and no
+  accessibility pass (phase 7). The brief asks for the note. The desktop
+  docs have none to copy. The wording is for the owner to see first.
+- No browser tests in the everyday CI run (see the end of the phase 2
+  section above).
+- A web export has not been opened in the real desktop app, and the other
+  way round has not been tried either.
+- The 7 `npm audit` findings and Dependabot's first pull request are still
+  not looked at.
+
 ## Decisions
 
-| Decision                           | Answer                                                                                                                                        |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| React or Svelte                    | React                                                                                                                                         |
-| First public version               | The page is public from phase 0, marked as early. Announce after phase 4                                                                      |
-| Hosting                            | GitHub Pages first. A custom domain later, before phase 7 if at all                                                                           |
-| Desktop bundle compatibility       | Promise reading desktop bundles (transcripts, Spaces, positions, bookmarks). Settings and writing bundles back are extras. Confirm in phase 3 |
-| Detached window                    | Not now                                                                                                                                       |
-| File import                        | Decided in phase 5, client-side only. Do not pick a parser before then                                                                        |
-| TypeScript version                 | Pinned to 6.0.3. typescript-eslint 8.72 does not accept TypeScript 7                                                                          |
-| `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                     |
-| Playwright                         | Starts in phase 2, when there is a real screen                                                                                                |
-| Release guard (tag equals version) | Phase 7                                                                                                                                       |
-| Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                               |
-| Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                      |
-| Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                      |
+| Decision                           | Answer                                                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React or Svelte                    | React                                                                                                                                             |
+| First public version               | The page is public from phase 0, marked as early. Announce after phase 4. Decided: `v1.0.0` at the end of phase 4, the owner's call on 2026-11-17 |
+| Hosting                            | GitHub Pages first. A custom domain later, before phase 7 if at all                                                                               |
+| Desktop bundle compatibility       | Promise reading desktop bundles (transcripts, Spaces, positions, bookmarks). Settings and writing bundles back are extras. Confirm in phase 3     |
+| Detached window                    | Not now                                                                                                                                           |
+| File import                        | Decided in phase 5, client-side only. Do not pick a parser before then                                                                            |
+| TypeScript version                 | Pinned to 6.0.3. typescript-eslint 8.72 does not accept TypeScript 7                                                                              |
+| `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                         |
+| Playwright                         | Starts in phase 2, when there is a real screen                                                                                                    |
+| Release guard (tag equals version) | Built with `v1.0.0`: `release.yml`, and a test for a version behind the newest tag                                                                |
+| Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                                   |
+| Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                          |
+| Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                          |
 
 ## Versions in use
 

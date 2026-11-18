@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { letTheClickSettle } from './helpers.js';
+
 // The position slider, in a real browser, with the keyboard only: the
 // thing the unit tests cannot show is that real arrow keys move it, and
 // that reading stays where it was put.
@@ -13,6 +15,7 @@ async function startReading(page: Page): Promise<void> {
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(TEXT);
   await page.getByRole('button', { name: 'Start reading' }).click();
+  await letTheClickSettle(page);
 }
 
 test('arrow keys move the slider a word at a time and reading stays put', async ({ page }) => {
@@ -20,6 +23,7 @@ test('arrow keys move the slider a word at a time and reading stays put', async 
   // Paused first, so a slow browser cannot be several words on before the
   // keys arrive. The playing case has its own test below.
   await page.getByRole('button', { name: 'Pause' }).click();
+  await letTheClickSettle(page);
   const slider = page.getByRole('slider', { name: 'Position' });
   await slider.focus();
   await page.keyboard.press('Home');

@@ -1,0 +1,114 @@
+name: Release
+
+# A release only ever comes from a pushed v* tag. Starting this workflow by
+# hand (Actions, Run workflow) is a dry run: it runs the same checks, browser
+# tests included, and that is all. It can't make a release, because a
+# hand-started run has a branch name where the tag should be, and a release
+# named after a branch is a mess to clean up.
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Looks at the tag before anything slow starts, so a wrong tag fails in a few
+  # seconds instead of after the whole test run. The checks only apply to a
+  # pushed tag. On a hand-started run this job does nothing and passes, so the
+  # jobs after it still go ahead.
+  verify:
+    name: Check the tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Every branch and tag, so the tagged commit can be looked up on main.
+          fetch-depth: 0
+
+      - name: Check the tag matches the app version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          version=$(tr -d '\r' < src/core/appInfo.ts | sed -n "s/^export const APP_VERSION = '\([^']*\)';.*/\1/p")
+          package=$(jq -r .version package.json)
+          if [ -z "$version" ]; then
+            echo "::error::Could not read APP_VERSION from src/core/appInfo.ts."
+            exit 1
+          fi
+          if [ "$version" != "$package" ]; then
+            echo "::error::APP_VERSION is $version but package.json says $package. Make them match, then delete the tag and tag again."
+            exit 1
+          fi
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::The tag is $GITHUB_REF_NAME but the app version is $version. Fix the version, then delete the tag and tag again."
+            exit 1
+          fi
+
+      - name: Check the tagged commit is on main
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::The commit behind $GITHUB_REF_NAME is not on main. Get it onto main first, then tag the tip of main."
+            exit 1
+          fi
+
+  check:
+    name: Lint, types, tests and build
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run format:check
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  # The browser tests, in Chromium, Firefox and WebKit. The everyday CI run
+  # does not have them. They run here so a release has been seen working in all
+  # three on GitHub's machines, not only on the owner's.
+  browsers:
+    name: Browser tests
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps
+      - run: npm run e2e
+
+  # Only for a pushed tag, and only after every check above passed. It makes a
+  # draft, so the notes get written and read before anything is public.
+  release:
+    name: Create the draft release
+    needs: [check, browsers]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Create the draft
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --draft \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Draft. Write the title and the notes as RELEASING.md describes, then publish."
