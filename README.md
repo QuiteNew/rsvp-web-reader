@@ -187,7 +187,8 @@ rsvp-web-reader/
 │   └── handoff/             # One spec per phase, and the progress notes of the phases built
 ├── e2e/                     # Playwright tests: the built site in Chromium, Firefox and WebKit
 ├── fixtures/
-│   └── core/                # Golden fixtures: what the desktop app's real code answered, as JSON
+│   ├── core/                # Golden fixtures: what the desktop app's real code answered, as JSON
+│   └── files/               # Files to import in the tests (Word for now), all invented text
 ├── reference/
 │   └── desktop-design/      # Design notes copied from the desktop project
 ├── src/
@@ -238,6 +239,8 @@ rsvp-web-reader/
 │   ├── importers/           # Reading a picked file into text, in the browser. Loaded only when a file is picked
 │   │   ├── importFile.ts        # The way in: a File becomes a title and text, or a message
 │   │   ├── importHtml.ts        # The readable text of a web page, with the browser's own HTML parser
+│   │   ├── importDocx.ts        # The text of a Word file: body, tables, text boxes and footnotes
+│   │   ├── unzip.ts             # A small zip reader on the browser's own DecompressionStream
 │   │   └── decodeText.ts        # A text file's bytes as text: UTF-8, else Windows-1252
 │   ├── ui/                  # React components. The only layer that may import the others
 │   │   ├── App.tsx              # The page: header, sidebar, reader, control band

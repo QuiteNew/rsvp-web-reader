@@ -2408,6 +2408,15 @@ def import_answer(function, path):
         return {"crash": type(error).__name__}
 
 
+def without_folder(answer, path):
+    """Some library messages name the whole path of the file, such as
+    python-docx's "Package not found at '/tmp/.../x.docx'". The temporary
+    folder changes on every run, so it is written as FOLDER."""
+    if "error" in answer:
+        return {"error": answer["error"].replace(str(Path(path).parent), "FOLDER")}
+    return answer
+
+
 def import_from_bytes(function, name, data):
     """Writes the bytes to a file with this name in a new temporary folder,
     and runs the importer on it."""
@@ -2416,7 +2425,7 @@ def import_from_bytes(function, name, data):
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / name
         path.write_bytes(data)
-        return import_answer(function, path)
+        return without_folder(import_answer(function, path), path)
 
 
 def text_case(function, extension, text):
@@ -2431,25 +2440,42 @@ def text_case(function, extension, text):
 
 def record_importer_tests(importers):
     """Runs the desktop's importer tests with pytest, as they are, and writes
-    down every call a test makes to an importer for text or HTML: the file's
-    name and bytes, and the answer. Word and PDF calls are left for their
-    own steps. A test that fails stops the run."""
+    down every call a test makes to an importer for text, HTML or Word: the
+    file's name and bytes, and the answer. Gives two lists, text and HTML,
+    then Word. PDF calls are left for their own step. A test that fails
+    stops the run."""
     import pytest
 
     desktop = Path(importers.__file__).resolve().parents[1]
-    watched = ["import_txt", "import_srt", "import_vtt", "import_md", "import_html", "import_file"]
+    watched = ["import_txt", "import_srt", "import_vtt", "import_md", "import_html", "import_docx", "import_file"]
     text_types = {".txt", ".srt", ".vtt", ".md", ".markdown", ".html", ".htm"}
     recorded = {}
+    recorded_docx = {}
 
     class Recorder:
         @pytest.hookimpl(hookwrapper=True)
         def pytest_runtest_call(self, item):
             calls = recorded.setdefault(item.name, [])
 
+            docx_calls = recorded_docx.setdefault(item.name, [])
+
             def note(name, path, data, answer):
+                answer = without_folder(answer, path)
                 suffix = Path(path).suffix.lower()
                 if suffix in text_types or suffix not in importers.SUPPORTED_EXTENSIONS:
                     calls.append([name, Path(path).name, as_byte_string(data), answer])
+                elif suffix == ".docx":
+                    # A Word file a test made just now has today's date in
+                    # its zip, so the dates are fixed. The desktop has to
+                    # give the same answer for the fixed file.
+                    try:
+                        fixed = fixed_zip(data)
+                    except Exception:
+                        fixed = data  # not a zip at all, so nothing to fix
+                    function = getattr(importers, name)
+                    if import_from_bytes(function, Path(path).name, fixed) != answer:
+                        raise SystemExit(f"fixing the dates in {Path(path).name} changed the answer")
+                    docx_calls.append([name, Path(path).name, as_base64(fixed), answer])
 
             def watch(name, real):
                 def run(path, *rest):
@@ -2484,10 +2510,13 @@ def record_importer_tests(importers):
         )
         if status != 0:
             raise SystemExit(f"pytest ended with status {status} on the desktop's {test_file}")
-    return [
-        [[name], calls] for name, calls in recorded.items()
-        if calls and name not in IMPORTER_TESTS_LEFT_OUT
-    ]
+    def kept(found):
+        return [
+            [[name], calls] for name, calls in found.items()
+            if calls and name not in IMPORTER_TESTS_LEFT_OUT
+        ]
+
+    return kept(recorded), kept(recorded_docx)
 
 
 def build_importers(core):
@@ -2502,6 +2531,7 @@ def build_importers(core):
     md_lines = unique(
         line for text in MD_TEXTS + TEXTS for line in re.split(r"\r\n|\r|\n", text)
     )
+    desktop_tests, desktop_tests_docx = record_importer_tests(importers)
     # Python's str.splitlines(), which all three text importers use. It
     # breaks lines on more characters than a line feed, so the port needs
     # its own, checked against these: every character that ends a line, and
@@ -2540,8 +2570,208 @@ def build_importers(core):
             [[name, as_byte_string(data)], import_from_bytes(importers.import_file, name, data)]
             for name, data in IMPORT_FILES
         ],
-        "desktop_tests": record_importer_tests(importers),
+        "desktop_tests": desktop_tests,
+        "import_docx": [
+            [[name, as_base64(make_docx(body, **(options[0] if options else {})))],
+             import_from_bytes(importers.import_docx, name + ".docx",
+                               make_docx(body, **(options[0] if options else {})))]
+            for name, body, *options in DOCX_CASES
+        ] + [
+            [["not a zip", as_base64(b"not a real docx file")],
+             import_from_bytes(importers.import_docx, "not a zip.docx", b"not a real docx file")],
+            [["empty file", ""], import_from_bytes(importers.import_docx, "empty file.docx", b"")],
+            [["zip with no document", as_base64(zip_without_document())],
+             import_from_bytes(importers.import_docx, "zip with no document.docx", zip_without_document())],
+            [["damaged XML", as_base64(broken_xml_docx())],
+             import_from_bytes(importers.import_docx, "damaged XML.docx", broken_xml_docx())],
+        ],
+        "import_docx_files": [
+            [[path.name], briefly(import_answer(importers.import_file, path))] for path in docx_files()
+        ],
+        "desktop_tests_docx": desktop_tests_docx,
     }
+
+
+# ---------------------------------------------------------------------------
+# Word files, for phase 5 step 6. Kept as base64: a .docx is a zip file, and
+# one character per byte would make it six times longer in JSON.
+# ---------------------------------------------------------------------------
+
+def as_base64(data):
+    import base64
+
+    return base64.b64encode(data).decode("ascii")
+
+
+def fixed_zip(data):
+    """The same zip with every date set to 1980-01-01, so a file made during
+    the run gives the same bytes on every run. The contents, the order and
+    the compression of each entry stay as they were."""
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(data)) as source, zipfile.ZipFile(out, "w") as target:
+        for entry in source.infolist():
+            fixed = zipfile.ZipInfo(entry.filename, date_time=(1980, 1, 1, 0, 0, 0))
+            fixed.compress_type = entry.compress_type
+            fixed.external_attr = entry.external_attr
+            target.writestr(fixed, source.read(entry.filename))
+    return out.getvalue()
+
+
+WORD_NAMESPACES = (
+    'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+    'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+    'xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing" '
+    'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" '
+    'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape" '
+    'xmlns:v="urn:schemas-microsoft-com:vml" '
+    'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"'
+)
+RELATIONSHIPS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+
+
+def make_docx(body, footnotes=None, main="word/document.xml", stored=False):
+    """A small but real .docx: the parts a Word file needs to open, with
+    this XML as the body of its document."""
+    import io
+    import zipfile
+
+    main_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    notes_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.footnotes+xml"
+    folder, _, main_name = main.rpartition("/")
+    parts = {
+        "[Content_Types].xml": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+            '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+            '<Default Extension="xml" ContentType="application/xml"/>'
+            f'<Override PartName="/{main}" ContentType="{main_type}"/>'
+            + (f'<Override PartName="/{folder}/footnotes.xml" ContentType="{notes_type}"/>' if footnotes else "")
+            + "</Types>"
+        ),
+        "_rels/.rels": (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId1" Type="{RELATIONSHIPS}/officeDocument" Target="{main}"/>'
+            "</Relationships>"
+        ),
+        main: (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            f"<w:document {WORD_NAMESPACES}><w:body>{body}</w:body></w:document>"
+        ),
+    }
+    if footnotes:
+        parts[f"{folder}/_rels/{main_name}.rels"] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            f'<Relationship Id="rId9" Type="{RELATIONSHIPS}/footnotes" Target="footnotes.xml"/>'
+            "</Relationships>"
+        )
+        parts[f"{folder}/footnotes.xml"] = (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            f"<w:footnotes {WORD_NAMESPACES}>{footnotes}</w:footnotes>"
+        )
+    out = io.BytesIO()
+    method = zipfile.ZIP_STORED if stored else zipfile.ZIP_DEFLATED
+    with zipfile.ZipFile(out, "w") as archive:
+        for name, text in parts.items():
+            info = zipfile.ZipInfo(name, date_time=(1980, 1, 1, 0, 0, 0))
+            info.compress_type = method
+            archive.writestr(info, text.encode("utf-8"))
+    return out.getvalue()
+
+
+def p(*runs):
+    return "<w:p>" + "".join(runs) + "</w:p>"
+
+
+def r(*content):
+    return "<w:r>" + "".join(content) + "</w:r>"
+
+
+def t(text):
+    return f'<w:t xml:space="preserve">{text}</w:t>'
+
+
+TEXT_BOX = (
+    "<mc:AlternateContent><mc:Choice Requires=\"wps\"><w:drawing><wp:anchor><a:graphic><a:graphicData>"
+    "<wps:wsp><wps:txbx><w:txbxContent>" + p(r(t("TEXT BOX inside."))) + "</w:txbxContent></wps:txbx></wps:wsp>"
+    "</a:graphicData></a:graphic></wp:anchor></w:drawing></mc:Choice>"
+    "<mc:Fallback><w:pict><v:shape><v:textbox><w:txbxContent>" + p(r(t("TEXT BOX inside.")))
+    + "</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent>"
+)
+
+FOOTNOTES = (
+    '<w:footnote w:type="separator" w:id="-1">' + p(r("<w:separator/>")) + "</w:footnote>"
+    '<w:footnote w:type="continuationSeparator" w:id="0">' + p(r("<w:continuationSeparator/>")) + "</w:footnote>"
+    '<w:footnote w:id="1">' + p(r(t("FOOTNOTE one."))) + "</w:footnote>"
+    '<w:footnote w:id="2">' + p(r(t("FOOTNOTE two,"))) + p(r(t("second paragraph."))) + "</w:footnote>"
+)
+
+# Name, then the body's XML and any options. Each becomes a .docx, and the
+# desktop's import_docx() is run on it.
+DOCX_CASES = [
+    ("paragraphs", p(r(t("First paragraph."))) + p() + p(r(t("   "))) + p(r(t("Second paragraph.")))),
+    ("runs", p(r(t("one ")), r(t("wo")), r(t("rd")), r(t(" split")))),
+    ("tabs and breaks", p(r(t("a"), "<w:tab/>", t("b"), "<w:br/>", t("c"), "<w:cr/>", t("d"), "<w:ptab/>", t("e")))),
+    ("break types", p(r(t("line"), '<w:br w:type="textWrapping"/>', t("page"), '<w:br w:type="page"/>',
+                         t("column"), '<w:br w:type="column"/>', t("end")))),
+    ("hyphen", p(r(t("non"), "<w:noBreakHyphen/>", t("breaking"), "<w:softHyphen/>", t("soft")))),
+    ("hyperlink", p(r(t("Go to ")), '<w:hyperlink r:id="rId5">' + r(t("the site")) + "</w:hyperlink>", r(t(".")))),
+    ("tracked changes", p(r(t("kept ")), "<w:del>" + r("<w:delText>deleted </w:delText>") + "</w:del>",
+                          "<w:ins>" + r(t("inserted ")) + "</w:ins>", r(t("end")))),
+    ("fields and controls", p(r(t("before ")), '<w:fldSimple w:instr="PAGE">' + r(t("7")) + "</w:fldSimple>",
+                              "<w:sdt><w:sdtContent>" + r(t("control ")) + "</w:sdtContent></w:sdt>",
+                              "<w:smartTag>" + r(t("smart ")) + "</w:smartTag>", r(t("after")))),
+    ("unicode", p(r(t("Caf\u00e9 \u201cquotes\u201d \U0001F600 \u0438\u0432\u0430\u043d &amp; &lt;tag&gt;")))),
+    ("spaces", p(r(t("  leading and trailing  "))) + p(r(t("\u00a0\u3000"))) + p(r(t("\u2003em space\u2003")))
+     + p(r(t("\ufeff"))) + p(r(t("\x85")))),
+    ("table", p(r(t("Before the table."))) + "<w:tbl><w:tr><w:tc>" + p(r(t("TABLE cell one"))) + "</w:tc><w:tc>"
+     + p(r(t("TABLE cell two"))) + "</w:tc></w:tr></w:tbl>" + p(r(t("After the table.")))),
+    ("text box", p(r(t("Anchor paragraph.")), r(TEXT_BOX)) + p(r(t("Next paragraph.")))),
+    ("content control", "<w:sdt><w:sdtContent>" + p(r(t("CONTROL paragraph."))) + "</w:sdtContent></w:sdt>"
+     + p(r(t("Body paragraph.")))),
+    ("footnotes", p(r(t("Body with a note.")), r('<w:footnoteReference w:id="1"/>')) + p(r(t("More body."))),
+     {"footnotes": FOOTNOTES}),
+    ("stored", p(r(t("Stored without compression."))), {"stored": True}),
+    ("another part name", p(r(t("The main part has another name."))), {"main": "word/document2.xml"}),
+    ("empty", p()),
+]
+
+
+def zip_without_document():
+    """A zip that holds a file, but nothing of a Word document."""
+    import io
+    import zipfile
+
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w") as archive:
+        archive.writestr(zipfile.ZipInfo("notes.txt", date_time=(1980, 1, 1, 0, 0, 0)), b"hello")
+    return out.getvalue()
+
+
+def broken_xml_docx():
+    """A Word file whose document is not well-formed XML."""
+    return make_docx(p(r(t("unclosed"))) + "<w:p><w:r>")
+
+
+def briefly(answer):
+    """A long text as its SHA-256 and its length in characters, so a file of
+    a whole book does not put the book into the fixture."""
+    import hashlib
+
+    text = answer.get("text")
+    if text is None or len(text) <= 5000:
+        return answer
+    return {"sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "characters": len(text)}
+
+
+def docx_files():
+    """The Word files that are in the web repository under fixtures/files."""
+    folder = Path(__file__).resolve().parents[2] / "fixtures" / "files"
+    return sorted(folder.glob("*.docx"))
 
 
 MODULES = {

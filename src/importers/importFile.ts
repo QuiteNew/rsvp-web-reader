@@ -3,8 +3,9 @@
 // of import_file() in the desktop's core/importers.py.
 //
 // The importer is picked by the file's extension, before the file is read,
-// as on the desktop. Each importer turns the bytes into raw text, and
-// finishImport() in core tidies it and turns empty text into an error.
+// as on the desktop. Each importer turns the bytes into raw text, or throws
+// an ImportFailure with a message, and finishImport() in core tidies the
+// text and turns empty text into an error.
 
 import {
   finishImport,
@@ -16,13 +17,15 @@ import {
   type ImportResult,
 } from '../core/importers';
 import { decodeText } from './decodeText';
+import { importDocx } from './importDocx';
+import { ImportFailure } from './importFailure';
 import { importHtml } from './importHtml';
 
-type Importer = (bytes: Uint8Array) => string;
+type Importer = (bytes: Uint8Array<ArrayBuffer>, name: string) => string | Promise<string>;
 
-// Word and PDF are added here in their own steps of phase 5. Until then
-// those files are refused as an unsupported type. Nothing offers importing
-// yet, so nobody can meet that.
+// PDF is added here in its own step of phase 5. Until then a PDF is refused
+// as an unsupported type. Nothing offers importing yet, so nobody can meet
+// that.
 const IMPORTERS: ReadonlyMap<string, Importer> = new Map<string, Importer>([
   ['.txt', decodeText],
   ['.srt', (bytes) => importSrt(decodeText(bytes))],
@@ -31,6 +34,7 @@ const IMPORTERS: ReadonlyMap<string, Importer> = new Map<string, Importer>([
   ['.markdown', (bytes) => importMd(decodeText(bytes))],
   ['.html', importHtml],
   ['.htm', importHtml],
+  ['.docx', importDocx],
 ]);
 
 export async function importFile(file: File): Promise<ImportResult> {
@@ -38,7 +42,7 @@ export async function importFile(file: File): Promise<ImportResult> {
   if (importer === undefined) {
     return { kind: 'error', message: unsupportedTypeMessage(file.name) };
   }
-  let bytes: Uint8Array;
+  let bytes: Uint8Array<ArrayBuffer>;
   try {
     bytes = new Uint8Array(await file.arrayBuffer());
   } catch {
@@ -46,5 +50,10 @@ export async function importFile(file: File): Promise<ImportResult> {
     // The desktop has no message for this, so this one is the web app's.
     return { kind: 'error', message: `Couldn't read ${file.name}.` };
   }
-  return finishImport(file.name, importer(bytes));
+  try {
+    return finishImport(file.name, await importer(bytes, file.name));
+  } catch (error) {
+    if (error instanceof ImportFailure) return { kind: 'error', message: error.message };
+    throw error;
+  }
 }

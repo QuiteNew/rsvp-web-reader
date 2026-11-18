@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 to 5 of the plan done, below     |
+| 5. Build                     | Steps 2 to 6 of the plan done, below     |
 
 ## Step 1: what the desktop app does
 
@@ -440,3 +440,54 @@ the first one, as PORTING.md says, until the desktop changes:
 
 The desktop's "Couldn't open NAME as HTML" message cannot happen in the
 web app: the browser's parser reads anything.
+
+### Build step 6: Word (2026-11-18)
+
+`src/importers/importDocx.ts` reads a `.docx` with no library: `unzip.ts`
+opens the zip with the browser's `DecompressionStream`, and `DOMParser`
+reads the XML. The main document is found through the package's own
+relationships (`_rels/.rels`), as python-docx does, so a document part with
+another name still opens. The footnotes are found the same way.
+
+- Each paragraph's text is python-docx's: runs and hyperlinks, a tab as
+  `\t`, a line break as `\n`, a page or column break as nothing, a
+  non-breaking hyphen as `-`. Blank paragraphs (Python's `strip()`) are left
+  out. So a body paragraph reads exactly as on the desktop.
+- The written difference the owner chose: every paragraph of the body in
+  order, so a table's cells, a text box and a content control come where
+  they stand, then the footnotes at the end. A text box is written twice in
+  the file (new Word and a fallback for old Word); the fallback is skipped.
+  Headers and footers are not read, as before.
+- As on the desktop, text inside a tracked insertion, a field or an inline
+  content control is not read: python-docx does not see it. Deleted text is
+  never read.
+- Errors keep the desktop's first line, "Couldn't open NAME as a Word
+  document:", with a reason in plain words instead of python-docx's (which
+  even shows a full path on the desktop). A Word file with a password to
+  open is not a zip at all; it gets its own reason.
+- The desktop also refuses a file whose main part is not a plain Word
+  document (a macro document renamed to .docx). The web app does not look
+  at that. Not met in the tests.
+
+`fixtures/files/` is new: `rich.docx` and `long.docx`, made with
+LibreOffice from invented text (its README says how). The fixture script
+records the desktop's answer for each, and for 21 small Word files it
+builds itself, one per case: runs, tabs and breaks, hyperlinks, tracked
+changes, fields, Unicode, spaces, a table, a text box, a content control,
+footnotes, a stored zip, a renamed main part, and four broken files. The
+desktop's four Word tests are recorded too, with the files they made.
+Those are made during the run, so the dates in their zips are fixed to
+1980 before they are kept, and the desktop's answer is checked to be the
+same for the fixed file. Long answers are kept as a SHA-256 and a length.
+
+Checked: every case matches the desktop, except the four listed (table,
+text box, content control, footnotes) where the web app reads more and the
+desktop's text is all still there. `long.docx` gives exactly the desktop's
+816,512 characters, by SHA-256. `rich.docx` gives the desktop's text with
+the table, the text box and the footnote put in where they stand. The same
+in real Chrome, with its own `DecompressionStream`.
+
+Broken on purpose, each made a test fail: reading the text box fallback
+too, a page break as a line break, no hyperlinks, reading tracked
+insertions, `trim()` for Python's `strip()`, no `ptab`, no
+non-breaking hyphen.
