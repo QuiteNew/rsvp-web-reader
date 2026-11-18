@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 and 3 of the plan done, below    |
+| 5. Build                     | Steps 2 to 4 of the plan done, below     |
 
 ## Step 1: what the desktop app does
 
@@ -338,3 +338,42 @@ The escapes in the step 2 additions to `generate.py` had come out as the
 characters themselves, some of them invisible (a no-break space, a line
 separator). They are written as `\u` escapes again. The fixture output is
 the same either way, checked.
+
+### Build step 4: the seam (2026-11-18)
+
+A new layer, `src/importers/`, for the part of importing that needs the
+browser. It may import `src/core` only, and no React. The ESLint layer rule
+has it, and core, engine and store may not import from it. The rule now
+only looks at paths that leave a folder (`../`) or name `src/`, because
+`src/core/importers.ts` has the layer's name and its own test imports it.
+Each of the five wrong imports was tried and refused.
+
+- `importFile(file)` is the way in. It picks the importer by extension
+  before reading the file, as the desktop does, reads the bytes, and ends
+  with `finishImport()` from core. It gives `{kind: 'text', title, text}`
+  or `{kind: 'error', message}`. The title is the file name without its
+  extension, as the desktop offers.
+- `decodeText()` reads UTF-8 with a byte order mark dropped, and
+  Windows-1252 when the bytes are not UTF-8.
+- In core: `SUPPORTED_EXTENSIONS`, `fileSuffix()` and `fileStem()` (Python's
+  `Path.suffix` and `Path.stem`), the lower-cased suffix, the "Unsupported
+  file type" message and `finishImport()`, with fixtures for the file name
+  rules.
+- One message of the web app's own: "Couldn't read NAME." when the browser
+  cannot read the file it was given. The desktop has none for that.
+- `.html`, `.htm`, `.docx` and `.pdf` are refused as an unsupported type
+  until their steps. Nothing offers importing yet, so nobody meets that.
+
+Checked: every `import_file` case for the formats built so far, every
+`read_text_with_fallback` case, and the desktop tests that call
+`import_txt` or `import_file`. Where the desktop read Latin-1, the test
+expects the same text with Windows-1252's characters for 0x80 to 0x9F,
+from a table written in the test, not asked of the browser. Breaking the
+decoder on purpose (keeping the byte order mark, not failing on bad UTF-8,
+true Latin-1) and a naive suffix rule each made tests fail. Using
+`toLowerCase()` for the suffix instead of `pyLower()` made none fail: the
+two agree on every name tried, so the Python one is kept for safety, not
+because a case needs it.
+
+The reader's own download is the same file as before, byte for byte
+(nothing imports the new layer yet).

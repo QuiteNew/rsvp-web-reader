@@ -1,6 +1,17 @@
 import { describe, expect, test } from 'vitest';
 import { expectToMatchFixture, loadFixture } from '../testing/fixtures';
-import { importMd, importSrt, importVtt, stripInlineMd } from './importers';
+import {
+  SUPPORTED_EXTENSIONS,
+  fileStem,
+  fileSuffix,
+  finishImport,
+  importMd,
+  importSrt,
+  importSuffix,
+  importVtt,
+  stripInlineMd,
+  unsupportedTypeMessage,
+} from './importers';
 
 const fixture = loadFixture('importers');
 
@@ -94,5 +105,46 @@ describe('in short', () => {
 
   test('a line break Python knows and JavaScript does not still ends a line', () => {
     expect(importSrt('one\u0085two')).toBe('one\ntwo');
+  });
+});
+
+describe('file names, against Python', () => {
+  test('SUPPORTED_EXTENSIONS', () => {
+    expectToMatchFixture(fixture, 'supported_extensions', () => [...SUPPORTED_EXTENSIONS].sort());
+  });
+
+  test('Path(name).suffix', () => {
+    expectToMatchFixture(fixture, 'path_suffix', ([name]) => fileSuffix(name as string));
+  });
+
+  test('Path(name).stem', () => {
+    expectToMatchFixture(fixture, 'path_stem', ([name]) => fileStem(name as string));
+  });
+
+  test('Path(name).suffix.lower()', () => {
+    expectToMatchFixture(fixture, 'suffix_lower', ([name]) => importSuffix(name as string));
+  });
+});
+
+describe('finishImport', () => {
+  test('tidies the text and offers the name without its extension as the title', () => {
+    expect(finishImport('My talk.srt', '  Hello   there.  \n\n\n\nBye.')).toEqual({
+      kind: 'text',
+      title: 'My talk',
+      text: 'Hello there.\n\nBye.',
+    });
+  });
+
+  test('text that ends up empty is an error with the desktop message', () => {
+    expect(finishImport('empty.txt', ' \n[00:00:01]\n')).toEqual({
+      kind: 'error',
+      message: "empty.txt didn't contain any readable text.",
+    });
+  });
+
+  test('an unknown type names its extension, or the whole name when it has none', () => {
+    expect(unsupportedTypeMessage('photo.JPG')).toBe('Unsupported file type: .jpg');
+    expect(unsupportedTypeMessage('README')).toBe('Unsupported file type: README');
+    expect(unsupportedTypeMessage('.txt')).toBe('Unsupported file type: .txt');
   });
 });

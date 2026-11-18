@@ -1,5 +1,6 @@
-// Port of the text formats in core/importers.py: subtitles (.srt and .vtt)
-// and Markdown (.md and .markdown).
+// Port of the parts of core/importers.py that need no browser: the list of
+// file types, the file name rules, the step every import ends with, and the
+// text formats, subtitles (.srt and .vtt) and Markdown (.md and .markdown).
 //
 // The desktop functions take a file's path and read it themselves. These
 // take the text after the file was read and decoded, because reading a file
@@ -18,16 +19,79 @@
 // Lines are split with pySplitlines(), Python's str.splitlines(), which
 // breaks on more characters than "\n".
 
+import { cleanTranscriptKeepLines } from './parser';
 import {
   PY_DIGIT,
   PY_SPACE,
   PY_WORD,
   characters,
   isPyDigit,
+  pyLower,
   pyRstrip,
   pySplitlines,
   pyStrip,
 } from './pythonText';
+
+/** Every file type the desktop app imports. The web app reads the same ones. */
+export const SUPPORTED_EXTENSIONS: ReadonlySet<string> = new Set([
+  '.txt',
+  '.srt',
+  '.vtt',
+  '.md',
+  '.markdown',
+  '.html',
+  '.htm',
+  '.docx',
+  '.pdf',
+]);
+
+/**
+ * Python's Path(name).suffix for a file name with no folders: from the last
+ * dot to the end. A name that starts with its only dot, such as ".txt", or
+ * ends with a dot, has none, so ".txt" is not a text file to the desktop.
+ */
+export function fileSuffix(name: string): string {
+  const dot = name.lastIndexOf('.');
+  return dot > 0 && dot < name.length - 1 ? name.slice(dot) : '';
+}
+
+/**
+ * Python's Path(name).stem: the name without its suffix. The desktop
+ * offers it as the title of an imported transcript.
+ */
+export function fileStem(name: string): string {
+  const suffix = fileSuffix(name);
+  return suffix === '' ? name : name.slice(0, name.length - suffix.length);
+}
+
+/** The suffix that picks the importer: lower case, as import_file() takes it. */
+export function importSuffix(name: string): string {
+  return pyLower(fileSuffix(name));
+}
+
+/** The desktop's message for a file type it does not import. */
+export function unsupportedTypeMessage(name: string): string {
+  return `Unsupported file type: ${importSuffix(name) || name}`;
+}
+
+/** What an import gives: the text, or a message to show as it is. */
+export type ImportResult =
+  | { readonly kind: 'text'; readonly title: string; readonly text: string }
+  | { readonly kind: 'error'; readonly message: string };
+
+/**
+ * The step every import ends with, as in import_file(): the text is tidied
+ * by cleanTranscriptKeepLines(), and text that ends up empty (an empty file,
+ * a scanned PDF with no text layer) is an error, not a blank transcript.
+ * The title is the file name without its extension, as the desktop offers.
+ */
+export function finishImport(name: string, rawText: string): ImportResult {
+  const text = cleanTranscriptKeepLines(rawText);
+  if (text === '') {
+    return { kind: 'error', message: `${name} didn't contain any readable text.` };
+  }
+  return { kind: 'text', title: fileStem(name), text };
+}
 
 const S = `[${PY_SPACE}]`;
 const W = `[${PY_WORD}]`;

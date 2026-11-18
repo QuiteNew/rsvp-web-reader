@@ -46,7 +46,7 @@ import random
 import re
 import subprocess
 import unicodedata
-from pathlib import Path
+from pathlib import Path, PurePath
 
 EXPECTED_PYTHON = (3, 13)
 
@@ -2337,6 +2337,18 @@ IMPORT_FILES = [
     ("text.text", b"close, but not .txt"),
 ]
 
+# File names as a browser gives them, with no folders: for Path.suffix,
+# which picks the importer, and Path.stem, which the desktop offers as the
+# title.
+FILE_NAMES = unique(
+    [name for name, _ in IMPORT_FILES]
+    + [
+        "a.txt", "a", "..", "...", ".txt", "..txt", "a.", "a..", "a..txt", "a.b.c",
+        "a. txt", "a .txt", " .txt", "a.t", ".a.b", "a.TXT", "a.T\u00ccT", "a.\u0130",
+        "notes.MARKDOWN", "caf\u00e9.md", "\U0001F600.srt", "a.\U0001F600", "name with spaces.vtt",
+    ]
+)
+
 IMPORTER_TEST_FILES = ["test_importers.py", "test_importer_errors.py"]
 
 # Tests that change the desktop code while they run, so what they record
@@ -2462,6 +2474,9 @@ def build_importers(core):
         "splitlines_boundaries": [[["all"], ranges(lambda ch: len(("a" + ch + "b").splitlines()) == 2)]],
         "str_splitlines": [call(str.splitlines, text) for text in splitlines_texts],
         "supported_extensions": [[[], sorted(importers.SUPPORTED_EXTENSIONS)]],
+        "path_suffix": [call(lambda name: PurePath(name).suffix, name) for name in FILE_NAMES],
+        "path_stem": [call(lambda name: PurePath(name).stem, name) for name in FILE_NAMES],
+        "suffix_lower": [call(lambda name: PurePath(name).suffix.lower(), name) for name in FILE_NAMES],
         "read_text_with_fallback": [
             [[as_byte_string(data)], import_from_bytes(importers.import_txt, "case.txt", data)]
             for data in unique(TEXT_BYTES)

@@ -458,6 +458,7 @@ What 1.0.0 does not have, written down so nobody assumes it does:
 | Playwright                         | Starts in phase 2, when there is a real screen                                                                                                    |
 | Release guard (tag equals version) | Built with `v1.0.0`: `release.yml`, and a test for a version behind the newest tag                                                                |
 | Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                                   |
+| Importing files                    | A fifth layer, `src/importers`, for the parts that need the browser. It imports `src/core` only, ESLint enforces it. Added in phase 5, step 4     |
 | Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                          |
 | Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                          |
 

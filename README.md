@@ -202,7 +202,7 @@ rsvp-web-reader/
 │   │   ├── settingsSearch.ts    # Pure matching for the Settings search (name, keywords, description)
 │   │   ├── parser.ts            # Strips timestamps from raw transcript text
 │   │   ├── normalizer.ts        # Normalizes transcript text and can split long walls of text into paragraphs
-│   │   ├── importers.ts         # Reads the text out of subtitle (.srt, .vtt) and Markdown files
+│   │   ├── importers.ts         # Import rules without a browser: file types, names, subtitles, Markdown
 │   │   ├── tokenizer.ts         # Splits cleaned text into words
 │   │   ├── punctuation.ts       # Splits punctuation off each word and classifies the pause that follows it
 │   │   ├── orp.ts               # Calculates each word's Optimal Recognition Point
@@ -235,6 +235,9 @@ rsvp-web-reader/
 │   │   ├── settingsStore.ts     # The settings, kept in localStorage
 │   │   ├── storageHealth.ts     # Asks the browser not to clear this site's data
 │   │   └── memoryPersistence.ts # A stand-in that keeps data in memory, for tests
+│   ├── importers/           # Reading a picked file into text, in the browser. Loaded only when a file is picked
+│   │   ├── importFile.ts        # The way in: a File becomes a title and text, or a message
+│   │   └── decodeText.ts        # A text file's bytes as text: UTF-8, else Windows-1252
 │   ├── ui/                  # React components. The only layer that may import the others
 │   │   ├── App.tsx              # The page: header, sidebar, reader, control band
 │   │   ├── WordDisplay.tsx      # The flashing word, the guide marks and the surrounding words

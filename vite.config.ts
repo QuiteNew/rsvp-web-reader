@@ -19,7 +19,7 @@ export default defineConfig({
         test: {
           name: 'logic',
           environment: 'node',
-          include: ['src/{core,engine,store}/**/*.test.ts'],
+          include: ['src/{core,engine,store,importers}/**/*.test.ts'],
         },
       },
       {
