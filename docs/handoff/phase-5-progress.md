@@ -1,8 +1,9 @@
 # Phase 5 progress: importing files
 
 Where phase 5 stands, so the work can carry on after a break. The plan is
-[phase-5.md](phase-5.md). Nothing is chosen or installed yet: this phase
-starts with research and testing, and the owner decides.
+[phase-5.md](phase-5.md). The research and tests are done, and the owner
+decided on 2026-11-18 (step 4). Nothing is installed yet: the build plan is
+step 5, one small commit at a time.
 
 The owner confirmed phase 4 on 2026-11-17 ("It's good").
 
@@ -11,8 +12,8 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 1. What the desktop app does | Done, below                              |
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
-| 4. The owner decides         | Waiting: the questions are at the end    |
-| 5. Build                     | Not started                              |
+| 4. The owner decides         | Done on 2026-11-18, below                |
+| 5. Build                     | Planned, below. Nothing built yet        |
 
 ## Step 1: what the desktop app does
 
@@ -194,11 +195,29 @@ The rest:
   plain string work, ported with golden fixtures in the build step.
 
 What was not measured well: how long the page freezes. The browser's
-long-task numbers came out uneven, so they are not used here. The build
-does the reading in a Web Worker either way, which keeps the page
-responsive whatever the option.
+long-task numbers came out uneven, so they are not used here.
 
-## Step 4: questions for the owner
+A correction to what was written here before: not everything can be read
+in a Web Worker. `DOMParser` does not exist in a worker (checked on
+2026-11-18 in Chrome: `typeof DOMParser` is `"undefined"` there, while
+`DecompressionStream` and `TextDecoder` are functions). So HTML and Word,
+which need `DOMParser`, are read on the page itself. That is about 0.25 s
+for the 150,000-word Word file. PDF is read by pdf.js in its own worker.
+
+## Step 4: the owner's decisions
+
+Asked on 2026-11-17, answered on 2026-11-18. The owner took every
+recommendation:
+
+| Question                  | Decision                                                                                                    |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| PDF                       | pdf.js (`pdfjs-dist`), version 6.5.438, still the newest on 2026-11-18                                      |
+| Word                      | Our own code, no library. It reads the body and also tables, text boxes and footnotes. A written difference |
+| `.vtt` and Markdown       | Yes, both. The web app opens the same file types as the desktop                                             |
+| Old text files, not UTF-8 | Read as Windows-1252. Curly quotes and dashes come out right, where the desktop gives control characters    |
+| Real files to test with   | Asked again with the build plan                                                                             |
+
+The questions as they were asked:
 
 1. PDF: pdf.js (recommended: same text as the desktop on every test, a
    quarter of PDFium's size, its own worker, made by Mozilla).
@@ -209,3 +228,47 @@ responsive whatever the option.
 3. `.vtt` and Markdown too? Recommended: yes, no library needed.
 4. Old text files read as Windows-1252? Recommended: yes.
 5. Real PDFs or Word files to test with, if the owner has some.
+
+## Step 5: the build plan
+
+One small commit at a time, each checked before the next. The order puts
+the plain string work first, because it needs nothing new, and pdf.js
+last but one, because it is the only new dependency.
+
+1. **Docs.** These decisions, in this file and in STATUS.md.
+2. **Fixtures.** The fixture script records the desktop importers' output
+   for `.srt`, `.vtt`, Markdown, HTML and text decoding, and their error
+   messages, run with `-B` against the desktop's real code.
+3. **The text formats in core.** `.srt`, `.vtt` and Markdown are pure
+   string functions in `src/core`, checked against those fixtures, with
+   the matching desktop tests from `test_importers.py` ported.
+4. **The seam.** A new layer, `src/importers/`, that may import from
+   `src/core` only, with the ESLint rule for it. One function takes a
+   `File` and gives back a title and the text, or a plain error message.
+   It picks the reader by extension, decodes text files (UTF-8 with a
+   BOM stripped, then Windows-1252) and gives the desktop's messages for
+   an unknown type and for a file with no readable text.
+5. **HTML.** The port of `import_html` on `DOMParser`.
+6. **Word.** A small zip reader on `DecompressionStream`, then
+   `DOMParser` on the document and the footnotes. Body, tables, text
+   boxes and footnotes, in that order. Where it differs from the desktop
+   it is written down, and the body alone is checked against it.
+7. **PDF.** `pdfjs-dist` installed with an exact version. Its worker file
+   is shipped with the site, nothing is fetched from elsewhere. Opened
+   with an empty password first, as the desktop does, and with
+   `isEvalSupported: false`.
+8. **The screen.** An import button where a transcript is created. The
+   importer code loads only when a file is picked (`import()`), with an
+   "Importing" notice, the desktop's heads-up above 30,000 words, and its
+   "Couldn't add that file" message. The text lands as a draft and does
+   not start reading, as on the desktop.
+9. **Browser tests.** Each test file in Chromium, Firefox and WebKit, no
+   request to another address while importing, and the reader's own
+   download no bigger than before.
+
+Then the owner tries it, ideally with real files, and confirms.
+
+What stays as on the desktop and is said plainly in the app and the
+README: a scanned PDF has no text to read without OCR, so it gives "didn't
+contain any readable text", and a PDF that needs a real password is
+refused.

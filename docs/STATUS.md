@@ -3,27 +3,26 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-17. Phases 0 to 4 are done (phase 4 confirmed by
-the owner on 2026-11-17). Phase 5 has started with research, not code:
-[handoff/phase-5-progress.md](handoff/phase-5-progress.md) has what the
-desktop app does, the options tested on made files, and the questions
-that wait for the owner's decision. The first release, `v1.0.0`, is
-prepared: the version, the README, [RELEASING.md](../RELEASING.md) and the
-release workflow are in place, and it waits for the owner's tag. See "The
-first release" below for what it does not have.
+Last updated: 2026-11-18. Phases 0 to 4 are done (phase 4 confirmed by
+the owner on 2026-11-17). The first release, `v1.0.0`, is out: tagged by
+the owner on 2026-11-18 on `aebce68`, after the release workflow's dry run
+passed. See "The first release" below for what it does not have. Phase 5
+is researched and decided: the owner chose on 2026-11-18, and
+[handoff/phase-5-progress.md](handoff/phase-5-progress.md) has the
+decisions and the build plan. Nothing is built or installed for it yet.
 
 ## Phases
 
-| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                                                                                          |
-| ----- | -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                                                                                       |
-| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                                                                                               |
-| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                                                                                       |
-| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                          |
-| 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md) Version 1.0.0 is prepared, see "The first release" |
-| 5     | Importing files                        | Under way: researched and tested, waiting for the owner to decide. Nothing chosen or installed. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md)                                                                                                                                                                                                                                 |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                                    |
-| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                                    |
+| Phase | What                                   | State                                                                                                                                                                                                                                                                                                                                                                                   |
+| ----- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0     | Scaffold, CI, deploy                   | Done, except the page: the first deploy failed because Pages was not switched on. The owner sets Source to GitHub Actions and re-runs it                                                                                                                                                                                                                                                |
+| 1     | Golden fixtures and the core pipeline  | Done. CI ran it green on Node 24                                                                                                                                                                                                                                                                                                                                                        |
+| 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                                                                                |
+| 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
+| 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
+| 5     | Importing files                        | Decided on 2026-11-18: pdf.js for PDF, own code for Word, `.vtt` and Markdown too. Building next. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md)                                                                                                                                                                                                                        |
+| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                             |
+| 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
 
@@ -424,7 +423,9 @@ says the first public version could ship after phase 4 or 5 and leaves it to
 the owner. It is prepared in one commit: `APP_VERSION` and `package.json` at
 1.0.0, the README laid out like the desktop one, `RELEASING.md`,
 `.github/workflows/release.yml`, and a test that fails when the version is
-behind the newest release tag. The tag itself is the owner's to push.
+behind the newest release tag. The owner pushed the tag on 2026-11-18,
+on `aebce68`. The release workflow's dry run passed first, the browser
+tests in all three browsers included.
 
 What 1.0.0 does not have, written down so nobody assumes it does:
 
@@ -451,7 +452,7 @@ What 1.0.0 does not have, written down so nobody assumes it does:
 | Hosting                            | GitHub Pages first. A custom domain later, before phase 7 if at all                                                                               |
 | Desktop bundle compatibility       | Promise reading desktop bundles (transcripts, Spaces, positions, bookmarks). Settings and writing bundles back are extras. Confirm in phase 3     |
 | Detached window                    | Not now                                                                                                                                           |
-| File import                        | Decided in phase 5, client-side only. Do not pick a parser before then                                                                            |
+| File import                        | Decided on 2026-11-18, client-side only: pdf.js for PDF, own code for Word, HTML and text. See phase-5-progress.md                                |
 | TypeScript version                 | Pinned to 6.0.3. typescript-eslint 8.72 does not accept TypeScript 7                                                                              |
 | `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                         |
 | Playwright                         | Starts in phase 2, when there is a real screen                                                                                                    |
