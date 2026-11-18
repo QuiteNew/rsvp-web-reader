@@ -2163,12 +2163,14 @@ SRT_TEXTS = [
     "1\r\n00:00:01,000 --> 00:00:04,000\r\nWindows endings\r\n\r\n2\r\n00:00:05,000 --> 00:00:06,000\r\nTwo\r\n",
     "1\r00:00:01,000 --> 00:00:04,000\rOld Mac endings\r",
     "No numbers or times at all, just a line.\nAnd another.",
-    "12\n007\n  42  \n²\n①\n٣٤\n\U0001D7D8\n½\n4.5\n-1\n1 2\nkeep me",
+    "12\n007\n  42  \n\u00b2\n\u2460\n\u0663\u0664\n\U0001D7D8\n\u00bd\n4.5\n-1\n1 2\nkeep me",
     "a --> b\n-->\n--> at the start\nat the end -->\n->\n- ->\nkept",
     "<>\n< >\n<a\nb>\na < b and c > d\n<<x>>\n<i><b></b></i>\n<i>  spaced  </i>\nx<br/>y",
-    "   indented text   \n\ttabbed\t\n no-break \n　ideographic　",
-    "one\x85two\x0bthree\x0cfour\x1cfive\x1dsix\x1eseven eight nine",
-    "1\n00:00:01,000 --> 00:00:04,000\n\U0001F600 emoji and иван\n",
+    "   indented text   \n\ttabbed\t\n\u00a0no-break\u00a0\n\u3000ideographic\u3000",
+    "one\x85two\x0bthree\x0cfour\x1cfive\x1dsix\x1eseven\u2028eight\u2029nine",
+    "1\n00:00:01,000 --> 00:00:04,000\n\U0001F600 emoji and \u0438\u0432\u0430\u043d\n",
+    # Python's strip() and JavaScript's trim() disagree on these two.
+    "\x1fa unit separator round the line\x1f\n\ufeffa byte order mark at a line start\n\x1f12\x1f",
     "",
     "\n\n\n",
 ]
@@ -2185,13 +2187,15 @@ VTT_TEXTS = [
     "WEBVTT\n\njust text with no timing\n\n00:01.000 --> 00:02.000\nkept\n",
     "WEBVTT\r\n\r\n1\r\n00:01.000 --> 00:02.000\r\nWindows\r\n\r\n2\r\n00:03.000 --> 00:04.000\r\nendings\r\n",
     "WEBVTT\n \n00:01.000 --> 00:02.000\nspace on the blank line\n\t\n00:03.000 --> 00:04.000\ntab on it\n",
-    "WEBVTT\n \n00:01.000 --> 00:02.000\nno-break space on the blank line\n",
+    "WEBVTT\n\u00a0\n00:01.000 --> 00:02.000\nno-break space on the blank line\n",
     "WEBVTT\n\n00:01.000 --> 00:02.000\nfirst\n00:03.000 --> 00:04.000\nsecond timing line in the same block\n",
     "WEBVTT\n\nid\nmore id\n00:01.000 --> 00:02.000\npayload\n",
-    "WEBVTT\n\n00:01.000 --> 00:02.000\none\x85two three\x0cfour\n",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\none\x85two\u2028three\x0cfour\n",
     "00:01.000 --> 00:02.000\nno header at all\n",
     "webvtt\n\n00:01.000 --> 00:02.000\nlower-case header\n",
-    "﻿WEBVTT\n\n00:01.000 --> 00:02.000\nbyte order mark kept by a decoded string\n",
+    "\ufeffWEBVTT\n\n00:01.000 --> 00:02.000\nbyte order mark kept by a decoded string\n",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\n\x1fpayload\x1f\n\ufeffbyte order mark\n",
+    "\x1fWEBVTT\n\n\ufeffNOTE behind a byte order mark\n00:01.000 --> 00:02.000\nkept\n\n\x1fNOTE\n00:03.000 --> 00:04.000\ndropped\n",
     "WEBVTT",
     "",
 ]
@@ -2213,11 +2217,27 @@ MD_TEXTS = [
     "Escapes: \\* \\_ \\# \\[ \\] \\\\ \\` \\a \\- \\! \\> \\~",
     "<b>html</b> and <span class=\"x\">span</span> and a < b > c",
     "Line one\n\n\n\nLine after blanks\n   \n\t\nend",
-    "  # no-break spaces before\n　- ideographic space\n-  list with no-break",
-    "one\x85two three\x0cfour",
+    "\u00a0\u00a0# no-break spaces before\n\u3000- ideographic space\n- \u00a0list with no-break",
+    "one\x85two\u2028three\x0cfour",
     "* **Bold item** with [a link](x) and `code`",
     "1. **Step**: do *this*\n2. Then ~~that~~ _other_",
-    "Café “quotes” \U0001F600 иван",
+    "Caf\u00e9 \u201cquotes\u201d \U0001F600 \u0438\u0432\u0430\u043d",
+    # Python's strip() and JavaScript's trim() disagree on these two.
+    "\x1f# heading after a unit separator\x1f\n\ufeff# heading after a byte order mark\n\x1f---",
+    # Python's . goes past these separators, JavaScript's does not.
+    "`code\u2028across` and [li\u2028nk](x) and ![im\u2029age](x) and [re\u2028f][1]",
+    "*em\u2029across*",
+    "**strong\u2028across**",
+    "~~gone\u2028across~~",
+    "__strong\u2029across__",
+    "_em\u2028across_",
+    # Python's \s and JavaScript's \s disagree on these.
+    "#\ufeffnot a heading\n-\x1flist item after a unit separator\n1.\x1fnumbered\n>\x1fquote",
+    "*\ufeffnot em* and **\ufeffnot strong** and _x\x1f_ and **y\x1f**",
+    "# closer after a unit separator\x1f#\n\x1f\x1f***\n\ufeff---",
+    # Python's \w knows letters and digits in every script.
+    "caf\u00e9_x_ and _y_\u00e9 and \u0438__b__ and \u0663_z_ and \u00bd_w_ and \U0001D7D8_v_",
+    "\u00e9*x* and *y*\u00e9 and **z**\u0438",
     "",
 ]
 
@@ -2251,24 +2271,24 @@ HTML_FILES = [
     b"",
     b"   \n\t",
     # Encodings: the desktop lets lxml find the encoding in the page itself.
-    "<meta charset=\"utf-8\"><p>Café “q”</p>".encode("utf-8"),
-    "<meta charset=\"windows-1252\"><p>Café “q”</p>".encode("cp1252"),
-    "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><p>Café</p>".encode("utf-8"),
-    "<html><body><p>Café “q” with no charset</p></body></html>".encode("utf-8"),
-    "<html><body><p>Café “q” with no charset</p></body></html>".encode("cp1252"),
-    b"\xef\xbb\xbf" + "<p>Café after a byte order mark</p>".encode("utf-8"),
-    "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><html><body><p>Café</p></body></html>".encode("latin-1"),
+    "<meta charset=\"utf-8\"><p>Caf\u00e9 \u201cq\u201d</p>".encode("utf-8"),
+    "<meta charset=\"windows-1252\"><p>Caf\u00e9 \u201cq\u201d</p>".encode("cp1252"),
+    "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><p>Caf\u00e9</p>".encode("utf-8"),
+    "<html><body><p>Caf\u00e9 \u201cq\u201d with no charset</p></body></html>".encode("utf-8"),
+    "<html><body><p>Caf\u00e9 \u201cq\u201d with no charset</p></body></html>".encode("cp1252"),
+    b"\xef\xbb\xbf" + "<p>Caf\u00e9 after a byte order mark</p>".encode("utf-8"),
+    "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><html><body><p>Caf\u00e9</p></body></html>".encode("latin-1"),
 ]
 
 TEXT_BYTES = [
     b"",
     b"Hello world.\n",
-    "Café résumé “quotes” \U0001F600".encode("utf-8"),
+    "Caf\u00e9 r\u00e9sum\u00e9 \u201cquotes\u201d \U0001F600".encode("utf-8"),
     "With a byte order mark".encode("utf-8-sig"),
     b"\xef\xbb\xbf",
     b"\xef\xbb\xbf\xef\xbb\xbftwo byte order marks",
-    "Café in Latin-1".encode("latin-1"),
-    "Windows “quotes” – dash … €".encode("cp1252"),
+    "Caf\u00e9 in Latin-1".encode("latin-1"),
+    "Windows \u201cquotes\u201d \u2013 dash \u2026 \u20ac".encode("cp1252"),
     bytes(range(0x80, 0xA0)),
     bytes(range(256)),
     b"lone continuation \x80 byte",
@@ -2278,7 +2298,7 @@ TEXT_BYTES = [
     b"beyond U+10FFFF \xf4\x90\x80\x80",
     b"five-byte form \xf8\x88\x80\x80\x80",
     b"\xff\xfeU\x00T\x00F\x00-\x001\x006\x00",
-    "UTF-8 then a bad byte é".encode("utf-8") + b"\xe9",
+    "UTF-8 then a bad byte \u00e9".encode("utf-8") + b"\xe9",
     b"\r\n\r\nline endings\r\n",
 ] + [text.encode("utf-8") for text in TEXTS[:20]]
 
@@ -2292,7 +2312,7 @@ IMPORT_FILES = [
     ("only stamps.txt", b"[00:00:01]\n(1:23)\n0:05"),
     ("UPPER.TXT", b"Upper-case extension."),
     ("Mixed.Txt", b"Mixed-case extension."),
-    ("windows.txt", "“Quoted” in Windows-1252".encode("cp1252")),
+    ("windows.txt", "\u201cQuoted\u201d in Windows-1252".encode("cp1252")),
     ("talk.srt", SRT_TEXTS[0].encode("utf-8")),
     ("empty.srt", b"1\n00:00:01,000 --> 00:00:04,000\n\n"),
     ("talk.vtt", VTT_TEXTS[0].encode("utf-8")),
@@ -2312,7 +2332,7 @@ IMPORT_FILES = [
     ("archive.tar.gz", b"only the last extension counts"),
     ("notes.txt.md", b"# the last one"),
     ("notes.md.txt", b"# the last one"),
-    ("café “notes”.txt", b""),
+    ("caf\u00e9 \u201cnotes\u201d.txt", b""),
     ("transcript.doc", b"an old Word file"),
     ("text.text", b"close, but not .txt"),
 ]
@@ -2429,7 +2449,18 @@ def build_importers(core):
     md_lines = unique(
         line for text in MD_TEXTS + TEXTS for line in re.split(r"\r\n|\r|\n", text)
     )
+    # Python's str.splitlines(), which all three text importers use. It
+    # breaks lines on more characters than a line feed, so the port needs
+    # its own, checked against these: every character that ends a line, and
+    # whole texts split.
+    splitlines_texts = unique(
+        TEXTS + SRT_TEXTS + VTT_TEXTS + MD_TEXTS
+        + ["a\r\nb", "a\r\rb", "a\n\rb", "a\n", "a\r\n", "\n", "\r\n", "a\n\n", "\n\na"]
+        + ["x" + chr(number) + "y" for number in range(0x3000) if ("x" + chr(number) + "y").splitlines() != ["x" + chr(number) + "y"]]
+    )
     return {
+        "splitlines_boundaries": [[["all"], ranges(lambda ch: len(("a" + ch + "b").splitlines()) == 2)]],
+        "str_splitlines": [call(str.splitlines, text) for text in splitlines_texts],
         "supported_extensions": [[[], sorted(importers.SUPPORTED_EXTENSIONS)]],
         "read_text_with_fallback": [
             [[as_byte_string(data)], import_from_bytes(importers.import_txt, "case.txt", data)]

@@ -105,6 +105,27 @@ export function pyRstrip(text: string): string {
   return text.replace(TRAILING_SPACE, '');
 }
 
+// What Python's str.splitlines() breaks a line on: "\r\n" as one break, or
+// any one of these. More than JavaScript's line ends: Python also counts
+// the vertical tab, the form feed, three separator controls and the next
+// line character (U+0085). Written as text and built into a regular
+// expression, as PY_SPACE is: ESLint's no-control-regex rule flags control
+// characters in a regular expression literal, and here they are the point.
+const LINE_BREAK_CHARACTERS = '\\n\\v\\f\\r\\x1c-\\x1e\\x85\\u2028\\u2029';
+const LINE_BREAK = new RegExp(`\\r\\n|[${LINE_BREAK_CHARACTERS}]`, 'u');
+
+/**
+ * Python's str.splitlines() with no arguments: the lines, without their
+ * breaks. A break at the very end does not start one more empty line, and
+ * an empty text has no lines at all.
+ */
+export function pySplitlines(text: string): string[] {
+  if (text === '') return [];
+  const lines = text.split(LINE_BREAK);
+  if (lines[lines.length - 1] === '') lines.pop();
+  return lines;
+}
+
 /** Python's " ".join(text.split()): every run of whitespace becomes one space. */
 export function pySqueeze(text: string): string {
   return pySplit(text).join(' ');

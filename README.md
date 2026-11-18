@@ -202,6 +202,7 @@ rsvp-web-reader/
 │   │   ├── settingsSearch.ts    # Pure matching for the Settings search (name, keywords, description)
 │   │   ├── parser.ts            # Strips timestamps from raw transcript text
 │   │   ├── normalizer.ts        # Normalizes transcript text and can split long walls of text into paragraphs
+│   │   ├── importers.ts         # Reads the text out of subtitle (.srt, .vtt) and Markdown files
 │   │   ├── tokenizer.ts         # Splits cleaned text into words
 │   │   ├── punctuation.ts       # Splits punctuation off each word and classifies the pause that follows it
 │   │   ├── orp.ts               # Calculates each word's Optimal Recognition Point

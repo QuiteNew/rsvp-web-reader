@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { loadFixture } from '../testing/fixtures';
+import { expectToMatchFixture, loadFixture } from '../testing/fixtures';
 import {
   PY_DIGIT,
   PY_WORD,
@@ -12,6 +12,7 @@ import {
   pyLength,
   pyRound,
   pySplit,
+  pySplitlines,
   pyStrip,
 } from './pythonText';
 
@@ -102,6 +103,38 @@ describe('against every character Python knows', () => {
     }
     expect(changes.size).toBeGreaterThan(1000);
     expect(wrong).toEqual([]);
+  });
+});
+
+describe('pySplitlines, against str.splitlines()', () => {
+  // Recorded with the importers, the only code that splits lines this way.
+  const importers = loadFixture('importers');
+
+  test('breaks a line on exactly the characters Python breaks it on', () => {
+    const [[, ranges]] = importers.functions['splitlines_boundaries'] as unknown as [
+      [unknown, readonly (readonly [number, number])[]],
+    ];
+    const python = new Uint8Array(LAST_CHARACTER + 1);
+    for (const [first, last] of ranges) python.fill(1, first, last + 1);
+    const wrong: string[] = [];
+    for (let number = 0; number <= LAST_CHARACTER; number += 1) {
+      if (number >= 0xd800 && number <= 0xdfff) continue;
+      const breaks = pySplitlines(`a${String.fromCodePoint(number)}b`).length === 2;
+      if (breaks !== (python[number] === 1)) wrong.push(number.toString(16));
+    }
+    expect(ranges.length).toBeGreaterThan(0);
+    expect(wrong).toEqual([]);
+  });
+
+  test('splits whole texts the same way', () => {
+    expectToMatchFixture(importers, 'str_splitlines', ([text]) => pySplitlines(text as string));
+  });
+
+  test('no line for an empty text, and none after a break at the end', () => {
+    expect(pySplitlines('')).toEqual([]);
+    expect(pySplitlines('a\n')).toEqual(['a']);
+    expect(pySplitlines('\n')).toEqual(['']);
+    expect(pySplitlines('a\r\nb\rc')).toEqual(['a', 'b', 'c']);
   });
 });
 

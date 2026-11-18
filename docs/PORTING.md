@@ -68,6 +68,9 @@ Python's own lists in `fixtures/core/charsets.json`.
 | `text[i]`, `text[a:b]`                  | `characters(text)`, then index            | Indexing a string can cut an emoji in half                                             |
 | `text.split()`                          | `pySplit(text)`                           | `\s` in JavaScript is a different list of spaces                                       |
 | `text.strip()`                          | `pyStrip(text)`                           | `trim()` uses that different list too                                                  |
+| `text.splitlines()`                     | `pySplitlines(text)`                      | Python also ends a line at `\v`, `\f`, U+001C to U+001E and U+0085                     |
+| `text.isdigit()`                        | every character passes `isPyDigit`        | Python counts ² and ① as digits too                                                    |
+| `.` in a regular expression             | `[^\n]` with the `u` flag                 | JavaScript's `.` also stops at `\r`, U+2028 and U+2029                                 |
 | `ch.isspace()`                          | `isPySpace(ch)`                           | Same reason                                                                            |
 | `ch.isalnum()`                          | `isPyAlnum(ch)`                           | There is no built-in for it                                                            |
 | `\s` in a regular expression            | `[${PY_SPACE}]`                           | Same list problem                                                                      |
@@ -88,8 +91,8 @@ Python's own lists in `fixtures/core/charsets.json`.
 | `divmod(a, b)` on whole numbers         | `Math.floor(a / b)` and `a % b`           | Only equal for numbers that are not negative                                           |
 
 Not met yet, so check them when they first come up: `str.lower()` on a whole
-text, `str.title()`, `str.isalpha()`, `str.isdigit()`, sorting text, `//` and `%` on
-negative numbers, and the order of keys in a dictionary.
+text, `str.title()`, `str.isalpha()`, sorting text, `//` and `%` on negative
+numbers, and the order of keys in a dictionary.
 
 Never use `Intl.Segmenter` to count characters. It counts what a person sees
 as one character, which is a third answer, different from both Python's and

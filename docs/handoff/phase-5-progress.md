@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Step 2 of the plan done, below           |
+| 5. Build                     | Steps 2 and 3 of the plan done, below    |
 
 ## Step 1: what the desktop app does
 
@@ -310,3 +310,31 @@ fixed there, and not decided for the web yet:
 - A file named only `.txt` is refused as "Unsupported file type: .txt",
   because to Python a name that starts with a dot has no extension. Harmless,
   and the port copies it.
+
+### Build step 3: the text formats in core (2026-11-18)
+
+`src/core/importers.ts` ports `import_srt`, `import_vtt`, `import_md` and
+`_strip_inline_md`. They take the decoded text, not a path: reading and
+decoding the file belongs to `src/importers/` (step 4).
+
+- `pySplitlines()` in `pythonText.ts` is Python's `str.splitlines()`. It
+  also ends a line at `\v`, `\f`, U+001C to U+001E and U+0085, which
+  JavaScript does not. Checked character by character against Python, and
+  on 164 whole texts.
+- Python's `.` became `[^\n]`, and `\s`, `\w` and `str.isdigit()` use the
+  Python lists, as everywhere in core.
+- Checked against every case in `importers.json` and the 22 desktop tests
+  that call these importers.
+
+The fixtures got more cases in this step, for the places where Python and
+JavaScript part ways: `strip()` against `trim()`, `.` across U+2028, and
+`\s` and `\w` on characters outside ASCII. Each of these changes to the port
+was tried on purpose and made a test fail: `split("\n")` for
+`pySplitlines()`, `.` for `[^\n]` in each of the six inline patterns,
+JavaScript's `\s` and `\w`, `trim()` for `pyStrip()` in each of the five
+places, and an ASCII-only digit test.
+
+The escapes in the step 2 additions to `generate.py` had come out as the
+characters themselves, some of them invisible (a no-break space, a line
+separator). They are written as `\u` escapes again. The fixture output is
+the same either way, checked.
