@@ -20,7 +20,9 @@ anything into it. See section 7 of [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
    module's own edges. Add new awkward input to `TEXTS` rather than to one
    module, so every module gets it.
 
-3. **Generate.** From the web repository's root, with Python 3.13:
+3. **Generate.** From the web repository's root, with Python 3.13 and the
+   desktop app's packages installed (its `requirements.txt`; the importer
+   fixtures need lxml, python-docx and pypdf):
 
    ```bash
    python -B tools/fixtures/generate.py --desktop PATH_TO_DESKTOP_CLONE

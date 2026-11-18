@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Planned, below. Nothing built yet        |
+| 5. Build                     | Step 2 of the plan done, below           |
 
 ## Step 1: what the desktop app does
 
@@ -272,3 +272,41 @@ What stays as on the desktop and is said plainly in the app and the
 README: a scanned PDF has no text to read without OCR, so it gives "didn't
 contain any readable text", and a PDF that needs a real password is
 refused.
+
+### Build step 2: the fixtures (2026-11-18)
+
+`fixtures/core/importers.json`, written by `tools/fixtures/generate.py`
+from the desktop's `core/importers.py` at `8112ff1`, with lxml 6.1.3
+(libxml2 2.14.6). Run twice with the same output, and the desktop clone
+was unchanged afterwards, ignored files included. The other fixture files
+came out byte for byte as before.
+
+What is in it, each as the file's bytes (one character per byte) or the
+text, and the desktop's answer, `{"text": ...}` or `{"error": message}`:
+
+- `read_text_with_fallback`: 38 byte strings, through `import_txt`. UTF-8,
+  byte order marks, Latin-1, Windows-1252, every byte, broken UTF-8.
+- `import_srt`, `import_vtt`, `import_md`: their own awkward inputs plus
+  the shared `TEXTS`. The argument is the text the desktop worked on, after
+  decoding.
+- `strip_inline_md`: every line of those, called directly.
+- `import_html`: 35 pages as bytes, the encoding cases included.
+- `import_file`: 30 files by name, for picking the importer by extension
+  and for the error messages.
+- `desktop_tests`: the calls 50 of the desktop's importer tests make, with
+  the files' bytes, for the text and HTML importers. Word and PDF come with
+  their own steps. One test is left out because it changes the desktop's
+  code while it runs (it makes lxml fail on purpose).
+
+Found while recording, for the owner. These are in the desktop app, not
+fixed there, and not decided for the web yet:
+
+- **HTML with no declared character set comes out garbled.** A UTF-8 page
+  without a `<meta charset>` is read as Latin-1, so "Café" becomes
+  "CafÃ©". Pages saved by a browser usually declare one, so the common
+  case is fine. A page with an XML declaration that names ISO-8859-1 gives
+  "Caf�". To decide at the HTML step: copy this, or read such a page
+  as UTF-8 when it is valid UTF-8.
+- A file named only `.txt` is refused as "Unsupported file type: .txt",
+  because to Python a name that starts with a dot has no extension. Harmless,
+  and the port copies it.

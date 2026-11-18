@@ -20,6 +20,10 @@ Rules this script keeps:
 - Use Python 3.13, the version the desktop app targets. What counts as a
   letter, a digit or a space comes from Python's Unicode tables, and those
   change between Python versions.
+- Use a Python that has the desktop app's own packages installed (its
+  requirements.txt), the one the desktop app runs with. core/importers.py
+  imports lxml, python-docx and pypdf, and the HTML answers depend on the
+  lxml version, so importers.json records it.
 
 Besides the fixtures it writes two tables the port needs at run time, so
 they live with the code: src/core/pythonLowerTable.ts, every character
@@ -2135,6 +2139,324 @@ def build_reopen(core):
     return {"transcript_to_reopen": cases}
 
 
+# ---------------------------------------------------------------------------
+# Phase 5: importing files. The desktop importers read a file from a path,
+# so each case is written to a file of its own in a temporary folder (never
+# in the desktop repository), and the file's bytes go into the fixture.
+# Word and PDF come with their own steps of phase 5.
+# ---------------------------------------------------------------------------
+
+# Bytes are written into the JSON as a string with one character per byte
+# (character 0 to 255), which keeps plain text readable there. The web tests
+# turn it back into bytes the same way.
+def as_byte_string(data):
+    return data.decode("latin-1")
+
+
+# Extra facts for one fixture file's meta, filled in by its build function.
+EXTRA_META = {}
+
+SRT_TEXTS = [
+    "1\n00:00:01,000 --> 00:00:04,000\nHello world.\n\n2\n00:00:05,000 --> 00:00:08,000\nSecond line.\n",
+    "1\n00:00:01,000 --> 00:00:04,000\n<i>Italic</i> and <b>bold</b> and <font color=\"red\">red</font>\n",
+    "1\n00:00:01,000 --> 00:00:04,000\nFirst line of a cue\nsecond line of the same cue\n",
+    "1\r\n00:00:01,000 --> 00:00:04,000\r\nWindows endings\r\n\r\n2\r\n00:00:05,000 --> 00:00:06,000\r\nTwo\r\n",
+    "1\r00:00:01,000 --> 00:00:04,000\rOld Mac endings\r",
+    "No numbers or times at all, just a line.\nAnd another.",
+    "12\n007\n  42  \n²\n①\n٣٤\n\U0001D7D8\n½\n4.5\n-1\n1 2\nkeep me",
+    "a --> b\n-->\n--> at the start\nat the end -->\n->\n- ->\nkept",
+    "<>\n< >\n<a\nb>\na < b and c > d\n<<x>>\n<i><b></b></i>\n<i>  spaced  </i>\nx<br/>y",
+    "   indented text   \n\ttabbed\t\n no-break \n　ideographic　",
+    "one\x85two\x0bthree\x0cfour\x1cfive\x1dsix\x1eseven eight nine",
+    "1\n00:00:01,000 --> 00:00:04,000\n\U0001F600 emoji and иван\n",
+    "",
+    "\n\n\n",
+]
+
+VTT_TEXTS = [
+    "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\nHello world.\n\n00:00:05.000 --> 00:00:08.000\nSecond line.\n",
+    "WEBVTT - with a title\n\nintro\n00:00:01.000 --> 00:00:04.000 align:middle line:84%\nHello.\n",
+    "WEBVTT\n\nNOTE a comment\nover two lines\n\n00:01.000 --> 00:02.000\nAfter the note.\n",
+    "WEBVTT\n\nSTYLE\n::cue { color: red }\n\nREGION\nid:fred\n\n00:01.000 --> 00:02.000\nAfter style.\n",
+    "WEBVTT\n\nSTYLE \nnot quite\n\nREGIONS\n00:01.000 --> 00:02.000\nblock starting REGIONS\n\nNOTE\n00:03.000 --> 00:04.000\nnote with a time\n",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\n<v Roger Bingham>Hello <c.yellow>there</c> <i>you</i>\n<00:00:01.500>timed",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\nline one\nline two\n  line three  \n",
+    "WEBVTT\n\n\n\n00:01.000 --> 00:02.000\nafter extra blank lines\n\n\n\n",
+    "WEBVTT\n\njust text with no timing\n\n00:01.000 --> 00:02.000\nkept\n",
+    "WEBVTT\r\n\r\n1\r\n00:01.000 --> 00:02.000\r\nWindows\r\n\r\n2\r\n00:03.000 --> 00:04.000\r\nendings\r\n",
+    "WEBVTT\n \n00:01.000 --> 00:02.000\nspace on the blank line\n\t\n00:03.000 --> 00:04.000\ntab on it\n",
+    "WEBVTT\n \n00:01.000 --> 00:02.000\nno-break space on the blank line\n",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\nfirst\n00:03.000 --> 00:04.000\nsecond timing line in the same block\n",
+    "WEBVTT\n\nid\nmore id\n00:01.000 --> 00:02.000\npayload\n",
+    "WEBVTT\n\n00:01.000 --> 00:02.000\none\x85two three\x0cfour\n",
+    "00:01.000 --> 00:02.000\nno header at all\n",
+    "webvtt\n\n00:01.000 --> 00:02.000\nlower-case header\n",
+    "﻿WEBVTT\n\n00:01.000 --> 00:02.000\nbyte order mark kept by a decoded string\n",
+    "WEBVTT",
+    "",
+]
+
+MD_TEXTS = [
+    "# Heading one\n## Heading two\n###### Six\n####### Seven is not a heading\n#hashtag\n# Closed #\n## Closed too ###\nnot # a closer",
+    "Title\n=====\n\nSubtitle\n--------\n\nText.",
+    "---\n***\n___\n- - -\n* * *\n_ _ _\n--\n-\n**\n*\n==\n=\n= = =\n-*-\n*_*",
+    "*em* **strong** ***both*** _em_ __strong__ ~~gone~~ * not em * ** no ** 2*3*4",
+    "snake_case_name and __init__ and a_b_ and _a_b and x__y__z",
+    "`code` and ``co`de`` and ```three``` and ` spaced ` and `unclosed",
+    "[link](http://example.com) ![image](pic.png) [ref][1] [plain] [](empty) ![](x.png) [a](b \"title\")",
+    "- one\n* two\n+ three\n1. four\n2) five\n10. ten\n-no space\n1.no space\n  - nested",
+    "> quote\n> > nested quote\n>no space\n   > indented",
+    "```\ncode kept\n  indented code\n```\n~~~python\nx = 1\n~~~\nafter",
+    "```\ninside\n~~~\nstill inside\n```\nout",
+    "````\nfour\n```\nclosed by three\nafter",
+    "```\nnever closed\nlast line",
+    "Escapes: \\* \\_ \\# \\[ \\] \\\\ \\` \\a \\- \\! \\> \\~",
+    "<b>html</b> and <span class=\"x\">span</span> and a < b > c",
+    "Line one\n\n\n\nLine after blanks\n   \n\t\nend",
+    "  # no-break spaces before\n　- ideographic space\n-  list with no-break",
+    "one\x85two three\x0cfour",
+    "* **Bold item** with [a link](x) and `code`",
+    "1. **Step**: do *this*\n2. Then ~~that~~ _other_",
+    "Café “quotes” \U0001F600 иван",
+    "",
+]
+
+HTML_FILES = [
+    b"<html><body><p>Hello <b>world</b>.</p></body></html>",
+    b"<p>One</p><p>Two</p><div>Three<div>Four</div></div><p>Five</p>",
+    b"<p>a<br>b<br/>c<br />d</p>",
+    b"<ul><li>one</li><li>two</li></ul><ol><li>three</li></ol><dl><dt>t</dt><dd>d</dd></dl>",
+    b"<table><tr><th>h1</th><th>h2</th></tr><tr><td>a</td><td>b</td></tr></table>",
+    b"<p>  lots   of\n   space\tand\ttabs  </p>\n\n<p>\n  indented\n  source\n</p>",
+    b"<pre>  keep\n  my\n    layout</pre>",
+    b"<p>&amp; &lt; &gt; &quot; &#39; &copy; &nbsp;x &eacute; &#8220;q&#8221; &unknown;</p>",
+    b"<html><head><title>Title</title><meta name=x></head><body><p>Body</p></body></html>",
+    b"<p>Before</p><script>var x = '<p>no</p>';</script><style>p { }</style><p>After</p>",
+    b"<noscript>No script</noscript><template><p>Template</p></template><p>Kept</p>",
+    b"<p>One<!-- a comment -->Two</p><!-- outside -->",
+    b"<?xml-stylesheet href='a'?><p>processing instruction</p>",
+    b"<p>Unclosed<p>paragraphs<div>and divs",
+    b"Text with no tags at all",
+    b"<P>Upper</P><BR><DIV>Case</DIV>",
+    b"<p>Inline <a href='x'>link</a>, <em>em</em>, <span>span</span> and <code>code</code>.</p>",
+    b"<h1>Title</h1><section><article><header>Head</header><p>Body</p><footer>Foot</footer></article></section>",
+    b"<nav>Menu</nav><main>Main</main><aside>Aside</aside><figure>Fig<figcaption>Cap</figcaption></figure><hr>end",
+    b"<blockquote>Quoted</blockquote><p><![CDATA[cdata]]></p>",
+    b"<svg><text>svg text</text></svg><p>after svg</p>",
+    b"<!DOCTYPE html><html lang=en><body>Doctype</body></html>",
+    b"<!-- only a comment -->",
+    b"<!DOCTYPE html>",
+    b"<html></html>",
+    b"<html><head><title>Only a title</title></head><body></body></html>",
+    b"",
+    b"   \n\t",
+    # Encodings: the desktop lets lxml find the encoding in the page itself.
+    "<meta charset=\"utf-8\"><p>Café “q”</p>".encode("utf-8"),
+    "<meta charset=\"windows-1252\"><p>Café “q”</p>".encode("cp1252"),
+    "<meta http-equiv=\"Content-Type\" content=\"text/html; charset=utf-8\"><p>Café</p>".encode("utf-8"),
+    "<html><body><p>Café “q” with no charset</p></body></html>".encode("utf-8"),
+    "<html><body><p>Café “q” with no charset</p></body></html>".encode("cp1252"),
+    b"\xef\xbb\xbf" + "<p>Café after a byte order mark</p>".encode("utf-8"),
+    "<?xml version=\"1.0\" encoding=\"iso-8859-1\"?><html><body><p>Café</p></body></html>".encode("latin-1"),
+]
+
+TEXT_BYTES = [
+    b"",
+    b"Hello world.\n",
+    "Café résumé “quotes” \U0001F600".encode("utf-8"),
+    "With a byte order mark".encode("utf-8-sig"),
+    b"\xef\xbb\xbf",
+    b"\xef\xbb\xbf\xef\xbb\xbftwo byte order marks",
+    "Café in Latin-1".encode("latin-1"),
+    "Windows “quotes” – dash … €".encode("cp1252"),
+    bytes(range(0x80, 0xA0)),
+    bytes(range(256)),
+    b"lone continuation \x80 byte",
+    b"overlong \xc0\xaf slash",
+    b"surrogate \xed\xa0\x80 half",
+    b"cut short \xe2\x82",
+    b"beyond U+10FFFF \xf4\x90\x80\x80",
+    b"five-byte form \xf8\x88\x80\x80\x80",
+    b"\xff\xfeU\x00T\x00F\x00-\x001\x006\x00",
+    "UTF-8 then a bad byte é".encode("utf-8") + b"\xe9",
+    b"\r\n\r\nline endings\r\n",
+] + [text.encode("utf-8") for text in TEXTS[:20]]
+
+# File name, then the bytes. For import_file(): the extension picks the
+# importer, and the name shows in the error messages.
+IMPORT_FILES = [
+    ("plain.txt", b"  First   line.  \r\n\r\n\r\n\r\nSecond\tline.\n"),
+    ("stamped.txt", b"[00:00:01] Welcome.\n(1:23) Goodbye."),
+    ("empty.txt", b""),
+    ("blank.txt", b"   \n\t\r\n"),
+    ("only stamps.txt", b"[00:00:01]\n(1:23)\n0:05"),
+    ("UPPER.TXT", b"Upper-case extension."),
+    ("Mixed.Txt", b"Mixed-case extension."),
+    ("windows.txt", "“Quoted” in Windows-1252".encode("cp1252")),
+    ("talk.srt", SRT_TEXTS[0].encode("utf-8")),
+    ("empty.srt", b"1\n00:00:01,000 --> 00:00:04,000\n\n"),
+    ("talk.vtt", VTT_TEXTS[0].encode("utf-8")),
+    ("empty.vtt", b"WEBVTT\n\nNOTE nothing else\n"),
+    ("notes.md", MD_TEXTS[0].encode("utf-8")),
+    ("notes.markdown", b"# Long extension\n\n*text*"),
+    ("rules.md", b"---\n***\n"),
+    ("page.html", HTML_FILES[0]),
+    ("page.htm", HTML_FILES[1]),
+    ("PAGE.HTML", HTML_FILES[2]),
+    ("title only.html", HTML_FILES[25]),
+    ("comment.html", HTML_FILES[22]),
+    ("sample.xyz", b"irrelevant"),
+    ("README", b"no extension"),
+    (".txt", b"a dot file has no extension"),
+    (".hidden.md", b"# a dot file with an extension"),
+    ("archive.tar.gz", b"only the last extension counts"),
+    ("notes.txt.md", b"# the last one"),
+    ("notes.md.txt", b"# the last one"),
+    ("café “notes”.txt", b""),
+    ("transcript.doc", b"an old Word file"),
+    ("text.text", b"close, but not .txt"),
+]
+
+IMPORTER_TEST_FILES = ["test_importers.py", "test_importer_errors.py"]
+
+# Tests that change the desktop code while they run, so what they record
+# cannot happen in the web app.
+IMPORTER_TESTS_LEFT_OUT = {"test_an_html_file_the_parser_fails_on_otherwise_couldnt_be_opened"}
+
+
+def import_answer(function, path):
+    """What an importer gives for a file: {"text": ...}, or {"error": ...}
+    with the message the desktop shows."""
+    from core.importers import TranscriptImportError
+
+    try:
+        return {"text": function(str(path))}
+    except TranscriptImportError as error:
+        return {"error": str(error)}
+
+
+def import_from_bytes(function, name, data):
+    """Writes the bytes to a file with this name in a new temporary folder,
+    and runs the importer on it."""
+    import tempfile
+
+    with tempfile.TemporaryDirectory() as folder:
+        path = Path(folder) / name
+        path.write_bytes(data)
+        return import_answer(function, path)
+
+
+def text_case(function, extension, text):
+    """A case for an importer that reads text: the text is saved as UTF-8,
+    and the argument written down is the text the importer really worked on,
+    that is after the desktop decoded the file (it drops a byte order mark
+    at the start)."""
+    data = text.encode("utf-8")
+    seen = data.decode("utf-8-sig")
+    return [[seen], import_from_bytes(function, "case" + extension, data)]
+
+
+def record_importer_tests(importers):
+    """Runs the desktop's importer tests with pytest, as they are, and writes
+    down every call a test makes to an importer for text or HTML: the file's
+    name and bytes, and the answer. Word and PDF calls are left for their
+    own steps. A test that fails stops the run."""
+    import pytest
+
+    desktop = Path(importers.__file__).resolve().parents[1]
+    watched = ["import_txt", "import_srt", "import_vtt", "import_md", "import_html", "import_file"]
+    text_types = {".txt", ".srt", ".vtt", ".md", ".markdown", ".html", ".htm"}
+    recorded = {}
+
+    class Recorder:
+        @pytest.hookimpl(hookwrapper=True)
+        def pytest_runtest_call(self, item):
+            calls = recorded.setdefault(item.name, [])
+
+            def note(name, path, data, answer):
+                suffix = Path(path).suffix.lower()
+                if suffix in text_types or suffix not in importers.SUPPORTED_EXTENSIONS:
+                    calls.append([name, Path(path).name, as_byte_string(data), answer])
+
+            def watch(name, real):
+                def run(path, *rest):
+                    data = Path(path).read_bytes()
+                    try:
+                        result = real(path, *rest)
+                    except importers.TranscriptImportError as error:
+                        note(name, path, data, {"error": str(error)})
+                        raise
+                    note(name, path, data, {"text": result})
+                    return result
+                return run
+
+            originals = {}
+            for name in watched:
+                if hasattr(item.module, name):
+                    originals[name] = getattr(item.module, name)
+                    setattr(item.module, name, watch(name, originals[name]))
+            try:
+                outcome = yield
+            finally:
+                for name, original in originals.items():
+                    setattr(item.module, name, original)
+            if outcome.excinfo is not None:
+                raise SystemExit(f"the desktop test {item.name} failed, so it cannot be recorded")
+
+    for test_file in IMPORTER_TEST_FILES:
+        status = pytest.main(
+            [str(desktop / "tests" / test_file), "-q", "--no-header", "-p", "no:cacheprovider",
+             "--noconftest", "--rootdir", str(desktop), "-o", "addopts="],
+            plugins=[Recorder()],
+        )
+        if status != 0:
+            raise SystemExit(f"pytest ended with status {status} on the desktop's {test_file}")
+    return [
+        [[name], calls] for name, calls in recorded.items()
+        if calls and name not in IMPORTER_TESTS_LEFT_OUT
+    ]
+
+
+def build_importers(core):
+    import core.importers as importers
+    from lxml import etree
+
+    EXTRA_META["importers"] = {
+        "lxml": ".".join(str(part) for part in etree.LXML_VERSION),
+        "libxml2": ".".join(str(part) for part in etree.LIBXML_VERSION),
+    }
+
+    md_lines = unique(
+        line for text in MD_TEXTS + TEXTS for line in re.split(r"\r\n|\r|\n", text)
+    )
+    return {
+        "supported_extensions": [[[], sorted(importers.SUPPORTED_EXTENSIONS)]],
+        "read_text_with_fallback": [
+            [[as_byte_string(data)], import_from_bytes(importers.import_txt, "case.txt", data)]
+            for data in unique(TEXT_BYTES)
+        ],
+        "import_srt": [
+            text_case(importers.import_srt, ".srt", text) for text in unique(SRT_TEXTS + TEXTS)
+        ],
+        "import_vtt": [
+            text_case(importers.import_vtt, ".vtt", text) for text in unique(VTT_TEXTS + TEXTS)
+        ],
+        "import_md": [
+            text_case(importers.import_md, ".md", text) for text in unique(MD_TEXTS + TEXTS)
+        ],
+        "strip_inline_md": [call(importers._strip_inline_md, line) for line in md_lines],
+        "import_html": [
+            [[as_byte_string(data)], import_from_bytes(importers.import_html, "case.html", data)]
+            for data in unique(HTML_FILES)
+        ],
+        "import_file": [
+            [[name, as_byte_string(data)], import_from_bytes(importers.import_file, name, data)]
+            for name, data in IMPORT_FILES
+        ],
+        "desktop_tests": record_importer_tests(importers),
+    }
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -2159,6 +2481,7 @@ MODULES = {
     "normalizer": build_normalizer,
     "desktop_tests": build_desktop_tests,
     "colors": build_colors,
+    "importers": build_importers,
 }
 
 
@@ -2241,7 +2564,7 @@ def main():
     out.mkdir(parents=True, exist_ok=True)
     for name, build in MODULES.items():
         functions = build(core)
-        text = to_json(meta, functions)
+        text = to_json({**meta, **EXTRA_META.get(name, {})}, functions)
         (out / f"{name}.json").write_text(text, encoding="ascii", newline="\n")
         total = sum(len(cases) for cases in functions.values())
         print(f"{name}.json: {total} cases, {len(text) // 1024} KB")
