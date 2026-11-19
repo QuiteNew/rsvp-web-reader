@@ -20,12 +20,12 @@ import { decodeText } from './decodeText';
 import { importDocx } from './importDocx';
 import { ImportFailure } from './importFailure';
 import { importHtml } from './importHtml';
+import { importPdf } from './importPdf';
 
 type Importer = (bytes: Uint8Array<ArrayBuffer>, name: string) => string | Promise<string>;
 
-// PDF is added here in its own step of phase 5. Until then a PDF is refused
-// as an unsupported type. Nothing offers importing yet, so nobody can meet
-// that.
+// Every type the desktop imports. pdf.js, the big one, is only loaded when
+// a PDF is picked (pdfjsLoader.ts).
 const IMPORTERS: ReadonlyMap<string, Importer> = new Map<string, Importer>([
   ['.txt', decodeText],
   ['.srt', (bytes) => importSrt(decodeText(bytes))],
@@ -35,6 +35,7 @@ const IMPORTERS: ReadonlyMap<string, Importer> = new Map<string, Importer>([
   ['.html', importHtml],
   ['.htm', importHtml],
   ['.docx', importDocx],
+  ['.pdf', (bytes, name) => importPdf(bytes, name)],
 ]);
 
 export async function importFile(file: File): Promise<ImportResult> {

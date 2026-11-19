@@ -188,7 +188,7 @@ rsvp-web-reader/
 ├── e2e/                     # Playwright tests: the built site in Chromium, Firefox and WebKit
 ├── fixtures/
 │   ├── core/                # Golden fixtures: what the desktop app's real code answered, as JSON
-│   └── files/               # Files to import in the tests (Word for now), all invented text
+│   └── files/               # Word and PDF files to import in the tests, all invented text
 ├── reference/
 │   └── desktop-design/      # Design notes copied from the desktop project
 ├── src/
@@ -241,6 +241,7 @@ rsvp-web-reader/
 │   │   ├── importHtml.ts        # The readable text of a web page, with the browser's own HTML parser
 │   │   ├── importDocx.ts        # The text of a Word file: body, tables, text boxes and footnotes
 │   │   ├── unzip.ts             # A small zip reader on the browser's own DecompressionStream
+│   │   ├── importPdf.ts         # The text of a PDF, with pdf.js
 │   │   └── decodeText.ts        # A text file's bytes as text: UTF-8, else Windows-1252
 │   ├── ui/                  # React components. The only layer that may import the others
 │   │   ├── App.tsx              # The page: header, sidebar, reader, control band
@@ -282,6 +283,7 @@ and [src/ui](src/ui/README.md), says what may import what. For the plan and the 
 - [Playwright](https://playwright.dev/) - the browser tests, in Chromium, Firefox and WebKit
 - [ESLint](https://eslint.org/) & [Prettier](https://prettier.io/) - the layer rule, and formatting
 - [Fredoka](https://fonts.google.com/specimen/Fredoka) & [Quicksand](https://fonts.google.com/specimen/Quicksand) - bundled fonts
+- [pdf.js](https://mozilla.github.io/pdf.js/) - reading the text of a PDF, loaded only when a PDF is picked
 
 ## Settings and Configuration
 
@@ -315,7 +317,9 @@ Released under the MIT License. See [LICENSE](LICENSE) for the full text.
 The bundled Fredoka and Quicksand fonts are each released under
 the SIL Open Font License, not the MIT license. A copy of each font's license
 sits next to the font files in [src/ui/fonts](src/ui/fonts), and the fonts are
-credited under Acknowledgments. The MIT license covers the project's own code.
+credited under Acknowledgments. pdf.js is released by Mozilla under the Apache
+License 2.0, and its license notice is kept at the top of its files. The MIT
+license covers the project's own code.
 
 ## Acknowledgments
 

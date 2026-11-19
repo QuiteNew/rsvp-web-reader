@@ -2390,8 +2390,14 @@ FILE_NAMES = unique(
 IMPORTER_TEST_FILES = ["test_importers.py", "test_importer_errors.py"]
 
 # Tests that change the desktop code while they run, so what they record
-# cannot happen in the web app.
-IMPORTER_TESTS_LEFT_OUT = {"test_an_html_file_the_parser_fails_on_otherwise_couldnt_be_opened"}
+# cannot happen in the web app. A test run with several parameters counts
+# by its name without them.
+IMPORTER_TESTS_LEFT_OUT = {
+    "test_an_html_file_the_parser_fails_on_otherwise_couldnt_be_opened",
+    "test_a_page_that_cant_be_read_is_skipped_and_the_rest_kept",
+    "test_a_pdf_whose_pages_all_fail_has_no_readable_text",
+    "test_a_pdf_that_decrypt_fails_on_is_reported_as_password_protected",
+}
 
 
 def import_answer(function, path):
@@ -2440,17 +2446,24 @@ def text_case(function, extension, text):
 
 def record_importer_tests(importers):
     """Runs the desktop's importer tests with pytest, as they are, and writes
-    down every call a test makes to an importer for text, HTML or Word: the
-    file's name and bytes, and the answer. Gives two lists, text and HTML,
-    then Word. PDF calls are left for their own step. A test that fails
-    stops the run."""
+    down every call a test makes to an importer: the file's name and bytes,
+    and the answer. Gives three lists: text and HTML, then Word, then PDF.
+    A test that fails stops the run.
+
+    An encrypted PDF a test makes is not kept: pypdf encrypts with random
+    keys, so the file is different on every run. The encrypted PDFs in
+    fixtures/files stand in for those tests."""
     import pytest
 
     desktop = Path(importers.__file__).resolve().parents[1]
-    watched = ["import_txt", "import_srt", "import_vtt", "import_md", "import_html", "import_docx", "import_file"]
+    watched = [
+        "import_txt", "import_srt", "import_vtt", "import_md", "import_html", "import_docx", "import_pdf",
+        "import_file",
+    ]
     text_types = {".txt", ".srt", ".vtt", ".md", ".markdown", ".html", ".htm"}
     recorded = {}
     recorded_docx = {}
+    recorded_pdf = {}
 
     class Recorder:
         @pytest.hookimpl(hookwrapper=True)
@@ -2458,6 +2471,7 @@ def record_importer_tests(importers):
             calls = recorded.setdefault(item.name, [])
 
             docx_calls = recorded_docx.setdefault(item.name, [])
+            pdf_calls = recorded_pdf.setdefault(item.name, [])
 
             def note(name, path, data, answer):
                 answer = without_folder(answer, path)
@@ -2476,6 +2490,8 @@ def record_importer_tests(importers):
                     if import_from_bytes(function, Path(path).name, fixed) != answer:
                         raise SystemExit(f"fixing the dates in {Path(path).name} changed the answer")
                     docx_calls.append([name, Path(path).name, as_base64(fixed), answer])
+                elif suffix == ".pdf" and b"/Encrypt" not in data:
+                    pdf_calls.append([name, Path(path).name, as_base64(data), answer])
 
             def watch(name, real):
                 def run(path, *rest):
@@ -2513,10 +2529,10 @@ def record_importer_tests(importers):
     def kept(found):
         return [
             [[name], calls] for name, calls in found.items()
-            if calls and name not in IMPORTER_TESTS_LEFT_OUT
+            if calls and name.split("[")[0] not in IMPORTER_TESTS_LEFT_OUT
         ]
 
-    return kept(recorded), kept(recorded_docx)
+    return kept(recorded), kept(recorded_docx), kept(recorded_pdf)
 
 
 def build_importers(core):
@@ -2531,7 +2547,7 @@ def build_importers(core):
     md_lines = unique(
         line for text in MD_TEXTS + TEXTS for line in re.split(r"\r\n|\r|\n", text)
     )
-    desktop_tests, desktop_tests_docx = record_importer_tests(importers)
+    desktop_tests, desktop_tests_docx, desktop_tests_pdf = record_importer_tests(importers)
     # Python's str.splitlines(), which all three text importers use. It
     # breaks lines on more characters than a line feed, so the port needs
     # its own, checked against these: every character that ends a line, and
@@ -2586,9 +2602,13 @@ def build_importers(core):
              import_from_bytes(importers.import_docx, "damaged XML.docx", broken_xml_docx())],
         ],
         "import_docx_files": [
-            [[path.name], briefly(import_answer(importers.import_file, path))] for path in docx_files()
+            [[path.name], briefly(import_answer(importers.import_file, path))] for path in test_files("*.docx")
+        ],
+        "import_pdf_files": [
+            [[path.name], briefly(import_answer(importers.import_file, path))] for path in test_files("*.pdf")
         ],
         "desktop_tests_docx": desktop_tests_docx,
+        "desktop_tests_pdf": desktop_tests_pdf,
     }
 
 
@@ -2768,10 +2788,10 @@ def briefly(answer):
     return {"sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "characters": len(text)}
 
 
-def docx_files():
-    """The Word files that are in the web repository under fixtures/files."""
+def test_files(pattern):
+    """The files of one type that are in the web repository under fixtures/files."""
     folder = Path(__file__).resolve().parents[2] / "fixtures" / "files"
-    return sorted(folder.glob("*.docx"))
+    return sorted(folder.glob(pattern))
 
 
 MODULES = {

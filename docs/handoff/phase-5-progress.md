@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 to 6 of the plan done, below     |
+| 5. Build                     | Steps 2 to 7 of the plan done, below     |
 
 ## Step 1: what the desktop app does
 
@@ -491,3 +491,51 @@ Broken on purpose, each made a test fail: reading the text box fallback
 too, a page break as a line break, no hyperlinks, reading tracked
 insertions, `trim()` for Python's `strip()`, no `ptab`, no
 non-breaking hyphen.
+
+### Build step 7: PDF (2026-11-18)
+
+`pdfjs-dist` 6.5.438 is installed with an exact version, the newest on
+2026-11-18 (Apache-2.0). It brings `@napi-rs/canvas` as an optional
+dependency, which pdf.js uses only in Node to draw pages; the site never
+loads it. `npm audit` shows the same 7 moderate findings as before, none
+from pdf.js.
+
+- `src/importers/pdfjsLoader.ts` loads pdf.js only when a PDF is picked.
+  Vite builds it into a chunk of its own (444 KB, 134 KB compressed) and
+  copies its worker into the site (1.27 MB, about 378 KB compressed). The
+  worker reads the PDF in a thread of its own, from the site itself.
+- `src/importers/importPdf.ts` ports `import_pdf`: a PDF locked only
+  against printing or editing opens (pdf.js tries the empty password
+  itself), one that needs a real password gets the desktop's message, a
+  page that cannot be read is skipped. A file that is not a PDF keeps the
+  desktop's first line, "Couldn't open NAME as a PDF:", with a reason in
+  plain words.
+- `isEvalSupported`, which the research step meant to switch off, does not
+  exist in pdf.js 6: TypeScript refused it. Its source has no `eval` and no
+  `new Function` left, so there is nothing to switch off.
+- The unit tests run pdf.js in Node with its "legacy" build, in the same
+  thread. The site uses the normal build in a real worker.
+
+`fixtures/files/` has seven PDFs now (its README says how they were made).
+The fixture script records the desktop's answer for each, and the
+desktop's PDF tests with the PDFs they made. Left out: the tests that
+change the desktop's code while they run, and the ones that make an
+encrypted PDF, because pypdf encrypts with random keys, so the file is new
+on every run. The locked PDFs in `fixtures/files` stand in for those.
+
+Checked: every PDF gives exactly the desktop's answer after tidying, in
+Node and in real Chrome with the real worker: the three locked ones, the
+password one ("password-protected, so it can't be imported"), the scanned
+one ("didn't contain any readable text"), `rich.pdf`, and `long.pdf` with
+the desktop's 825,820 characters by SHA-256 (0.8 s in Chrome). Chrome made
+no request to any other address, only to the site's own files. Firefox and
+Safari come with the browser tests in step 9.
+
+Known gap, for later: PDFs in Chinese, Japanese or Korean that rely on the
+reader's own character maps (CMaps) need pdf.js's `cmaps` folder served
+with the site (169 files, 1.7 MB). Not done yet, and not tried: none of the test
+PDFs needs it. To decide with the owner.
+
+Step 8 must check that the pdf.js license notice is still at the top of the
+built chunk, as the Apache license asks. The worker file is copied as it
+is, notice included.
