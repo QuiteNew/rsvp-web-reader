@@ -22,6 +22,7 @@ const TEXT = [
 async function startReading(page: Page, text: string): Promise<void> {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Smoke test');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(text);
@@ -121,6 +122,7 @@ test('the focus letter stays on one spot', async ({ page }) => {
 test('transcripts live in their own Space', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('In General');
   await page.getByRole('button', { name: 'Create' }).click();
 

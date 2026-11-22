@@ -88,6 +88,10 @@ project.
   change the speed by 10 WPM, `R` restarts, `B` sets a bookmark, `C` centres a
   wide flash and Esc stops reading. The keys stay out of the way while you type
   and leave the browser's own keys alone
+- Add a transcript from a file: plain text, subtitles (.srt, .vtt), Markdown,
+  web pages (.html), Word (.docx) and PDF. The file is read in your browser and
+  never uploaded. A scanned PDF has no text to read, and a PDF that needs a
+  password to open can't be added
 - Export everything (transcripts, Spaces and settings) to one file and import
   one, in the same file format the desktop app uses. Reading a desktop export is
   tested against the desktop app's own code. Opening a web export in the desktop
@@ -158,10 +162,11 @@ The single steps behind `npm run check`:
 
 ## Usage
 
-1. Click **+** in the sidebar to create a new transcript - give it a title
-   and choose which Space it belongs to.
-2. Click the transcript to open it, paste in your raw transcript text, and
-   click **Start reading**.
+1. Click **+** in the sidebar and choose **Blank transcript**, or **Add from
+   file…** to start from a file. Give it a title; it goes into the current
+   Space.
+2. Paste in your raw transcript text, or look over the text from the file,
+   and click **Start reading**.
 3. Use the controls above the reader to pause, restart, jump with the
    progress slider, set bookmarks, or stop and go back to the text.
 4. Adjust speed, word size, grouping and colors for the current transcript
@@ -169,8 +174,8 @@ The single steps behind `npm run check`:
 5. Open **Settings** for new-transcript defaults, theme, and your data.
 <br>
 
-Text comes in by pasting for now. Importing PDF, Word and other files is next
-on the [Roadmap](#roadmap).
+Text from a file lands in the text box first, the same as pasted text, so you
+can read it through or tidy it with **Normalize** before you start.
 
 For what is done, what was checked and what is open, see [docs/STATUS.md](docs/STATUS.md).
 
@@ -253,6 +258,7 @@ rsvp-web-reader/
 │   │   ├── ChunkingDialog.tsx   # The chunking window
 │   │   ├── BookmarksDialog.tsx  # The bookmarks list
 │   │   ├── DataSettings.tsx     # Export and import
+│   │   ├── fileImport.ts        # Adding a transcript from a file: the picker, the heads-up
 │   │   └── fonts/               # Bundled Fredoka and Quicksand font files, with their licenses
 │   └── testing/             # Helpers shared by tests: a fake clock, fixtures, store steps
 ├── tools/
@@ -318,7 +324,8 @@ The bundled Fredoka and Quicksand fonts are each released under
 the SIL Open Font License, not the MIT license. A copy of each font's license
 sits next to the font files in [src/ui/fonts](src/ui/fonts), and the fonts are
 credited under Acknowledgments. pdf.js is released by Mozilla under the Apache
-License 2.0, and its license notice is kept at the top of its files. The MIT
+License 2.0. The build writes the licenses of every library built into the
+site to `third-party-licenses.md`, next to the site's own files. The MIT
 license covers the project's own code.
 
 ## Acknowledgments

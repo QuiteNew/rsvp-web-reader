@@ -65,6 +65,7 @@ function answerDialog(value: string, button = 'Create'): void {
 
 function addTranscript(title: string): void {
   press('Add transcript');
+  press('Blank transcript');
   answerDialog(title);
 }
 
@@ -145,6 +146,7 @@ describe('transcripts', () => {
   test('a transcript needs a title', () => {
     renderPage();
     press('Add transcript');
+    press('Blank transcript');
     answerDialog('   ');
     expect(screen.getByRole('dialog')).toBeVisible();
     expect(titles()).toEqual([]);
@@ -153,6 +155,7 @@ describe('transcripts', () => {
   test('Cancel adds nothing', () => {
     renderPage();
     press('Add transcript');
+    press('Blank transcript');
     answerDialog('Notes', 'Cancel');
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(titles()).toEqual([]);
@@ -196,6 +199,112 @@ describe('transcripts', () => {
     expect(titles()).toEqual([]);
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('RSVP Web Reader');
     expect(screen.queryByLabelText('Transcript text')).toBeNull();
+  });
+});
+
+// Adding a transcript from a file. The browser's file picker cannot be
+// driven from a test, so these hand the picked file to the page's file
+// input, as the picker does.
+function pickFile(file: File): void {
+  const input = document.querySelector('input[type="file"]');
+  if (!(input instanceof HTMLInputElement)) throw new Error('no file input on the page');
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
+describe('adding from a file', () => {
+  test('the add button offers a blank transcript or a file, as on the desktop', () => {
+    renderPage();
+    press('Add transcript');
+    const dialog = screen.getByRole('dialog', { name: 'Add Transcript' });
+    expect(within(dialog).getByText('How would you like to add a transcript?')).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Blank transcript' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Add from file…' })).toBeVisible();
+    press('Add from file…');
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  test('the file picker offers every type the desktop imports', () => {
+    renderPage();
+    const input = document.querySelector('input[type="file"]');
+    expect(input?.getAttribute('accept')).toBe(
+      '.docx,.htm,.html,.markdown,.md,.pdf,.srt,.txt,.vtt',
+    );
+  });
+
+  test('a picked file becomes a new transcript, as text to read through first', async () => {
+    renderPage();
+    pickFile(new File(['  First line.\r\n\r\n\r\nSecond line.'], 'My notes.txt'));
+    expect(screen.getByRole('dialog', { name: 'Importing' })).toHaveTextContent(
+      'Importing “My notes.txt”…',
+    );
+    const dialog = await screen.findByRole('dialog', { name: 'Add Transcript from File' });
+    expect(within(dialog).getByRole('textbox')).toHaveValue('My notes');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    expect(titles()).toEqual(['My notes']);
+    expect(screen.getByLabelText('Transcript text')).toHaveValue('First line.\n\nSecond line.');
+    expect(screen.getByRole('button', { name: 'Start reading' })).toBeVisible();
+  });
+
+  test('the title can be changed before the transcript is added', async () => {
+    renderPage();
+    pickFile(new File(['Some words.'], 'talk.srt'));
+    await screen.findByRole('dialog', { name: 'Add Transcript from File' });
+    answerDialog('Monday talk');
+    expect(titles()).toEqual(['Monday talk']);
+  });
+
+  test('Cancel adds nothing', async () => {
+    renderPage();
+    pickFile(new File(['Some words.'], 'notes.txt'));
+    await screen.findByRole('dialog', { name: 'Add Transcript from File' });
+    press('Cancel');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(titles()).toEqual([]);
+  });
+
+  test('a file that cannot be added says why, and adds nothing', async () => {
+    renderPage();
+    pickFile(new File(['x'], 'photo.jpg'));
+    const dialog = await screen.findByRole('dialog', { name: "Couldn't add that file" });
+    expect(dialog).toHaveTextContent('Unsupported file type: .jpg');
+    press('OK');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(titles()).toEqual([]);
+  });
+
+  test('an empty file says it has no readable text', async () => {
+    renderPage();
+    pickFile(new File([' \n '], 'empty.txt'));
+    const dialog = await screen.findByRole('dialog', { name: "Couldn't add that file" });
+    expect(dialog).toHaveTextContent("empty.txt didn't contain any readable text.");
+  });
+
+  test('a very long file gets a heads-up, and can still be added', async () => {
+    renderPage();
+    pickFile(new File([Array.from({ length: 30_001 }, () => 'word').join(' ')], 'book.txt'));
+    const dialog = await screen.findByRole('dialog', { name: 'Add Transcript from File' });
+    expect(dialog).toHaveTextContent('Heads up: this file is about 30,001 words long.');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
+    expect(titles()).toEqual(['book']);
+  });
+
+  test('no heads-up at 30,000 words', async () => {
+    renderPage();
+    pickFile(new File([Array.from({ length: 30_000 }, () => 'word').join(' ')], 'book.txt'));
+    const dialog = await screen.findByRole('dialog', { name: 'Add Transcript from File' });
+    expect(dialog).not.toHaveTextContent('Heads up');
+  });
+
+  test('closing the Importing notice drops that file', async () => {
+    renderPage();
+    pickFile(new File(['Some words.'], 'notes.txt'));
+    press('Close');
+    // Let the import finish in the background.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(titles()).toEqual([]);
   });
 });
 
@@ -526,6 +635,7 @@ describe('saving', () => {
   test('adding a transcript and typing its text are written', async () => {
     const { store, persistence } = renderPage();
     press('Add transcript');
+    press('Blank transcript');
     answerDialog('Lecture');
     fireEvent.change(screen.getByLabelText('Transcript text'), { target: { value: 'some words' } });
     await act(() => store.flush());
@@ -599,6 +709,7 @@ describe('saving', () => {
     render(<App store={store} settings={savedSettings()} />);
     expect((await screen.findByRole('alert')).textContent).toContain('not letting the app save');
     press('Add transcript');
+    press('Blank transcript');
     answerDialog('Lecture');
     expect(screen.getByRole('button', { name: 'Lecture' })).toBeTruthy();
   });
@@ -614,6 +725,7 @@ describe('saving', () => {
     );
     expect(requestPersistence).not.toHaveBeenCalled();
     press('Add transcript');
+    press('Blank transcript');
     answerDialog('Lecture');
     expect(requestPersistence).toHaveBeenCalledTimes(1);
   });
@@ -827,6 +939,7 @@ describe('coming back after a reload', () => {
 
   function addAndType(title: string, text: string): void {
     press('Add transcript');
+    press('Blank transcript');
     answerDialog(title);
     fireEvent.change(screen.getByLabelText('Transcript text'), { target: { value: text } });
   }

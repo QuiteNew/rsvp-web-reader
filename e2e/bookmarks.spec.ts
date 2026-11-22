@@ -12,6 +12,7 @@ const TEXT = Array.from({ length: 21 }, (_, index) => `w${index}`).join(' ');
 async function startPaused(page: Page): Promise<void> {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Marked');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(TEXT);

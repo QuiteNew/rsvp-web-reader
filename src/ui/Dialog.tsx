@@ -63,10 +63,22 @@ interface NameDialogProps {
   readonly onClose: () => void;
   // Returns a message when the name is refused, or null when it was taken.
   readonly onSubmit: (name: string) => string | null;
+  // The name to start with, such as an imported file's name.
+  readonly initialValue?: string;
+  // A word of caution under the name, such as for a very long file.
+  readonly warning?: string;
 }
 
 // A dialog that asks for one name: a new Space, or a new transcript's title.
-export function NameDialog({ title, label, confirm, onClose, onSubmit }: NameDialogProps) {
+export function NameDialog({
+  title,
+  label,
+  confirm,
+  onClose,
+  onSubmit,
+  initialValue = '',
+  warning,
+}: NameDialogProps) {
   const inputId = useId();
   return (
     <Dialog title={title} onClose={onClose}>
@@ -89,10 +101,12 @@ export function NameDialog({ title, label, confirm, onClose, onSubmit }: NameDia
           className={styles.input}
           autoFocus
           autoComplete="off"
+          defaultValue={initialValue}
           onInput={(event) => {
             event.currentTarget.setCustomValidity('');
           }}
         />
+        {warning !== undefined && <p className={styles.warning}>{warning}</p>}
         <div className={styles.buttons}>
           <button type="button" className={styles.action} onClick={onClose}>
             Cancel
@@ -102,6 +116,27 @@ export function NameDialog({ title, label, confirm, onClose, onSubmit }: NameDia
           </button>
         </div>
       </form>
+    </Dialog>
+  );
+}
+
+interface MessageDialogProps {
+  readonly title: string;
+  readonly message: string;
+  readonly onClose: () => void;
+}
+
+// A message and an OK button, like the desktop's MessageDialog. Line breaks
+// in the message are kept, so a reason can stand in a paragraph of its own.
+export function MessageDialog({ title, message, onClose }: MessageDialogProps) {
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <p className={styles.message}>{message}</p>
+      <div className={`${styles.buttons} ${styles.alone}`}>
+        <button type="button" className={styles.action} autoFocus onClick={onClose}>
+          OK
+        </button>
+      </div>
     </Dialog>
   );
 }

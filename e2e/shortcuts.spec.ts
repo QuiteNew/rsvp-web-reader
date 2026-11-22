@@ -10,6 +10,7 @@ const TEXT = Array.from({ length: 300 }, (_, index) => `w${index}`).join(' ');
 async function startReading(page: Page): Promise<void> {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Keys');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(TEXT);
@@ -57,6 +58,7 @@ test('Space on a focused button presses the button and nothing more', async ({ p
 test('typing in the text box is left alone', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Typed');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').click();

@@ -10,6 +10,7 @@ const SHORT = Array.from({ length: 40 }, (_, index) => `w${index}`).join(' ');
 async function startPaused(page: Page, text: string): Promise<void> {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Wide');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(text);

@@ -39,6 +39,8 @@
      colours, not the palette). */
   --scroll-thumb: #8c8c8c;
   --scroll-thumb-hover: #6e6e6e;
+  /* A word of caution: the desktop's red (#A33636), 5.9 to 1 on paper. */
+  --warning: #a33636;
 
   --font-heading: 'Fredoka', system-ui, sans-serif;
   --font-body: 'Quicksand', system-ui, sans-serif;
@@ -54,7 +56,8 @@
 /* The dark theme: the page sets data-theme="dark" on the html element, for
    Dark, or for System when the browser prefers dark. The names on the left
    are the palette's: paper is hearth_paper, ink is cocoa_ink, and so on. The
-   last six are not in the desktop's palette, they are made from it. */
+   six before --warning are not in the desktop's palette, they are made from
+   it. */
 :root[data-theme='dark'] {
   --paper: #1d1712;
   --ink: #f2e8dc;
@@ -73,6 +76,9 @@
   --card: #261e16;
   --card-current: #3a2a1a;
   --text-box: #241d17;
+  /* The desktop keeps its red in Dark too, where it is hard to read (2.7 to
+     1 on this paper). A lighter red of the same kind, at 6.0 to 1. */
+  --warning: #e0786c;
 
   color-scheme: dark;
 }

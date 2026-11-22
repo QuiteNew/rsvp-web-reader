@@ -10,6 +10,7 @@ import { letTheClickSettle } from './helpers.js';
 test('Space works straight after a click on the footer', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Keys');
   await page.getByLabel('Transcript title').press('Enter');
   await page

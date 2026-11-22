@@ -26,10 +26,11 @@ import type { ChunkingChoice, StorageHealth } from '../store/contract';
 import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './App.module.css';
-import { Dialog, NameDialog } from './Dialog';
+import { Dialog, MessageDialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { BookmarksDialog } from './BookmarksDialog';
 import { ChunkingDialog } from './ChunkingDialog';
+import { IMPORT_ACCEPT, largeImportWarning, readPickedFile } from './fileImport';
 import {
   BookmarkIcon,
   NormalizeIcon,
@@ -106,7 +107,16 @@ const WPM_STEP = WPM_KEY_STEP;
 
 type OpenDialog =
   | { readonly kind: 'none' }
+  | { readonly kind: 'addChoice' }
   | { readonly kind: 'addTranscript' }
+  | { readonly kind: 'importing'; readonly name: string }
+  | { readonly kind: 'importFailed'; readonly message: string }
+  | {
+      readonly kind: 'addImported';
+      readonly title: string;
+      readonly text: string;
+      readonly warning: string | undefined;
+    }
   | { readonly kind: 'newSpace' }
   | { readonly kind: 'spaces' }
   | { readonly kind: 'settings' }
@@ -328,6 +338,57 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     setDialog(NO_DIALOG);
   }
 
+  // A new transcript in the current Space, with what Settings holds for a
+  // new transcript, opened as text to edit. Text from a file goes into the
+  // text box as if it had been pasted, so it is read through first and
+  // started when the reader chooses, as on the desktop.
+  function addTranscript(title: string, text = '') {
+    const added = store.addTranscript({
+      title,
+      space,
+      wpm: preferences.defaultWpm,
+      fontColor: themeFont,
+      highlightColor: themeHighlight,
+      backgroundColor: themeBackground,
+      fontSize: preferences.defaultFontSize,
+      chunkingEnabled: preferences.defaultChunkingEnabled,
+      chunkSize: preferences.defaultChunkSize,
+      chunkMode: preferences.defaultChunkMode,
+      chunkCharTarget: preferences.defaultChunkCharTarget,
+    });
+    if (text !== '') store.setText(added.id, text);
+    store.setStopped(added.id, true);
+    open(added.id);
+    // Now there is something to lose, so ask the browser to keep it.
+    void health?.requestPersistence();
+  }
+
+  // The file picker. It is an <input> that is always on the page but never
+  // seen, because "Add from file..." has to open it straight from its click:
+  // a browser only opens a file picker as the direct answer to a click.
+  const filePicker = useRef<HTMLInputElement>(null);
+  // Counts the imports started. Closing the Importing notice counts as
+  // one more, so the answer for the file that was dropped is not shown.
+  const importRun = useRef(0);
+
+  async function importPicked(file: File) {
+    importRun.current += 1;
+    const run = importRun.current;
+    setDialog({ kind: 'importing', name: file.name });
+    const result = await readPickedFile(file);
+    if (run !== importRun.current) return;
+    if (result.kind === 'error') {
+      setDialog({ kind: 'importFailed', message: result.message });
+    } else {
+      setDialog({
+        kind: 'addImported',
+        title: result.title,
+        text: result.text,
+        warning: largeImportWarning(result.text),
+      });
+    }
+  }
+
   // Everything that leaves the open transcript goes through here, so a
   // session never keeps running behind another transcript.
   //
@@ -504,7 +565,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
         space={space}
         onSelect={open}
         onAdd={() => {
-          setDialog({ kind: 'addTranscript' });
+          setDialog({ kind: 'addChoice' });
         }}
         onDelete={(transcript) => {
           setDialog({ kind: 'deleteTranscript', transcript });
@@ -907,6 +968,48 @@ export function App({ store, settings, health, ...parts }: AppProps) {
         </div>
       </main>
 
+      <input
+        ref={filePicker}
+        type="file"
+        accept={IMPORT_ACCEPT}
+        className={dialogStyles.unseen}
+        tabIndex={-1}
+        aria-hidden="true"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          // Emptied, so picking the same file again is still a change.
+          event.currentTarget.value = '';
+          if (file !== undefined) void importPicked(file);
+        }}
+      />
+
+      {dialog.kind === 'addChoice' && (
+        <Dialog title="Add Transcript" onClose={closeDialog}>
+          <p className={dialogStyles.note}>How would you like to add a transcript?</p>
+          <div className={dialogStyles.choices}>
+            <button
+              type="button"
+              className={dialogStyles.action}
+              onClick={() => {
+                setDialog({ kind: 'addTranscript' });
+              }}
+            >
+              Blank transcript
+            </button>
+            <button
+              type="button"
+              className={dialogStyles.action}
+              onClick={() => {
+                closeDialog();
+                filePicker.current?.click();
+              }}
+            >
+              Add from file…
+            </button>
+          </div>
+        </Dialog>
+      )}
+
       {dialog.kind === 'addTranscript' && (
         <NameDialog
           title="Add Transcript"
@@ -916,25 +1019,47 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           onSubmit={(name) => {
             const title = name.trim();
             if (title === '') return 'Give the transcript a title.';
-            // A new transcript starts as text to edit, not in the reader.
-            // It gets what Settings holds for a new transcript.
-            const added = store.addTranscript({
-              title,
-              space,
-              wpm: preferences.defaultWpm,
-              fontColor: themeFont,
-              highlightColor: themeHighlight,
-              backgroundColor: themeBackground,
-              fontSize: preferences.defaultFontSize,
-              chunkingEnabled: preferences.defaultChunkingEnabled,
-              chunkSize: preferences.defaultChunkSize,
-              chunkMode: preferences.defaultChunkMode,
-              chunkCharTarget: preferences.defaultChunkCharTarget,
-            });
-            store.setStopped(added.id, true);
-            open(added.id);
-            // Now there is something to lose, so ask the browser to keep it.
-            void health?.requestPersistence();
+            addTranscript(title);
+            return null;
+          }}
+        />
+      )}
+
+      {dialog.kind === 'importing' && (
+        <Dialog
+          title="Importing"
+          onClose={() => {
+            // Not a stop: the reading may go on, but its answer is dropped.
+            importRun.current += 1;
+            closeDialog();
+          }}
+        >
+          <p className={dialogStyles.message} role="status">
+            Importing “{dialog.name}”…{'\n\n'}This can take a moment for large files.
+          </p>
+        </Dialog>
+      )}
+
+      {dialog.kind === 'importFailed' && (
+        <MessageDialog
+          title="Couldn't add that file"
+          message={dialog.message}
+          onClose={closeDialog}
+        />
+      )}
+
+      {dialog.kind === 'addImported' && (
+        <NameDialog
+          title="Add Transcript from File"
+          label="Transcript title"
+          confirm="Create"
+          initialValue={dialog.title}
+          warning={dialog.warning}
+          onClose={closeDialog}
+          onSubmit={(name) => {
+            const title = name.trim();
+            if (title === '') return 'Give the transcript a title.';
+            addTranscript(title, dialog.text);
             return null;
           }}
         />

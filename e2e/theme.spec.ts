@@ -39,6 +39,7 @@ test('a transcript read in Dark shows the dark reading colours', async ({ page }
   await page.goto('./');
   await pickAppearance(page, 'Dark');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Night');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill('one two three');

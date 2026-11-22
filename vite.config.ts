@@ -9,6 +9,13 @@ const BASE_PATH = '/rsvp-web-reader/';
 export default defineConfig({
   base: BASE_PATH,
   plugins: [react()],
+  build: {
+    // The licenses of the libraries built into the site, in one file next to
+    // it. The minifier drops the notice at the top of pdf.js's code, and its
+    // Apache license asks for a copy to go with it. Named without a leading
+    // dot (the default is .vite/license.md), so it is an ordinary file.
+    license: { fileName: 'third-party-licenses.md' },
+  },
   test: {
     // Three groups of tests. The logic layers run in plain Node, which is
     // fast and proves they need no browser. The importers and the React

@@ -14,6 +14,7 @@ function card(page: Page, title: string) {
 
 async function addTranscript(page: Page, title: string, text: string): Promise<void> {
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill(title);
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(text);

@@ -28,6 +28,7 @@ const SAVED_TRANSCRIPT = `new Promise((resolve) => {
 test('Normalize tidies the text, and Revert is still there after a reload', async ({ page }) => {
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
+  await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Lecture');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(WRAPPED);

@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 to 7 of the plan done, below     |
+| 5. Build                     | Steps 2 to 8 of the plan done, below     |
 
 ## Step 1: what the desktop app does
 
@@ -539,3 +539,62 @@ PDFs needs it. To decide with the owner.
 Step 8 must check that the pdf.js license notice is still at the top of the
 built chunk, as the Apache license asks. The worker file is copied as it
 is, notice included.
+
+### Build step 8: the screen (2026-11-22)
+
+The flow is the desktop's (`_handle_add_from_file_requested` and its
+dialogs):
+
+1. **+** opens "Add Transcript": "How would you like to add a transcript?",
+   with **Blank transcript** and **Add from file…**. Escape closes it, and
+   neither choice is focused first, as on the desktop.
+2. **Add from file…** opens the browser's file picker, offering the nine
+   types the desktop imports. The picker is an `<input type="file">` that is
+   always on the page and never seen, because a browser opens a picker only
+   as the direct answer to a click.
+3. "Importing “NAME”…" shows while the file is read. The importers, and
+   pdf.js behind them, are loaded only now (`import()`).
+4. A failure shows the importer's message under "Couldn't add that file",
+   with OK.
+5. Otherwise "Add Transcript from File" asks for the title, filled in with
+   the file name without its extension. Above 30,000 words it adds a
+   heads-up. **Create** adds the transcript to the current Space with the
+   text in its text box, as if pasted, so it is read through first.
+
+Differences from the desktop, all small, for the owner to look at:
+
+- The Importing notice does not say "the app won't respond until it's
+  done", because the page keeps answering (PDF is read in a worker). It can
+  be closed, and closing it drops that file.
+- The heads-up keeps the desktop's threshold but not its claim that very
+  large transcripts "have been known to crash RSVP Reader", which is about
+  the desktop app. It says they can be slow to work with. Tried in Chrome
+  with the 150,000-word files: importing took 0.4 s (Word) and 1.2 s (PDF),
+  adding 0.5 s, starting to read 0.45 s, a reload back to the word 0.4 s.
+  Owner to decide: keep this wording, use the desktop's, or drop it.
+- The warning's red is the desktop's #A33636 in Light. In Dark it is
+  #E0786C instead, because the desktop red is hard to read on dark paper
+  (2.7 to 1; this is 6.0 to 1). Kept as `--warning` in global.css.
+- The web app's Add Transcript dialog still has no Space chooser (it was
+  like that before this step); the transcript goes into the current Space.
+
+Also in this step:
+
+- The build writes `third-party-licenses.md` next to the site (Vite's
+  `build.license`). The minifier drops the license notice at the top of
+  pdf.js's code, and the Apache license asks for a copy to go with it.
+- `package.json` had `"pdfjs-dist": "^6.5.438"` in the step 7 commit, not
+  the exact version step 7 meant. Put back to `6.5.438`, in
+  `package-lock.json` too. A dry run of `npm ci` accepted it.
+- Every place in the tests that adds a transcript now clicks **Blank
+  transcript** after **+**: 14 in `e2e/` and 7 in `App.test.tsx`.
+- New App tests: the two choices, the picker's types, a file through to a
+  transcript, changing the title, Cancel, an unsupported file, an empty
+  file, the heads-up at 30,001 words and not at 30,000, and closing the
+  Importing notice. Dropping the check that ignores a closed notice's
+  answer made the last one fail.
+
+Run in Chrome: the whole e2e suite (42 tests), and the import flow by hand
+through a throwaway test with the files in `fixtures/files`, which asked for
+nothing outside the site. The browser tests for importing, in all three
+browsers, are step 9.
