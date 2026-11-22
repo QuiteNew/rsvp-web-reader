@@ -1,8 +1,8 @@
 # Phase 7: offline and polish
 
-Install and offline use, accessibility, browser checks, a help page, and the
-release after `v1.0.0`. The first release, `v1.0.0`, was decided at the end of
-phase 4 (see "The first release" in STATUS.md).
+Install and offline use, accessibility, browser checks, a help page, and a
+release of its own. The first release, `v1.0.0`, came at the end of phase 4,
+and `v1.1.0` at the end of phase 5 (see STATUS.md).
 
 ## Ask the owner first
 
@@ -60,5 +60,5 @@ copying with bold.
 ## Done when
 
 The site installs, reads offline, passes the checks in three browsers, and
-the owner has tagged the next release (`v1.1.0`, or whatever the owner
-chooses).
+the owner has tagged the release for it (the one after phase 6's, or
+whatever the owner chooses).

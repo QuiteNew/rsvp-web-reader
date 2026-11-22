@@ -1,9 +1,9 @@
 # Phase 5 progress: importing files
 
 Where phase 5 stands, so the work can carry on after a break. The plan is
-[phase-5.md](phase-5.md). The research and tests are done, and the owner
-decided on 2026-11-18 (step 4). Nothing is installed yet: the build plan is
-step 5, one small commit at a time.
+[phase-5.md](phase-5.md). Done: researched, decided by the owner on
+2026-11-18 (step 4), built in nine small commits (step 5), and called done
+by the owner on 2026-11-22. Released as `v1.1.0`.
 
 The owner confirmed phase 4 on 2026-11-17 ("It's good").
 
@@ -13,7 +13,7 @@ The owner confirmed phase 4 on 2026-11-17 ("It's good").
 | 2. Research, with facts      | Done, below                              |
 | 3. Test on real files        | Done on made test files in Chrome, below |
 | 4. The owner decides         | Done on 2026-11-18, below                |
-| 5. Build                     | Steps 2 to 8 of the plan done, below     |
+| 5. Build                     | Done, all nine steps, below              |
 
 ## Step 1: what the desktop app does
 
@@ -598,3 +598,43 @@ Run in Chrome: the whole e2e suite (42 tests), and the import flow by hand
 through a throwaway test with the files in `fixtures/files`, which asked for
 nothing outside the site. The browser tests for importing, in all three
 browsers, are step 9.
+
+### Build step 9: the browser tests (2026-11-22)
+
+`e2e/import.spec.ts`, nine tests, in Chromium, Firefox and WebKit. Each
+import goes the way a person goes: **+**, **Add from file…**, the browser's
+file picker, **Create**. Where the web app reads the same as the desktop,
+the expected text is the desktop's, from `fixtures/core/importers.json`.
+
+- The title offered is the file name, and the transcript opens as text.
+- `.srt`, `.vtt`, Markdown, and an old Windows-1252 text file.
+- A web page with a named encoding, and one without (read as UTF-8).
+- `rich.docx`: every line of the desktop's text, in order, plus the table
+  cells, the text box and the footnote.
+- `rich.pdf` and the three locked PDFs: exactly the desktop's text.
+- The password PDF and the scanned PDF: the desktop's messages.
+- A `.jpg`: "Unsupported file type: .jpg".
+- `long.docx` and `long.pdf`: the heads-up, then exactly the desktop's text,
+  by SHA-256 and length.
+- pdf.js is not fetched when the page loads, nor for a text file, only for
+  a PDF; and nothing is asked of any other address.
+
+Run here in Chrome only: the new tests three times over, twice each, all
+passing, and the whole suite (51 tests). Firefox and WebKit are the owner's
+`npm run e2e` and the release workflow, which runs all three browsers
+before it makes the draft.
+
+## Left open after phase 5
+
+For the owner, none of them blocking:
+
+1. The heads-up above 30,000 words: keep the web wording ("can be slow to
+   work with"), use the desktop's ("have been known to crash"), or drop it.
+2. The desktop bug the HTML import copies (text right after a dropped
+   `<script>` or `<style>` is lost): keep copying it, or keep the text as a
+   written difference. And the desktop crash on a control character inside
+   an HTML block, which the web app does not have.
+3. PDFs in Chinese, Japanese or Korean that need pdf.js's character maps
+   (169 files, 1.7 MB). Not shipped, not tried.
+4. Real files from the owner, to try PDF and Word beyond the made ones.
+5. A link to `third-party-licenses.md` from Settings, next to the license.

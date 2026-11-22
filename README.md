@@ -312,7 +312,7 @@ Settings are organized into three tabs, and changes take effect when you press *
 - ~~The reading session and the first screen~~
 - ~~Saved data in the browser, with export and import~~
 - ~~The reading experience: guide marks, surrounding words, progress slider, bookmarks, chunking, keyboard shortcuts, themes, fitting wide flashes~~
-- Importing files (PDF, Word, HTML and subtitles), read in the browser only
+- ~~Importing files (PDF, Word, HTML, subtitles and Markdown), read in the browser only~~
 - Comfort features: reading profiles, letter spacing, a dyslexia-friendly font, bold word starts, speaker cues
 - Offline use and installing as an app, accessibility, and a help page
 

@@ -3,13 +3,12 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-18. Phases 0 to 4 are done (phase 4 confirmed by
-the owner on 2026-11-17). The first release, `v1.0.0`, is out: tagged by
+Last updated: 2026-11-22. Phases 0 to 5 are done (phase 5 called done by
+the owner on 2026-11-22). The first release, `v1.0.0`, is out: tagged by
 the owner on 2026-11-18 on `aebce68`, after the release workflow's dry run
-passed. See "The first release" below for what it does not have. Phase 5
-is researched and decided: the owner chose on 2026-11-18, and
-[handoff/phase-5-progress.md](handoff/phase-5-progress.md) has the
-decisions and the build plan. Nothing is built or installed for it yet.
+passed. `v1.1.0` adds importing files and is prepared, waiting for the
+owner's tag. See "The first release" and "Version 1.1.0" below for what
+each has and does not have. Phase 6 is next.
 
 ## Phases
 
@@ -20,7 +19,7 @@ decisions and the build plan. Nothing is built or installed for it yet.
 | 2     | The reading session and a first screen | Done. The owner tried it. The desktop tests for `speakers` and `reader` are ported. The page also has the desktop layout                                                                                                                                                                                                                                                                |
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
-| 5     | Importing files                        | Decided on 2026-11-18: pdf.js for PDF, own code for Word, `.vtt` and Markdown too. Building next. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md)                                                                                                                                                                                                                        |
+| 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
 | 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
@@ -442,6 +441,29 @@ What 1.0.0 does not have, written down so nobody assumes it does:
   way round has not been tried either.
 - The 7 `npm audit` findings and Dependabot's first pull request are still
   not looked at.
+
+## Version 1.1.0
+
+Prepared on 2026-11-22, at the end of phase 5: `APP_VERSION`, `package.json`
+and `package-lock.json` at 1.1.0. A new feature bumps the minor number, as
+RELEASING.md says. The tag is the owner's to push, after the dry run.
+
+What it adds: a transcript from a file, with **+** then **Add from file…**.
+Plain text, `.srt` and `.vtt` subtitles, Markdown, web pages, Word and PDF,
+read in the browser and never uploaded. pdf.js is loaded only when a PDF is
+picked. The written differences from the desktop are in
+[handoff/phase-5-progress.md](handoff/phase-5-progress.md): Windows-1252 for
+old text files, UTF-8 for web pages that name no encoding, and Word files
+read with their tables, text boxes and footnotes.
+
+What it still does not have, besides the list for 1.0.0 above (file import
+aside):
+
+- No text from a scanned PDF, which would need OCR, and no PDF that needs a
+  password to open. Both are refused with the desktop's messages.
+- No headers and footers from Word files, as on the desktop.
+- No character maps for PDFs in Chinese, Japanese or Korean that need them.
+- The open questions at the end of phase-5-progress.md.
 
 ## Decisions
 
