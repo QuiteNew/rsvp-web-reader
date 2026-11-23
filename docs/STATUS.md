@@ -10,8 +10,11 @@ is out too: tagged on `74b3323`. See "The first release" and "Version
 1.1.0" below for what each has and does not have. Phase 6 has started:
 [handoff/phase-6-progress.md](handoff/phase-6-progress.md) has what the
 desktop app does, what its design notes add, the plan, and each feature as
-it is built. Phase 6 will be released once, at its end, as `v1.2.0`: it
-adds features and breaks nothing, so it is a minor version.
+it is built. Phase 6 is released in four minor versions, as the owner set
+on 2026-11-23: `v1.2.0` letter spacing (prepared, see "Version 1.2.0"
+below), `v1.3.0` the OpenDyslexic font and bold word starts, `v1.4.0`
+reading profiles, `v1.5.0` speaker cues and the HTML import fix. Each adds
+features and breaks nothing, so none is a major version.
 
 ## Phases
 
@@ -23,7 +26,7 @@ adds features and breaks nothing, so it is a minor version.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing built, waiting for the owner's eye check. To be released as 1.2.0. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                         |
+| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing built and prepared as 1.2.0. Then 1.3.0, 1.4.0 and 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                     |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
@@ -468,24 +471,53 @@ aside):
 - No character maps for PDFs in Chinese, Japanese or Korean that need them.
 - The open questions at the end of phase-5-progress.md.
 
+## Version 1.2.0
+
+Prepared on 2026-11-23, the first of the four phase 6 releases:
+`APP_VERSION`, `package.json` and `package-lock.json` at 1.2.0.
+
+What it adds:
+
+- Letter spacing, on the Appearance tab of Settings: Off, Small, Medium
+  and Large, as on the desktop. The highlighted letter stays on its spot,
+  and between the words of a chunk the room is the larger of the plain
+  space and twice the letter gap. Saved with the other settings.
+- The flashing word and the surrounding words are drawn in Fredoka
+  SemiBold, the desktop's font for them. Up to 1.1.0 they were in
+  Quicksand, the font of the rest of the page.
+
+How it was checked: the level table against fixtures from the desktop
+code, and the spacing measured on screen by the browser tests in Chromium,
+Firefox and WebKit. The look next to the desktop app is the owner's eye
+check, which the assistant cannot do.
+
+What it still does not have, besides the lists for 1.0.0 and 1.1.0 above:
+
+- The rest of phase 6: the OpenDyslexic font, bold word starts, reading
+  profiles and speaker cues.
+- The desktop's note under Letter spacing also says the level is saved in
+  reading profiles. That part waits for profiles.
+- The HTML import fix that phase 5 left open.
+
 ## Decisions
 
-| Decision                           | Answer                                                                                                                                            |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| React or Svelte                    | React                                                                                                                                             |
-| First public version               | The page is public from phase 0, marked as early. Announce after phase 4. Decided: `v1.0.0` at the end of phase 4, the owner's call on 2026-11-17 |
-| Hosting                            | GitHub Pages first. A custom domain later, before phase 7 if at all                                                                               |
-| Desktop bundle compatibility       | Promise reading desktop bundles (transcripts, Spaces, positions, bookmarks). Settings and writing bundles back are extras. Confirm in phase 3     |
-| Detached window                    | Not now                                                                                                                                           |
-| File import                        | Decided on 2026-11-18, client-side only: pdf.js for PDF, own code for Word, HTML and text. See phase-5-progress.md                                |
-| TypeScript version                 | Pinned to 6.0.3. typescript-eslint 8.72 does not accept TypeScript 7                                                                              |
-| `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                         |
-| Playwright                         | Starts in phase 2, when there is a real screen                                                                                                    |
-| Release guard (tag equals version) | Built with `v1.0.0`: `release.yml`, and a test for a version behind the newest tag                                                                |
-| Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                                   |
-| Importing files                    | A fifth layer, `src/importers`, for the parts that need the browser. It imports `src/core` only, ESLint enforces it. Added in phase 5, step 4     |
-| Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                          |
-| Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                          |
+| Decision                           | Answer                                                                                                                                                                                          |
+| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| React or Svelte                    | React                                                                                                                                                                                           |
+| First public version               | The page is public from phase 0, marked as early. Announce after phase 4. Decided: `v1.0.0` at the end of phase 4, the owner's call on 2026-11-17                                               |
+| Hosting                            | GitHub Pages first. A custom domain later, before phase 7 if at all                                                                                                                             |
+| Desktop bundle compatibility       | Promise reading desktop bundles (transcripts, Spaces, positions, bookmarks). Settings and writing bundles back are extras. Confirm in phase 3                                                   |
+| Detached window                    | Not now                                                                                                                                                                                         |
+| File import                        | Decided on 2026-11-18, client-side only: pdf.js for PDF, own code for Word, HTML and text. See phase-5-progress.md                                                                              |
+| TypeScript version                 | Pinned to 6.0.3. typescript-eslint 8.72 does not accept TypeScript 7                                                                                                                            |
+| `package-lock.json`                | Written by npm, not by hand. It is the one file not reviewed line by line                                                                                                                       |
+| Playwright                         | Starts in phase 2, when there is a real screen                                                                                                                                                  |
+| Release guard (tag equals version) | Built with `v1.0.0`: `release.yml`, and a test for a version behind the newest tag                                                                                                              |
+| Where the library rules live       | In `src/core` as pure functions with fixtures. `src/store` only saves and loads                                                                                                                 |
+| Importing files                    | A fifth layer, `src/importers`, for the parts that need the browser. It imports `src/core` only, ESLint enforces it. Added in phase 5, step 4                                                   |
+| Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                                                                        |
+| Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                                                                        |
+| Phase 6 releases                   | Four minor versions, the owner's call on 2026-11-23: 1.2.0 letter spacing, 1.3.0 the OpenDyslexic font and bold word starts, 1.4.0 reading profiles, 1.5.0 speaker cues and the HTML import fix |
 
 ## Versions in use
 

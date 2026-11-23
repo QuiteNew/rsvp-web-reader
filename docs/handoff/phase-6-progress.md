@@ -8,7 +8,7 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 | -------------------------------------- | ----------------------------------------- |
 | 1. What the desktop app does, and plan | Done, below                               |
 | 2. Design notes from the owner         | Done on 2026-11-23, below                 |
-| 3. Build, one feature at a time        | 1 of 6 built (letter spacing), below      |
+| 3. Build, one feature at a time        | 1 of 6 built (letter spacing), in 1.2.0   |
 | 4. The owner tries each feature        | Letter spacing is waiting for the owner   |
 | 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own |
 
@@ -100,22 +100,25 @@ set in their own window from the Defaults tab.
 
 One feature at a time, each in small commits, each shown to the owner
 before the next. The order puts the small, settled ones first, and
-profiles after the settings they hold have a screen:
+profiles after the settings they hold have a screen. On 2026-11-23 the
+owner set a release after each group (see the end of step 2), and bold
+word starts moved before profiles to go out with the font in 1.3.0:
 
-1. **Letter spacing.** The level table, the CSS spacing, the eye check of
-   the focus letter next to the desktop, the Appearance tab control.
-2. **The OpenDyslexic font.** The two files and the license, the switch on
-   the Appearance tab, applied at once.
-3. **Reading profiles.** The port with fixtures and the three desktop test
-   files, the `profiles` field settled, then the Profiles tab.
-4. **Bold word starts.** The port of `bold_starts.py` with fixtures. Then
-   the display and copying choices for the owner, with their costs, before
-   any screen work.
-5. **Speaker cues.** The chime maths with fixtures, the sound (the
+1. **Letter spacing** (1.2.0). The level table, the CSS spacing, the eye
+   check of the focus letter next to the desktop, the Appearance tab
+   control.
+2. **The OpenDyslexic font** (1.3.0). The two files and the license, the
+   switch on the Appearance tab, applied at once.
+3. **Bold word starts** (1.3.0). The port of `bold_starts.py` with
+   fixtures. Then the display and copying choices for the owner, with
+   their costs, before any screen work.
+4. **Reading profiles** (1.4.0). The port with fixtures and the three
+   desktop test files, the `profiles` field settled, then the Profiles tab.
+5. **Speaker cues** (1.5.0). The chime maths with fixtures, the sound (the
    recommendation is to port the desktop's sample maths into an
    `AudioBuffer`, to keep the same sound, and compare by ear), the name tag,
    the flash, the speakers window.
-6. **The phase 5 HTML fix**, in a commit of its own, as the owner asked:
+6. **The phase 5 HTML fix** (1.5.0), in a commit of its own, as the owner asked:
    keep the text after a dropped `<script>` or `<style>`, as a written
    difference from the desktop.
 
@@ -264,6 +267,12 @@ is for a change that breaks something people rely on, and phase 6 only
 adds features. Saved settings, the library and export files from 1.1.0
 keep working unchanged, since every setting phase 6 uses is already saved
 and checked since phase 3.
+
+Changed by the owner later the same day: a release after each group
+instead of one at the end. `v1.2.0` letter spacing (with the Fredoka fix
+below), `v1.3.0` the OpenDyslexic font and bold word starts, `v1.4.0`
+reading profiles, `v1.5.0` speaker cues and the HTML import fix. Each is
+a minor version, for the same reason.
 
 ## Step 3: building
 

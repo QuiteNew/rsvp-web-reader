@@ -80,6 +80,9 @@ project.
 - Reading comfort settings that follow the desktop app: guide marks, a line of
   surrounding words, slowing down for long words, easing in at the start,
   and rewinding a few words when you resume
+- Letter spacing for the flashing word, in four levels (Off, Small, Medium,
+  Large), with the highlighted letter kept on its spot and the words of a chunk
+  kept apart
 - Light / Dark / System theme support, with reading colors that automatically
   follow the active theme unless you've customized them
 - Picks up where you left off: the last transcript reopens at launch, paused
@@ -300,7 +303,7 @@ Settings are organized into three tabs, and changes take effect when you press *
   marks, pacing, skipping, the surrounding-words line, reopening the last
   transcript at launch, and more. A live search filters them by name or by
   description. **Configure chunking** opens its own window
-- **Appearance** - Light / Dark / System theme
+- **Appearance** - Light / Dark / System theme, and letter spacing
 - **Data** - export everything (transcripts, Spaces and settings) to a file, or
   import one, choosing whether to replace what's here or add to it. The version,
   the license and a link to the source are at the bottom
@@ -313,7 +316,7 @@ Settings are organized into three tabs, and changes take effect when you press *
 - ~~Saved data in the browser, with export and import~~
 - ~~The reading experience: guide marks, surrounding words, progress slider, bookmarks, chunking, keyboard shortcuts, themes, fitting wide flashes~~
 - ~~Importing files (PDF, Word, HTML, subtitles and Markdown), read in the browser only~~
-- Comfort features: reading profiles, letter spacing, a dyslexia-friendly font, bold word starts, speaker cues
+- Comfort features: ~~letter spacing~~, a dyslexia-friendly font, bold word starts, reading profiles, speaker cues
 - Offline use and installing as an app, accessibility, and a help page
 
 ## License
