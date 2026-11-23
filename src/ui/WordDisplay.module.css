@@ -1,7 +1,14 @@
 /* The display is as tall as the word's line, so its middle is the middle of
-   the focus letter, and the guide marks are placed from there. */
+   the focus letter, and the guide marks are placed from there.
+
+   The word, the surrounding words and the ruler that measures them are in
+   the heading font, Fredoka SemiBold, as on the desktop (its reader display
+   uses the heading font for all of them). The rest of the page keeps the
+   body font. */
 .display {
   position: relative;
+  font-family: var(--font-heading);
+  font-weight: 600;
   font-size: var(--size, 2.5rem);
   line-height: 1.2;
   /* A flash wider than the row is cut off at the row's sides. The scrollbar

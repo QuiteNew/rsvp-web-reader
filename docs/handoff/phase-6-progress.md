@@ -345,12 +345,19 @@ one. The unit tests do not draw, so they cannot see it either.
 Not done: the eye check against the desktop app, which the assistant cannot
 run. The owner holds the levels up against the desktop (step 4).
 
-Found while checking this, and not changed here: the desktop draws the
-flashing word, the surrounding-words line and the speaker name in the
+The font of the word. While checking this, it turned out the desktop draws
+the flashing word, the surrounding-words line and the speaker name in the
 heading font, Fredoka SemiBold (`gui/components/reader_display.py`, lines
-240, 265, 331 and 348 at `eccfc89`). The web app draws them in the body
-font, Quicksand, and has since phase 2. The spacing rule is the same in
-either font, but the word looks different next to the desktop, and the
-space in Fredoka is narrower (about 0.24 em), so Medium and Large add a
-little more room between words there (0.12 and 0.36 em) than here. For
-the owner to decide: fix it in a commit of its own, before the eye check.
+240, 265, 331 and 348 at `eccfc89`). The web app drew them in the body
+font, Quicksand, since phase 2. The owner chose to fix it, in a commit of
+its own, before the eye check. The reading area now uses Fredoka SemiBold
+for the word, the surrounding words and the ruler that measures them, and
+a browser test checks the word and the surrounding words. The speaker
+name, built with speaker cues (feature 5), goes in the same area and gets
+the same font. The rest of the page keeps Quicksand.
+
+With Fredoka, the space is about 0.241 em (measured in Chromium). Between
+the words of a chunk the room grows by nothing at Small, and by 0.119 and
+0.359 em at Medium and Large. The measurements above were taken in
+Quicksand, before the change; the rule is the same, and the browser tests
+pass in both.

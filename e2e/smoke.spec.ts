@@ -150,3 +150,23 @@ test('the site asks for nothing from anywhere else', async ({ page, baseURL }) =
   await expect.poll(() => page.evaluate('document.fonts.check("16px Quicksand")')).toBe(true);
   expect(elsewhere).toEqual([]);
 });
+
+test('the word and the surrounding words are in Fredoka SemiBold, as on the desktop', async ({
+  page,
+}) => {
+  await startReading(page, TEXT);
+  await page.getByRole('button', { name: 'Pause' }).click();
+  // Strings, because this file is checked as Node code and has no `document`.
+  const font = (testId: string) =>
+    page.evaluate<string>(`(() => {
+      const style = getComputedStyle(document.querySelector('[data-testid=${testId}]'));
+      return style.fontWeight + ' ' + style.fontFamily.split(',')[0].replaceAll('"', '');
+    })()`);
+  expect(await font('word')).toBe('600 Fredoka');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByLabel('Show surrounding words').check();
+  await page.getByRole('button', { name: 'Apply' }).click();
+  await expect(page.getByTestId('context')).toBeVisible();
+  expect(await font('context')).toBe('600 Fredoka');
+  await expect.poll(() => page.evaluate('document.fonts.check("600 16px Fredoka")')).toBe(true);
+});
