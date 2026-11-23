@@ -7,7 +7,7 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 | Step                                   | State                                     |
 | -------------------------------------- | ----------------------------------------- |
 | 1. What the desktop app does, and plan | Done, below                               |
-| 2. Design notes from the owner         | Waiting: the list is at the end           |
+| 2. Design notes from the owner         | Done on 2026-11-23, below                 |
 | 3. Build, one feature at a time        | Not started. The order is under "Plan"    |
 | 4. The owner tries each feature        | Not started                               |
 | 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own |
@@ -119,18 +119,141 @@ profiles after the settings they hold have a screen:
    keep the text after a dropped `<script>` or `<style>`, as a written
    difference from the desktop.
 
-## Step 2: design notes from the owner
+## Step 2: what the design notes add
 
-The desktop's design notes are not in its repository. Please copy the ones
-you have on these into `reference/desktop-design/`, as for chunking and the
-fit and scroll work:
+The owner put the notes in the desktop repository, not in this one:
+`reference/desktop-design/` at desktop commit `eccfc89` ("Added the desktop
+design notes to reference/"), which changes nothing else there. Read on
+2026-11-23:
 
-- letter spacing
-- the OpenDyslexic font
-- reading profiles
-- bold word starts, and copying with bold
-- speaker cues and the chimes
+- `dyslexia-font-design.md`: the font switch and letter spacing (v3.6.0).
+- `reading-profiles-design.md`: profiles (v3.5.0).
+- `bionic-reading-design.md` and `bold-starts-step4-notes.md`: bold word
+  starts and copying with bold (v3.7.0). The second is about Tk.
+- `speaker-cues-design.md` and `speaker-cues-start.md`: speaker cues
+  (v4.1.0).
 
-Whichever exist. If there is none for a feature, the code, the tests and
-`docs/usage.md` are the specification, as before. Letter spacing can start
-without them, since the plan for it is already set in phase-6.md.
+The desktop released each of these as a minor version of its own.
+
+### Corrections to step 1
+
+The test counts in step 1 counted test functions. Counted by pytest, with
+their parameters, they are: `test_letter_spacing` 78, `test_font_choice` 41,
+`test_profiles` 65, `test_profile_apply` 64, `test_settings_store_profiles`
+56, `test_bold_starts` 106, `test_rich_copy` 40, `test_chime` 132,
+`test_chime_player` 37, `test_reader_display_speaker_cues` 69,
+`test_speaker_cues_wiring` 25. Nothing else in step 1 changes.
+
+### Letter spacing
+
+- The word gap rule: between the words of a chunk, the plain space plus
+  whatever it takes to reach twice the letter gap. So the gap is the larger
+  of the plain space and twice the letter gap, not the two added together.
+  CSS `letter-spacing` puts its gap after the space too, which gives the
+  plain space plus twice the gap. To match the desktop, `word-spacing` has to
+  take the difference back off, which needs the width of the font's space.
+  To decide by eye at the build, with the focus letter check.
+- Auto-fit measures the word with the spacing in it, so the fit is right for
+  what is drawn.
+- The levels were tuned by eye, not proven. Medium is close to the spacing
+  of one study of children with dyslexia, on running text.
+- Applied with Settings' Apply, and saved in profiles.
+
+### The OpenDyslexic font
+
+- The whole app changes: body text to OpenDyslexic Regular and headings to
+  OpenDyslexic Bold, the way Quicksand and Fredoka share the work now.
+- The switch is read strictly: only a real `true` turns it on, so a damaged
+  settings file cannot (`core/font_choice.py`, 41 tests). The web settings
+  already read it as a flag.
+- OpenDyslexic is about 40 percent taller than Fredoka, and its space is
+  0.85 em against Fredoka's 0.24. On the desktop the focus letter stays at
+  the same height and the guide marks sit farther out. To look at by eye.
+- Not in profiles. The desktop needs a restart for it; the web will not.
+- For the docs: a comfort setting, with no claim that it helps. The note
+  sums up the research (weak evidence for the typeface, better for
+  spacing, none on single flashed words).
+
+### Reading profiles
+
+- The Profiles tab sits after Appearance (on the desktop, between Appearance
+  and Stats). A paragraph on it says what a profile holds and does not
+  change, and that Spaces are the way to keep texts apart.
+- Settings' own Apply is hidden on that tab. Saving and updating a profile
+  apply the pending changes first and take the snapshot from them. Applying
+  a profile closes Settings on the desktop, so no window shows old values;
+  the web can show the new values instead, to decide at the build.
+- Names are unique, case aside, at most 30 characters. Save, rename,
+  update, delete. Clicking the selected profile again unselects it. No
+  starter profiles. A profile is a snapshot, not a live link.
+- Speed and Word size in a profile are only the Defaults sliders, for the
+  next new transcript.
+- The guide mark colour keeps its "follows the theme" flag through a
+  profile.
+
+### Bold word starts, and copying with bold
+
+- The look is for the edit box only: not the reader, not the surrounding
+  words, not profiles. The text never changes. A button next to Normalize,
+  with an icon that swaps between off and on, remembered as
+  `bold_starts_enabled`.
+- The rules (`bold_starts.py`, 106 tests): words of Latin, Cyrillic or
+  Greek letters; each part of a hyphenated word on its own; a word touching
+  a digit left plain; web and email addresses left plain; a length curve,
+  with a nudge to a vowel and consonant boundary in words of seven letters
+  or more.
+- Lines over 4,000 characters stay plain on the desktop, because Tk's cost
+  for formatting a line grows with the square of its words. A browser may
+  not need that limit; to measure at the build.
+- Copying: Ctrl+C while the look is on, and a "Copy with bold" item in the
+  right-click menu, put HTML next to the plain text. Cut stays plain.
+  `rich_copy.py` builds the HTML: one paragraph per line with no margin,
+  `<b>` around the bold, spaces that HTML would squeeze kept as `&nbsp;`, a
+  tab as four of them, control characters left out of the HTML only. The
+  Windows header around it (CF_HTML) is not needed in a browser, which
+  writes its own.
+- The desktop edit box never had undo; the web text box has the browser's.
+- The name: never "Bionic Reading", in the app, the settings or a release
+  title. The docs and the README License section say once that it is a
+  trademark of BRCG Casutt GmbH and that the project is not affiliated with
+  it, as the desktop does. The note also records a French patent
+  publication (FR1755215) whose status was never checked, and says the
+  owner should know of it before releasing publicly. That note is not legal
+  advice, and neither is this.
+- No claim that it helps; the note lists the studies.
+
+### Speaker cues
+
+- Off by default, and with it off the reader does not change at all.
+- The name tag: the font colour blended 0.55 towards the background. Above
+  the word (and moving with it when the reader is panned sideways), or a
+  fixed spot in the top right corner, 12 px in. It stays while paused.
+- The flash: 330 ms, the tag in the highlight colour and the background
+  moved 0.18 towards the highlight. Each with its own switch, both on by
+  default.
+- The sound: one chime for any change, or a pattern for each speaker (C5;
+  C5-G5; G5-C5; C6; C5-E5-G5; the sixth wraps round), the change chime on
+  A4, four styles (Bell, Soft, Glass, Wood). No two chimes closer than
+  400 ms. On the desktop only Windows plays it; the web can play it in
+  every browser.
+- The window: a "Configure speaker cues…" button under "Configure
+  chunking…" on the Defaults tab. Close and Apply (Apply keeps it open and
+  says "Applied."). The top part is for the whole app (the switch, the name
+  and its position, the flash, Sound and Style with a Listen button, greyed
+  while the sound is off). The bottom part is for the open transcript: one
+  row per speaker with a tick box, an editable name and "seen N times",
+  Automatic or Custom, and "Back to automatic".
+- Not in profiles. No per-transcript switch, and nothing about speakers in
+  the edit box.
+
+### What this changes in the plan
+
+The order stays. Two things are added:
+
+- Letter spacing: the word gap rule above is part of the eye check.
+- Bold word starts: the 4,000-character limit is measured in a browser
+  before it is copied or dropped.
+
+One question for the owner, not blocking: the desktop released each of
+these features as a minor version. Release the web app once at the end of
+phase 6, as for phase 5, or after each feature?
