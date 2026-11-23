@@ -3,12 +3,13 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-22. Phases 0 to 5 are done (phase 5 called done by
+Last updated: 2026-11-23. Phases 0 to 5 are done (phase 5 called done by
 the owner on 2026-11-22). The first release, `v1.0.0`, is out: tagged by
-the owner on 2026-11-18 on `aebce68`, after the release workflow's dry run
-passed. `v1.1.0` adds importing files and is prepared, waiting for the
-owner's tag. See "The first release" and "Version 1.1.0" below for what
-each has and does not have. Phase 6 is next.
+the owner on 2026-11-18 on `aebce68`. `v1.1.0`, which adds importing files,
+is out too: tagged on `74b3323`. See "The first release" and "Version
+1.1.0" below for what each has and does not have. Phase 6 has started:
+[handoff/phase-6-progress.md](handoff/phase-6-progress.md) has what the
+desktop app does, the plan, and the design notes it asks for.
 
 ## Phases
 
@@ -20,7 +21,7 @@ each has and does not have. Phase 6 is next.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Not started                                                                                                                                                                                                                                                                                                                                                                             |
+| 6     | Comfort and the rest                   | Started on 2026-11-23: step 1 (what the desktop does, and the plan) done. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                                                                                                                                |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
@@ -446,7 +447,7 @@ What 1.0.0 does not have, written down so nobody assumes it does:
 
 Prepared on 2026-11-22, at the end of phase 5: `APP_VERSION`, `package.json`
 and `package-lock.json` at 1.1.0. A new feature bumps the minor number, as
-RELEASING.md says. The tag is the owner's to push, after the dry run.
+RELEASING.md says. Tagged by the owner on `74b3323`.
 
 What it adds: a transcript from a file, with **+** then **Add from file…**.
 Plain text, `.srt` and `.vtt` subtitles, Markdown, web pages, Word and PDF,
