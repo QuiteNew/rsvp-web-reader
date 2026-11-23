@@ -8,8 +8,8 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 | -------------------------------------- | ----------------------------------------- |
 | 1. What the desktop app does, and plan | Done, below                               |
 | 2. Design notes from the owner         | Done on 2026-11-23, below                 |
-| 3. Build, one feature at a time        | Not started. The order is under "Plan"    |
-| 4. The owner tries each feature        | Not started                               |
+| 3. Build, one feature at a time        | 1 of 6 built (letter spacing), below      |
+| 4. The owner tries each feature        | Letter spacing is waiting for the owner   |
 | 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own |
 
 ## Step 1: what the desktop app does
@@ -257,3 +257,100 @@ The order stays. Two things are added:
 One question for the owner, not blocking: the desktop released each of
 these features as a minor version. Release the web app once at the end of
 phase 6, as for phase 5, or after each feature?
+
+Answered on 2026-11-23: once, at the end of phase 6, as `v1.2.0`. The
+owner asked whether it should be `v2.0.0`. It should not: a major version
+is for a change that breaks something people rely on, and phase 6 only
+adds features. Saved settings, the library and export files from 1.1.0
+keep working unchanged, since every setting phase 6 uses is already saved
+and checked since phase 3.
+
+## Step 3: building
+
+### 1. Letter spacing
+
+Built on 2026-11-23, in two commits: the core port with its fixtures, then
+the reader and the Settings control.
+
+What was ported. Only the level table and `clamp_level()` of
+`core/letter_spacing.py`, into `src/core/letterSpacing.ts`, checked against
+`fixtures/core/letter_spacing.json` (the four tables and 22 levels for
+`clamp_level`, generated at desktop `eccfc89`). The rest of the desktop
+module (measuring thin space characters in the font and building each gap
+out of them) is not needed, because CSS has `letter-spacing` and
+`word-spacing`. One difference that cannot matter: Python gives 0 for the
+level `1.0` and JavaScript cannot tell `1.0` from `1`. The settings are
+checked before the level gets there.
+
+How the desktop's gaps map to CSS, in `WordDisplay`:
+
+- `letter-spacing` goes on the text before and after the focus letter, not
+  on the focus letter. The focus column then stays exactly as wide as the
+  letter, so the letter stays on its spot.
+- The desktop puts a letter gap at the start of the after text, even when
+  it starts with a space. The page adds it as padding (`gapStart`).
+- The desktop puts a letter gap at the end of the before text even when it
+  ends with a space (the focus letter starts its word). `letter-spacing`
+  gives one already; the page adds the second as padding (`gapEnd`).
+- Between two words of a chunk the desktop has the larger of the font's
+  space and twice the letter gap. CSS gives the space plus two letter gaps
+  (one after the last letter, one after the space), so `word-spacing` takes
+  the difference back off. That needs the width of the space, which the
+  page measures with its ruler (`wordSpacingEm` in `letterSpacing.ts`).
+- Auto-fit measures the text with the spacing in it.
+
+The control is a "Letter spacing" list on the Appearance tab, under the
+theme, with the desktop's note. The desktop's note also says the level is
+saved in reading profiles. That part is left out until profiles exist
+(feature 3), and goes back in then. Reset to Original Defaults leaves the
+level alone, as on the desktop, because it is on another tab.
+
+What was run, on 2026-11-23:
+
+- `npm run check`: lint, Prettier, types, 1369 Vitest tests (7 new in
+  `letterSpacing.test.ts`, 4 new in `App.test.tsx`), the build.
+- The Playwright tests, 54 of them, 3 new in `e2e/letterSpacing.spec.ts`:
+  by the assistant in Chromium, and by the owner on Windows in Chromium,
+  Firefox and WebKit.
+- Measured in Chromium: the focus letter is off the centre of the row by
+  0.00 px at every level, for one word and for a chunk. The room in front
+  of the after text grows by 0.10, 0.18 and 0.30 em. Between the words of
+  a chunk, with Quicksand's space at about 0.275 em, the room grows by
+  nothing at Small (0.20 em is under the space), and by 0.085 and 0.325 em
+  at Medium and Large, which is twice the gap less the space, as on the
+  desktop.
+- The browser tests were checked by breaking the page on purpose, one
+  thing at a time, in Chromium: no `word-spacing`, no gap in front of the
+  after text, the focus letter spaced too, and every gap 10 percent too
+  big. Each one failed a test. Then the page was put back.
+- The fixtures were made again from a scratch copy of the desktop: the new
+  file came out byte for byte the same, and the desktop clone was left as
+  it was.
+
+WebKit and letter boxes. The first version of the browser tests measured
+each letter, and failed in WebKit by 0.4 to 0.6 px. A throwaway probe, run
+by the owner in Chromium and WebKit, printed every letter's box at every
+level. WebKit gives a letter's box in whole pixels from the start of its
+element: a letter 12.8 px in is reported at 12 px, even with no spacing at
+all. The ends of each piece of text are not rounded, and there Chromium
+and WebKit agreed to 0.02 px at every level, the focus letter to the
+thousandth of a pixel. So the page is drawn the same in both, and only the
+way the test read it was wrong. The tests now measure the ends of the text
+before and after the focus letter, and the focus letter's left edge.
+
+Not tested in a browser: the extra gap when the text before the focus
+letter ends with a space (`gapEnd`). The texts in the tests do not have
+one. The unit tests do not draw, so they cannot see it either.
+
+Not done: the eye check against the desktop app, which the assistant cannot
+run. The owner holds the levels up against the desktop (step 4).
+
+Found while checking this, and not changed here: the desktop draws the
+flashing word, the surrounding-words line and the speaker name in the
+heading font, Fredoka SemiBold (`gui/components/reader_display.py`, lines
+240, 265, 331 and 348 at `eccfc89`). The web app draws them in the body
+font, Quicksand, and has since phase 2. The spacing rule is the same in
+either font, but the word looks different next to the desktop, and the
+space in Fredoka is narrower (about 0.24 em), so Medium and Large add a
+little more room between words there (0.12 and 0.36 em) than here. For
+the owner to decide: fix it in a commit of its own, before the eye check.

@@ -9,7 +9,9 @@ the owner on 2026-11-18 on `aebce68`. `v1.1.0`, which adds importing files,
 is out too: tagged on `74b3323`. See "The first release" and "Version
 1.1.0" below for what each has and does not have. Phase 6 has started:
 [handoff/phase-6-progress.md](handoff/phase-6-progress.md) has what the
-desktop app does, what its design notes add, and the plan.
+desktop app does, what its design notes add, the plan, and each feature as
+it is built. Phase 6 will be released once, at its end, as `v1.2.0`: it
+adds features and breaks nothing, so it is a minor version.
 
 ## Phases
 
@@ -21,7 +23,7 @@ desktop app does, what its design notes add, and the plan.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Started on 2026-11-23: steps 1 and 2 (what the desktop does, the plan, and the desktop's design notes) done. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                                                                                             |
+| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing built, waiting for the owner's eye check. To be released as 1.2.0. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                         |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
