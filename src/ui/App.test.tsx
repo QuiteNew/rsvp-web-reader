@@ -283,7 +283,12 @@ describe('adding from a file', () => {
     renderPage();
     pickFile(new File([Array.from({ length: 30_001 }, () => 'word').join(' ')], 'book.txt'));
     const dialog = await screen.findByRole('dialog', { name: 'Add Transcript from File' });
-    expect(dialog).toHaveTextContent('Heads up: this file is about 30,001 words long.');
+    // The desktop's words, as the owner chose.
+    expect(dialog).toHaveTextContent(
+      'Heads up: this file is about 30,001 words long. Very large transcripts have been ' +
+        'known to crash RSVP Reader. If that happens, try splitting the file into smaller ' +
+        'parts and importing those instead.',
+    );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Create' }));
     expect(titles()).toEqual(['book']);
   });

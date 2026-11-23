@@ -566,9 +566,9 @@ Differences from the desktop, all small, for the owner to look at:
 - The Importing notice does not say "the app won't respond until it's
   done", because the page keeps answering (PDF is read in a worker). It can
   be closed, and closing it drops that file.
-- The heads-up keeps the desktop's threshold but not its claim that very
-  large transcripts "have been known to crash RSVP Reader", which is about
-  the desktop app. It says they can be slow to work with. Tried in Chrome
+- The heads-up first kept the desktop's threshold but not its claim that
+  very large transcripts "have been known to crash RSVP Reader". On
+  2026-11-23 the owner chose the desktop's wording, word for word. Tried in Chrome
   with the 150,000-word files: importing took 0.4 s (Word) and 1.2 s (PDF),
   adding 0.5 s, starting to read 0.45 s, a reload back to the word 0.4 s.
   Owner to decide: keep this wording, use the desktop's, or drop it.
@@ -626,7 +626,15 @@ before it makes the draft.
 
 ## Left open after phase 5
 
-For the owner, none of them blocking:
+For the owner, none of them blocking. Answered on 2026-11-23:
+
+1. The heads-up: the desktop's wording. Done in the commit after `v1.1.0`.
+2. The copied HTML bug: fixed at the end of phase 6, in a commit of its own.
+3. The CJK character maps: at a later date.
+4. Real files: the owner tries them later.
+5. The licenses link in Settings: later.
+
+The questions as they were asked:
 
 1. The heads-up above 30,000 words: keep the web wording ("can be slow to
    work with"), use the desktop's ("have been known to crash"), or drop it.

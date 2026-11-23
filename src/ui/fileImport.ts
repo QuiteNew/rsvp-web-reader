@@ -17,15 +17,18 @@ export const LARGE_IMPORT_WORDS = 30_000;
 
 /**
  * The heads-up for a file over LARGE_IMPORT_WORDS words, or undefined. The
- * words are counted the way the reader splits them, as on the desktop.
+ * words are counted the way the reader splits them, and the wording is the
+ * desktop's, word for word, app name included (the owner's choice on
+ * 2026-11-23).
  */
 export function largeImportWarning(text: string): string | undefined {
   const words = tokenize(text).length;
   if (words <= LARGE_IMPORT_WORDS) return undefined;
   return (
     `Heads up: this file is about ${words.toLocaleString('en-US')} words long. ` +
-    'Very large transcripts can be slow to work with. If that happens, try ' +
-    'splitting the file into smaller parts and importing those instead.'
+    'Very large transcripts have been known to crash RSVP Reader. If that ' +
+    'happens, try splitting the file into smaller parts and importing those ' +
+    'instead.'
   );
 }
 
