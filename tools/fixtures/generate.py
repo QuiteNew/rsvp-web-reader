@@ -2794,6 +2794,28 @@ def test_files(pattern):
     return sorted(folder.glob(pattern))
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: letter spacing. Only the level table and clamp_level() are ported:
+# CSS has letter-spacing, so the gap characters the desktop measures and
+# chooses (choose_gap, build_plan, space_text) are not needed.
+# ---------------------------------------------------------------------------
+
+def build_letter_spacing(core):
+    import core.letter_spacing as spacing
+
+    levels = [
+        -100, -2, -1, 0, 1, 2, 3, 4, 5, 99, 2**40, -(2**40),
+        True, False, None, "1", "", 1.5, -0.5, 2.25, [], {},
+    ]
+    return {
+        "level_names": [[[], list(spacing.LEVEL_NAMES)]],
+        "level_gap_em": [[[], list(spacing.LEVEL_GAP_EM)]],
+        "max_level": [[[], spacing.MAX_LEVEL]],
+        "word_gap_ratio": [[[], spacing.WORD_GAP_RATIO]],
+        "clamp_level": [call(spacing.clamp_level, level) for level in levels],
+    }
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -2819,6 +2841,7 @@ MODULES = {
     "desktop_tests": build_desktop_tests,
     "colors": build_colors,
     "importers": build_importers,
+    "letter_spacing": build_letter_spacing,
 }
 
 

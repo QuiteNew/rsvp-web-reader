@@ -1,0 +1,41 @@
+{
+ "meta": {"written_by": "tools/fixtures/generate.py", "desktop_repository": "QuiteNew/rsvp-desktop-reader", "desktop_commit": "eccfc8949a735573b2d64b16e55234b75cc48f6c", "desktop_version": "4.1.1", "python": "3.13", "unicode": "15.1.0"},
+ "functions": {
+  "level_names": [
+   [[],["Off","Small","Medium","Large"]]
+  ],
+  "level_gap_em": [
+   [[],[0.0,0.1,0.18,0.3]]
+  ],
+  "max_level": [
+   [[],3]
+  ],
+  "word_gap_ratio": [
+   [[],2.0]
+  ],
+  "clamp_level": [
+   [[-100],0],
+   [[-2],0],
+   [[-1],0],
+   [[0],0],
+   [[1],1],
+   [[2],2],
+   [[3],3],
+   [[4],3],
+   [[5],3],
+   [[99],3],
+   [[1099511627776],3],
+   [[-1099511627776],0],
+   [[true],0],
+   [[false],0],
+   [[null],0],
+   [["1"],0],
+   [[""],0],
+   [[1.5],0],
+   [[-0.5],0],
+   [[2.25],0],
+   [[[]],0],
+   [[{}],0]
+  ]
+ }
+}
