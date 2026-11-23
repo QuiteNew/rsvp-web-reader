@@ -2816,6 +2816,29 @@ def build_letter_spacing(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: the OpenDyslexic font. Only the strict reading of the switch is
+# ported. Tk needs the font files looked up and registered by hand, and the
+# Regular and Bold files register as two families; on the web both are one
+# family with two weights, and the files are bundled, so none of that is
+# needed. What is kept is which set the saved value selects.
+# ---------------------------------------------------------------------------
+
+def build_font_choice(core):
+    import core.font_choice as fonts
+
+    values = [
+        True, False, None, 1, 0, 1.0, "true", "True", "", [], {}, [True], "yes",
+    ]
+    every_file = fonts.STANDARD_FONTS.files + fonts.DYSLEXIA_FONTS.files
+    return {
+        "dyslexia_friendly": [
+            call(lambda value: fonts.choose_fonts(value, every_file).dyslexia_friendly, value)
+            for value in values
+        ],
+    }
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -2842,6 +2865,7 @@ MODULES = {
     "colors": build_colors,
     "importers": build_importers,
     "letter_spacing": build_letter_spacing,
+    "font_choice": build_font_choice,
 }
 
 

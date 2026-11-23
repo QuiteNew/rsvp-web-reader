@@ -1,0 +1,20 @@
+{
+ "meta": {"written_by": "tools/fixtures/generate.py", "desktop_repository": "QuiteNew/rsvp-desktop-reader", "desktop_commit": "eccfc8949a735573b2d64b16e55234b75cc48f6c", "desktop_version": "4.1.1", "python": "3.13", "unicode": "15.1.0"},
+ "functions": {
+  "dyslexia_friendly": [
+   [[true],true],
+   [[false],false],
+   [[null],false],
+   [[1],false],
+   [[0],false],
+   [[1.0],false],
+   [["true"],false],
+   [["True"],false],
+   [[""],false],
+   [[[]],false],
+   [[{}],false],
+   [[[true]],false],
+   [["yes"],false]
+  ]
+ }
+}
