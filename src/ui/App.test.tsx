@@ -2128,6 +2128,61 @@ describe('letter spacing', () => {
   });
 });
 
+describe('the OpenDyslexic font', () => {
+  function fontSet(): string | undefined {
+    return document.documentElement.dataset.font;
+  }
+
+  afterEach(() => {
+    delete document.documentElement.dataset.font;
+  });
+
+  test('it starts off, with the standard fonts', () => {
+    renderPage();
+    expect(fontSet()).toBe('standard');
+    openSettings('Appearance');
+    expect(screen.getByLabelText('Use the OpenDyslexic font')).not.toBeChecked();
+  });
+
+  test('it applies with Apply, at once, and is saved', () => {
+    renderPage();
+    openSettings('Appearance');
+    fireEvent.click(screen.getByLabelText('Use the OpenDyslexic font'));
+    expect(fontSet()).toBe('standard');
+    press('Apply');
+    expect(fontSet()).toBe('dyslexic');
+    expect(savedSettings().saved().dyslexia_font_enabled).toBe(true);
+    openSettings('Appearance');
+    fireEvent.click(screen.getByLabelText('Use the OpenDyslexic font'));
+    press('Apply');
+    expect(fontSet()).toBe('standard');
+    expect(savedSettings().saved().dyslexia_font_enabled).toBe(false);
+  });
+
+  test('a saved switch is used from the start', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ dyslexia_font_enabled: true }));
+    renderPage();
+    expect(fontSet()).toBe('dyslexic');
+  });
+
+  test('anything but a real true leaves the standard fonts', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ dyslexia_font_enabled: 'true' }));
+    renderPage();
+    expect(fontSet()).toBe('standard');
+  });
+
+  test('Reset to Original Defaults leaves it alone', () => {
+    renderPage();
+    openSettings('Appearance');
+    fireEvent.click(screen.getByLabelText('Use the OpenDyslexic font'));
+    press('Apply');
+    openSettings();
+    press('Reset to Original Defaults');
+    press('Apply');
+    expect(savedSettings().saved().dyslexia_font_enabled).toBe(true);
+  });
+});
+
 describe('the Settings window', () => {
   const saved = () =>
     JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<string, unknown>;

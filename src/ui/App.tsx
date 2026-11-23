@@ -48,6 +48,7 @@ import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { usePointerLetsGoOfFocus } from './usePointerLetsGoOfFocus';
 import { useShortcuts } from './useShortcuts';
+import { useFontSet } from './useFontSet';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
 
@@ -221,6 +222,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   // does this only when it starts. The page changes at once, so its reading
   // colours do too.
   const isDark = useTheme(preferences.appearanceMode);
+  useFontSet(preferences.dyslexiaFontEnabled);
 
   // The surrounding-words line is built by the engine only when it is on.
   const showContext = preferences.peripheralContextEnabled;

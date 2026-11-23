@@ -443,6 +443,15 @@ export function SettingsDialog({
             applies as soon as you press Apply. The right amount differs from person to person, so
             try the levels by eye.
           </p>
+          {toggle('Use the OpenDyslexic font', form.dyslexiaFontEnabled, (on) => {
+            change({ dyslexiaFontEnabled: on });
+          })}
+          <p className={quiet}>
+            Changes every font on the page, not only the reader's. It applies as soon as you press
+            Apply. OpenDyslexic is a typeface made with dyslexia in mind. The research on whether it
+            helps is mixed, and it was not done on words flashed one at a time, so this is a comfort
+            setting to try, not a treatment.
+          </p>
         </div>
       )}
 

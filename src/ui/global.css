@@ -3,7 +3,7 @@
    has the colours of its DARK_PALETTE. A test checks both against
    src/core/theme.ts. */
 
-/* The same two fonts the desktop app ships, both under the SIL Open Font
+/* The same fonts the desktop app ships, all under the SIL Open Font
    License. Their licence texts are next to them in ./fonts. */
 @font-face {
   font-family: 'Fredoka';
@@ -17,6 +17,26 @@
   font-weight: 500;
   font-display: swap;
   src: url('./fonts/Quicksand-Medium.ttf') format('truetype');
+}
+
+/* OpenDyslexic, for the "Use the OpenDyslexic font" switch. Both files as
+   they came, not converted or cut down. The desktop registers them as two
+   families; here they are one family with two weights, the Regular for body
+   text and the Bold for headings, which is the same split. A browser fetches
+   a font file only when text on the page uses it, so these cost nothing
+   until the switch is on. */
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-weight: 400;
+  font-display: swap;
+  src: url('./fonts/OpenDyslexic3-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'OpenDyslexic';
+  font-weight: 700;
+  font-display: swap;
+  src: url('./fonts/OpenDyslexic3-Bold.ttf') format('truetype');
 }
 
 :root {
@@ -51,6 +71,21 @@
   line-height: 1.5;
   color: var(--ink);
   background: var(--paper);
+}
+
+/* The OpenDyslexic switch: the page sets data-font="dyslexic" on the html
+   element, and every font in the app follows, not only the reader's. Body
+   text asks for weight 500 and headings for 600, which land on the Regular
+   and the Bold file. */
+:root[data-font='dyslexic'] {
+  --font-heading: 'OpenDyslexic', system-ui, sans-serif;
+  --font-body: 'OpenDyslexic', system-ui, sans-serif;
+}
+
+/* Drop-down lists use the system's font unless told otherwise. With the
+   switch on they follow, so no font on the page is left out. */
+:root[data-font='dyslexic'] select {
+  font: inherit;
 }
 
 /* The dark theme: the page sets data-theme="dark" on the html element, for

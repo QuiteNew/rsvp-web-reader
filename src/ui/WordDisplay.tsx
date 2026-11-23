@@ -159,12 +159,34 @@ export function WordDisplay({
           });
     observer?.observe(element);
     let live = true;
-    void document.fonts?.ready.then(() => {
+    const measureAgain = () => {
       if (live) setFontsLoaded((count) => count + 1);
+    };
+    void document.fonts?.ready.then(measureAgain);
+    // A font that was not needed before, OpenDyslexic once it is switched
+    // on, is fetched when the text first uses it, and measured again then.
+    document.fonts?.addEventListener('loadingdone', measureAgain);
+    // The width of the text depends on the font set (see useFontSet), so a
+    // new set is measured again. A set loaded before sends no loading event,
+    // which is why the change itself is watched too. WebKit also sends no
+    // loadingdone for the first switch-on, so the new font is asked for by
+    // name and measured again when it has arrived.
+    const fontSetWatch = new MutationObserver(() => {
+      measureAgain();
+      const style = getComputedStyle(element);
+      void document.fonts
+        ?.load(`${style.fontWeight} 16px ${style.fontFamily}`)
+        .then(measureAgain, measureAgain);
+    });
+    fontSetWatch.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-font'],
     });
     return () => {
       live = false;
       observer?.disconnect();
+      fontSetWatch.disconnect();
+      document.fonts?.removeEventListener('loadingdone', measureAgain);
     };
   }, []);
 
