@@ -2075,6 +2075,59 @@ describe('the reading settings reach the reader', () => {
   });
 });
 
+describe('letter spacing', () => {
+  function shownGap(): string {
+    const display = screen.getByTestId('word').parentElement;
+    return display?.style.getPropertyValue('--letter-gap') ?? '';
+  }
+
+  test('it starts Off, and each level is offered by its name', () => {
+    renderPage();
+    openSettings('Appearance');
+    const select = screen.getByLabelText('Letter spacing');
+    expect(select).toHaveValue('0');
+    expect(
+      within(select)
+        .getAllByRole('option')
+        .map((option) => option.textContent),
+    ).toEqual(['Off', 'Small', 'Medium', 'Large']);
+  });
+
+  test('a level reaches the reader with Apply, and is saved', () => {
+    renderPage();
+    addTranscript('Notes');
+    paste('one two three');
+    press('Start reading');
+    expect(shownGap()).toBe('0em');
+    openSettings('Appearance');
+    fireEvent.change(screen.getByLabelText('Letter spacing'), { target: { value: '2' } });
+    expect(shownGap()).toBe('0em');
+    press('Apply');
+    expect(shownGap()).toBe('0.18em');
+    expect(savedSettings().saved().letter_spacing_level).toBe(2);
+  });
+
+  test('a saved level is used from the start', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ letter_spacing_level: 3 }));
+    renderPage();
+    addTranscript('Notes');
+    paste('one two three');
+    press('Start reading');
+    expect(shownGap()).toBe('0.3em');
+  });
+
+  test('Reset to Original Defaults leaves it alone, as it does the theme', () => {
+    renderPage();
+    openSettings('Appearance');
+    fireEvent.change(screen.getByLabelText('Letter spacing'), { target: { value: '1' } });
+    press('Apply');
+    openSettings();
+    press('Reset to Original Defaults');
+    press('Apply');
+    expect(savedSettings().saved().letter_spacing_level).toBe(1);
+  });
+});
+
 describe('the Settings window', () => {
   const saved = () =>
     JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '{}') as Record<string, unknown>;

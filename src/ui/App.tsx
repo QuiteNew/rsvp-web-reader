@@ -18,6 +18,7 @@ import { transcriptToReopen } from '../core/reopen';
 import { blendColors } from '../core/colors';
 import { fitCandidates } from '../core/fit';
 import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
+import { letterGapEm } from '../core/letterSpacing';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
 import { CHUNK_SIZE_RANGE, FONT_SIZE_RANGE, WPM_RANGE } from '../core/settings';
 import { formatDuration } from '../core/timing';
@@ -747,6 +748,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 contextColor={dimmed(selected)}
                 pan={pan}
                 onPanChange={setPan}
+                letterGap={letterGapEm(preferences.letterSpacingLevel)}
                 marks={{
                   visible: snapshot.status === 'playing',
                   horizontal: preferences.guideMarkHorizontalEnabled,

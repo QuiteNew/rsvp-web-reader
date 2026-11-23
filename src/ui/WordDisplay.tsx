@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import type { ChunkText, PeripheralContext } from '../core/reader';
 import { FIT_SIDE_MARGIN_PX, fitRenderSize, requiredWidth } from '../core/fit';
 import { guideMarkLength, peripheralContextSize } from '../core/guideMarks';
+import { wordSpacingEm } from '../core/letterSpacing';
 import { clampPan, panFromFraction, scrollbarFractions } from '../core/scroll';
 import { HorizontalScrollbar } from './HorizontalScrollbar';
 import styles from './WordDisplay.module.css';
@@ -37,6 +38,9 @@ interface WordDisplayProps {
   // new session can set it back to 0.
   readonly pan: number;
   readonly onPanChange: (pan: number) => void;
+  // The room between letters, as a part of the word size (em), from the
+  // letter spacing level. 0 is Off. The surrounding words are not spaced.
+  readonly letterGap?: number;
 }
 
 // How far one step of the scrollbar slides the flash (an arrow key or a
@@ -60,6 +64,13 @@ interface Reaches {
 // down. They are drawn here and not on the desktop's canvas, so they are
 // plain elements that the style sheet places.
 //
+// Letter spacing goes on the text before and after the focus letter, never
+// on the focus letter itself, which keeps the focus column exactly as wide as
+// the letter, so the letter stays on its spot. Where the desktop adds a gap
+// next to the focus letter, the page adds it as padding (see the gapStart
+// and gapEnd classes), and word-spacing keeps the gap between the words of a
+// chunk at the desktop's width (wordSpacingEm in core/letterSpacing.ts).
+//
 // This is not a live region on purpose. A screen reader must not be made
 // to read words out one by one at reading speed.
 export function WordDisplay({
@@ -72,6 +83,7 @@ export function WordDisplay({
   contextColor,
   pan,
   onPanChange,
+  letterGap = 0,
 }: WordDisplayProps) {
   const display = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLSpanElement>(null);
@@ -83,9 +95,14 @@ export function WordDisplay({
   // Counts up when the page's fonts have loaded, to measure again: the first
   // measure may have been taken in the stand-in font.
   const [fontsLoaded, setFontsLoaded] = useState(0);
+  // The width of the word font's own space, in em. Needed for the gap
+  // between the words of a chunk once letters are spaced.
+  const [spaceEm, setSpaceEm] = useState(0);
+  const wordGap = wordSpacingEm(letterGap, spaceEm);
 
   // Find the widest of the candidate chunks, in real pixels, at the chosen
-  // size. The ruler is an unseen span with the word's own font.
+  // size. The ruler is an unseen span with the word's own font. It measures
+  // the text spaced as it is drawn, so the fit is right for what is seen.
   useLayoutEffect(() => {
     const span = ruler.current;
     if (span === null) return;
@@ -93,12 +110,28 @@ export function WordDisplay({
       span.textContent = text;
       return span.getBoundingClientRect().width;
     };
+    // The plain space first, with no spacing.
+    span.style.letterSpacing = '0';
+    span.style.wordSpacing = '0';
+    const space = chosenSize > 0 ? width(' ') / chosenSize : 0;
+    setSpaceEm(space);
+    const gapPx = letterGap * chosenSize;
+    span.style.letterSpacing = `${gapPx}px`;
+    span.style.wordSpacing = `${wordSpacingEm(letterGap, space) * chosenSize}px`;
+    // Spaced text as drawn: the before text ends with a letter gap of its own
+    // (letter-spacing puts one after its last character), plus the padding of
+    // gapEnd after a space. The after text gets a gap in front (gapStart) and
+    // one after its last character, which takes no room on screen, so the two
+    // cancel. The focus letter is never spaced.
+    const spaced = (text: string, extra: number): number => (text === '' ? 0 : width(text) + extra);
     let widest = 0;
     let found: Reaches | null = null;
     for (const text of fitTexts) {
-      const before = width(text.before);
+      const before = spaced(text.before, text.before.endsWith(' ') ? gapPx : 0);
+      const after = spaced(text.after, 0);
+      span.style.letterSpacing = '0';
       const focus = width(text.focus);
-      const after = width(text.after);
+      span.style.letterSpacing = `${gapPx}px`;
       const required = requiredWidth(before, focus, after);
       if (required > widest) {
         widest = required;
@@ -111,7 +144,7 @@ export function WordDisplay({
         ? { left: found.left / chosenSize, right: found.right / chosenSize }
         : null,
     );
-  }, [fitTexts, chosenSize, fontsLoaded]);
+  }, [fitTexts, chosenSize, fontsLoaded, letterGap]);
 
   // Follow the width of the row, and notice when the fonts arrive.
   useEffect(() => {
@@ -169,7 +202,11 @@ export function WordDisplay({
     '--context-size': `${peripheralContextSize(fontSize)}px`,
     '--context-color': contextColor,
     '--pan': `${shownPan}px`,
+    '--letter-gap': `${letterGap}em`,
+    '--word-gap': `${wordGap}em`,
   } as CSSProperties;
+  const before = chunk?.before ?? '';
+  const after = chunk?.after ?? '';
   return (
     <>
       <div className={styles.display} style={style} ref={display}>
@@ -180,9 +217,11 @@ export function WordDisplay({
           aria-hidden="true"
         />
         <div className={styles.row} data-testid="word">
-          <span className={styles.before}>{chunk?.before ?? ''}</span>
+          <span className={`${styles.before} ${before.endsWith(' ') ? styles.gapEnd : ''}`}>
+            {before}
+          </span>
           <span className={styles.focus}>{chunk?.focus ?? ''}</span>
-          <span className={styles.after}>{chunk?.after ?? ''}</span>
+          <span className={`${styles.after} ${after !== '' ? styles.gapStart : ''}`}>{after}</span>
         </div>
         {context?.current != null && (
           <div className={styles.context} data-testid="context" aria-hidden="true">

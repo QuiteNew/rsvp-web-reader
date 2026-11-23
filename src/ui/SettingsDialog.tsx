@@ -23,6 +23,7 @@ import {
   type FormProblem,
   type SettingsForm,
 } from '../core/settingsView';
+import { LEVEL_NAMES } from '../core/letterSpacing';
 import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import { DataSettings } from './DataSettings';
@@ -421,6 +422,26 @@ export function SettingsDialog({
           <p className={quiet}>
             System follows your browser's own light or dark choice. Reading colours you picked by
             hand stay as they are. Takes effect after clicking Apply.
+          </p>
+          <label className={styles.row}>
+            <span>Letter spacing</span>
+            <select
+              value={form.letterSpacingLevel}
+              onChange={(event) => {
+                change({ letterSpacingLevel: Number(event.target.value) });
+              }}
+            >
+              {LEVEL_NAMES.map((name, level) => (
+                <option key={name} value={level}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className={quiet}>
+            Adds room between the letters of the flashing word, and between the words of a chunk. It
+            applies as soon as you press Apply. The right amount differs from person to person, so
+            try the levels by eye.
           </p>
         </div>
       )}

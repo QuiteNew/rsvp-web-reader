@@ -40,6 +40,28 @@
   text-align: left;
 }
 
+/* Letter spacing, on the text around the focus letter only. --letter-gap is
+   0 when it is Off, and then nothing changes. */
+.before,
+.after {
+  letter-spacing: var(--letter-gap, 0);
+  word-spacing: var(--word-gap, 0);
+}
+
+/* The desktop puts a letter gap in front of the after text, even when it
+   starts with a space (a one-letter word in a chunk): there the gap and the
+   space make the word gap. */
+.gapStart {
+  padding-left: var(--letter-gap, 0);
+}
+
+/* And a letter gap at the end of the before text, even after a space (the
+   focus letter starts its word). letter-spacing already puts one after the
+   last letter; after a space the desktop has one more. */
+.gapEnd {
+  padding-right: var(--letter-gap, 0);
+}
+
 .marks {
   position: absolute;
   inset: 0;

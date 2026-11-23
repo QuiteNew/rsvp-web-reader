@@ -299,6 +299,7 @@ export interface SettingsForm {
   readonly skipWordCount: number;
   readonly pauseOnSkip: boolean;
   readonly appearanceMode: Settings['appearanceMode'];
+  readonly letterSpacingLevel: number;
 }
 
 /** The form as the window opens: what is saved now. */
@@ -326,6 +327,7 @@ export function formFromSettings(settings: Settings): SettingsForm {
     skipWordCount: settings.skipWordCount,
     pauseOnSkip: settings.pauseOnSkip,
     appearanceMode: settings.appearanceMode,
+    letterSpacingLevel: settings.letterSpacingLevel,
   };
 }
 
@@ -333,8 +335,8 @@ export function formFromSettings(settings: Settings): SettingsForm {
  * "Reset to Original Defaults": every control of the Defaults tab back to
  * the original value, as _handle_reset_defaults() does. Nothing is saved
  * until Apply, except the skip amount and pause when skipping, which the
- * caller saves at once, as on the desktop. The theme is on another tab and
- * stays as it is.
+ * caller saves at once, as on the desktop. The theme and the letter spacing
+ * are on another tab and stay as they are.
  *
  * The guide mark colour goes back to the original colour itself. On Apply
  * that counts as a colour picked by hand when it differs from the one in
@@ -344,6 +346,7 @@ export function resetDefaultsForm(form: SettingsForm): SettingsForm {
   return {
     ...formFromSettings(settingsView(DEFAULT_SAVED_SETTINGS)),
     appearanceMode: form.appearanceMode,
+    letterSpacingLevel: form.letterSpacingLevel,
   };
 }
 
@@ -447,6 +450,7 @@ export function checkSettingsForm(form: SettingsForm): FormCheck {
       reopenLastTranscript: form.reopenLastTranscript,
       guideMarkLengthPercent: form.guideMarkLengthPercent,
       appearanceMode: form.appearanceMode,
+      letterSpacingLevel: form.letterSpacingLevel,
     },
   };
 }
