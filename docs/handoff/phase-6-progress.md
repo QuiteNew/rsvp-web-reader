@@ -8,8 +8,8 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 | -------------------------------------- | ----------------------------------------- |
 | 1. What the desktop app does, and plan | Done, below                               |
 | 2. Design notes from the owner         | Done on 2026-11-23, below                 |
-| 3. Build, one feature at a time        | 1 of 6 built (letter spacing), in 1.2.0   |
-| 4. The owner tries each feature        | Letter spacing is waiting for the owner   |
+| 3. Build, one feature at a time        | 2 of 6 built. Letter spacing is in 1.2.0  |
+| 4. The owner tries each feature        | The font is waiting for the owner         |
 | 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own |
 
 ## Step 1: what the desktop app does
@@ -370,3 +370,80 @@ the words of a chunk the room grows by nothing at Small, and by 0.119 and
 0.359 em at Medium and Large. The measurements above were taken in
 Quicksand, before the change; the rule is the same, and the browser tests
 pass in both.
+
+### 2. The OpenDyslexic font
+
+Built on 2026-11-23, for 1.3.0. The release is not prepared yet: bold word
+starts goes out with it.
+
+What was added. The two font files and their licence text, copied from the
+desktop's `assets/fonts/` byte for byte (the md5 sums match, and nothing was
+converted or cut down, so they are the font as released), into
+`src/ui/fonts/`. A switch "Use the OpenDyslexic font" on the Appearance tab,
+under Letter spacing. When it is on, every font on the page changes, not only
+the reader's, as on the desktop.
+
+How it differs from the desktop, on purpose:
+
+- It applies when Apply is pressed. The desktop needs a restart, because Tk
+  fixes its fonts at start. The brief said the web can apply at once.
+- The Regular and Bold files are one family, `OpenDyslexic`, with two
+  weights. On the desktop they register as two families whose names differ
+  by one space. Body text (weight 500) lands on the Regular file and
+  headings and the flashing word (weight 600) on the Bold file, the same
+  split as the desktop.
+- The files are always there, so nothing like the desktop's fallback and its
+  notes (files missing, font not loadable on macOS and Linux) is needed. The
+  strict reading of the switch is kept: only a real `true` turns it on
+  (`src/core/fontChoice.ts`, checked against `fixtures/core/font_choice.json`,
+  13 values, generated at desktop `eccfc89`).
+- A browser fetches a font file only when text on the page uses it, so the
+  480 kB of OpenDyslexic is never downloaded for a person who does not turn
+  the switch on. A browser test checks that, and that both files come from
+  the site itself.
+- The desktop's note under the switch also says it is not saved in reading
+  profiles. That goes back in with profiles (feature 4). Profiles must leave
+  it out, as the desktop does.
+- Drop-down lists use the system's font by default, so with the switch on
+  they are told to follow it.
+
+The reader measures its word in the font it is drawn in, to fit it to the
+row. OpenDyslexic is wider, so after the switch the word is measured again:
+when the page's font set changes, when the new font has been asked for by
+name and has arrived, and when the browser says a font finished loading.
+
+A bug found by the browser test, in WebKit only. The first time the switch
+was turned on, the word stayed fitted to the fallback font (21 px, where
+Chromium settles at 19 px). A probe test run in WebKit showed why: the font
+loaded, but WebKit sent no `loadingdone` event for it, and the measuring
+again waited for that event. The second time the switch was turned on it was
+right, because the font was already loaded. The fix asks the browser for the
+new font by name when the font set changes (`document.fonts.load`) and
+measures again when that finishes. It does not depend on the event.
+
+What was run, on 2026-11-23: `npm run check` (1376 Vitest tests, 7 new), and
+`npm run e2e` in Chromium, Firefox and WebKit (4 new tests in
+`e2e/dyslexicFont.spec.ts`). The owner ran all three browsers. Before the fix
+above, one of the new tests failed in WebKit and passed in the other two.
+After it, all three pass. The new test was checked by breaking the page on
+purpose in Chromium: without the measuring again, and without watching the
+font set (back and forth between the two sets), it fails. With the browser's
+`loadingdone` event removed, the tests still pass in Chromium, because the
+change of the font set measures again too. The explicit request for the font
+was not removed on purpose to see what happens, so only the WebKit run shows
+that it works. Both are kept, since a font can finish loading after the
+first measure.
+
+Not done: the eye check. The desktop notes say OpenDyslexic is about 40
+percent taller than Fredoka and its space is 0.85 em, and that on the
+desktop the focus letter stays at the same height while the guide marks sit
+farther out. On the web the guide marks are placed from the middle of the
+focus letter (0.6 em), whatever the font, so they may sit differently. They
+were not looked at while reading. For the owner to look at, with letter
+spacing on as well: at 0.85 em, the space is already wider than twice any
+letter gap, so spacing adds nothing between the words of a chunk.
+
+Left for phase 7: the font files must be cached for offline use, and the
+licence texts (`OFL-*.txt`) are in the repository next to the fonts but are
+not part of the built site. The owner put the licences link off to later
+(phase 5 question 5), and this joins it.
