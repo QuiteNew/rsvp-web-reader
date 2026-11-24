@@ -2968,6 +2968,96 @@ def build_bold_starts(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: copying with bold. core/rich_copy.py builds Windows' clipboard HTML:
+# a header with byte counts around an HTML fragment. A browser writes that
+# header itself, so only the fragment is ported. It is cut out of cf_html()'s
+# answer at the places its own header names, so the real code is what is
+# compared.
+# ---------------------------------------------------------------------------
+
+def rich_fragment(core, segments):
+    from core.rich_copy import cf_html
+
+    data = cf_html([(text, bold) for text, bold in segments])
+    head = data[: data.index(b"<html")].decode("ascii")
+    offsets = dict(re.findall(r"(\w+):(\d+)\r\n", head))
+    return data[int(offsets["StartFragment"]) : int(offsets["EndFragment"])].decode("utf-8")
+
+
+# The cases of the desktop's tests/test_rich_copy.py.
+RICH_CASES = [
+    [],
+    [["", True]],
+    [["ab", True], ["cd", False]],
+    [["ab", True], ["cd", True], ["ef", False], ["gh", False]],
+    [["<b>&amp;</b>", False]],
+    [["a < b & c > d", True]],
+    [["say \"hi\" it's", False]],
+    [["one\ntwo", False]],
+    [["ab\ncd", True]],
+    [["one\n\ntwo", False]],
+    [["one\n", False]],
+    [["a b c", False]],
+    [["a  b", False]],
+    [["   a", False]],
+    [["a   ", False]],
+    [[" ", False]],
+    [["a ", False], ["b", True]],
+    [["a ", False], [" b", True]],
+    [["a\tb", False]],
+    [["a \tb", False]],
+    [["a\r\nb\x00c\x1bd\x7fe\x85f", False]],
+    [["a\u2028b\u2029c", False]],
+    [["\u041f\u0440\u0438\u0432\u0435\u0442 \U0001F600", True]],
+    [["hello world", True]],
+    [["he", True], ["llo ", False], ["wo", True], ["rld", False]],
+    [["\u041f\u0440\u0438\u0432", True], ["\u0435\u0442 \u043c\u0438\u0440\n", False], ["\U0001F600 ", True], ["ok", False]],
+    [["  indented\n\n\n  tail  ", False], ["\t", True]],
+    [["a\n", True], ["\n", False], ["b", True]],
+    [["<&>", True], ["\"'", False]],
+]
+
+
+def rich_random_cases():
+    """The desktop's own random test, with a seed of this file's."""
+    rng = random.Random(20261124)
+    alphabet = ["a", "b", "Z", "\u0431", "\u0436", "\U0001F600", "&", "<", ">", '"', "'", " ", " ", " ",
+                "\t", "\n", "\n", "\r", "\x00", "\x7f", "\x85", "\u200d", "\u00ad", "-", "\u00e9", "1",
+                "\u2028", "\x0b", "\x0c", "\x1f", "\xa0"]
+    cases = []
+    for _ in range(400):
+        cases.append([["".join(rng.choice(alphabet) for _ in range(rng.randint(0, 12))), rng.random() < 0.5]
+                      for _ in range(rng.randint(0, 8))])
+    return cases
+
+
+def build_rich_copy(core):
+    import core.bold_starts as bold
+
+    # Text cut the way the bold view cuts it, as copying would find it.
+    def as_segments(text):
+        pieces = []
+        last = 0
+        for start, end in bold.bold_ranges(text):
+            if start > last:
+                pieces.append([text[last:start], False])
+            pieces.append([text[start:end], True])
+            last = end
+        if last < len(text):
+            pieces.append([text[last:], False])
+        return pieces
+
+    from_bold = [as_segments(text) for text in BOLD_TEXTS + TEXTS]
+    cases = RICH_CASES + rich_random_cases() + from_bold
+    from core.rich_copy import segments_text
+
+    return {
+        "html_fragment": [[[segments], rich_fragment(core, segments)] for segments in cases],
+        "segments_text": [call(segments_text, segments) for segments in RICH_CASES + rich_random_cases()],
+    }
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -2996,6 +3086,7 @@ MODULES = {
     "letter_spacing": build_letter_spacing,
     "font_choice": build_font_choice,
     "bold_starts": build_bold_starts,
+    "rich_copy": build_rich_copy,
 }
 
 
