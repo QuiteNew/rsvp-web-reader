@@ -94,3 +94,58 @@ test('the look is kept after a reload, and off gives the text box back', async (
   await page.getByRole('button', { name: 'Bold word starts' }).click();
   await expect(page.getByLabel('Transcript text')).toHaveValue('hello world');
 });
+
+// What the app puts on the clipboard for a copy in the bold view. A copy
+// event is sent with a clipboard of its own, so every browser can be asked,
+// not only those that let a test read the real clipboard.
+const COPY = `(() => {
+  const clipboard = new DataTransfer();
+  const event = new Event('copy', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clipboardData', { value: clipboard });
+  document.activeElement.dispatchEvent(event);
+  return {
+    handled: event.defaultPrevented,
+    plain: clipboard.getData('text/plain'),
+    html: clipboard.getData('text/html'),
+  };
+})()`;
+
+test('Ctrl+A selects the text, and a copy carries the bold', async ({ page }) => {
+  await openNotes(page, 'hello world\nnext line');
+  await page.getByRole('button', { name: 'Bold word starts' }).click();
+  const view = page.getByRole('textbox', { name: 'Transcript text' });
+  await view.focus();
+  await page.keyboard.press('ControlOrMeta+a');
+  // Only the text of the view, not the whole page.
+  expect(await page.evaluate<string>('document.getSelection().toString()')).toBe(
+    'hello world\nnext line',
+  );
+  const copied = await page.evaluate<{ handled: boolean; plain: string; html: string }>(COPY);
+  expect(copied).toEqual({
+    handled: true,
+    plain: 'hello world\nnext line',
+    html:
+      '<p style="margin:0"><b>hel</b>lo <b>wor</b>ld</p>' +
+      '<p style="margin:0"><b>ne</b>xt <b>li</b>ne</p>',
+  });
+});
+
+test('a real Ctrl+C puts the bold on the clipboard', async ({ page, context, browserName }) => {
+  // Only Chromium lets a test read the clipboard back.
+  test.skip(browserName !== 'chromium', 'reading the clipboard is Chromium only');
+  await context.grantPermissions(['clipboard-read', 'clipboard-write']);
+  await openNotes(page, 'hello world');
+  await page.getByRole('button', { name: 'Bold word starts' }).click();
+  await page.getByRole('textbox', { name: 'Transcript text' }).focus();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('ControlOrMeta+c');
+  const found = await page.evaluate<{ plain: string; html: string }>(`(async () => {
+    const [item] = await navigator.clipboard.read();
+    return {
+      plain: await (await item.getType('text/plain')).text(),
+      html: await (await item.getType('text/html')).text(),
+    };
+  })()`);
+  expect(found.plain).toBe('hello world');
+  expect(found.html).toContain('<b>hel</b>lo <b>wor</b>ld');
+});
