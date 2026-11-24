@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { letTheClickSettle } from './helpers.js';
+import { installClock, letTheClickSettle, startReadingPaused } from './helpers.js';
 
 // Letter spacing in a real browser. The page spaces the letters with CSS,
 // where the desktop builds each gap out of thin space characters, so these
@@ -22,14 +22,14 @@ type Level = keyof typeof GAPS;
 const CLOSE_EM = 0.01;
 
 async function startPaused(page: Page): Promise<void> {
+  await installClock(page);
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
   await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Spacing');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill('Reading information carefully helps');
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await page.getByRole('button', { name: 'Pause' }).click();
+  await startReadingPaused(page);
 }
 
 async function chooseLevel(page: Page, level: Level): Promise<void> {

@@ -1,18 +1,20 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { installClock, startReadingPaused } from './helpers.js';
+
 // The OpenDyslexic switch in a real browser: the whole page changes font at
 // once, the files come from the site itself and only when the switch is on,
 // and the reader measures its word in the new font.
 
 async function startPaused(page: Page, text: string): Promise<void> {
+  await installClock(page);
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
   await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Font');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(text);
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await page.getByRole('button', { name: 'Pause' }).click();
+  await startReadingPaused(page);
 }
 
 // The size once it has stopped changing: the same twice, a moment apart. The

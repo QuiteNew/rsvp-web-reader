@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { installClock, startReadingPaused } from './helpers.js';
+
 // A flash still too wide at the smallest fitted size: the scrollbar appears,
 // slides the flash to show what is cut off, and the centre button and the C
 // key bring it back. A flash that fits has no scrollbar.
@@ -14,14 +16,14 @@ async function startPaused(page: Page, text: string): Promise<void> {
   await page.addInitScript(() => {
     localStorage.setItem('rsvp-web-reader.settings', JSON.stringify({ default_font_size: 96 }));
   });
+  await installClock(page);
   await page.goto('./');
   await page.getByRole('button', { name: 'Add transcript' }).click();
   await page.getByRole('button', { name: 'Blank transcript' }).click();
   await page.getByLabel('Transcript title').fill('Wide');
   await page.getByRole('button', { name: 'Create' }).click();
   await page.getByLabel('Transcript text').fill(text);
-  await page.getByRole('button', { name: 'Start reading' }).click();
-  await page.getByRole('button', { name: 'Pause' }).click();
+  await startReadingPaused(page);
 }
 
 // How far the end of the flash is past the right side of the reading row, in
