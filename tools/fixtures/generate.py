@@ -2839,6 +2839,135 @@ def build_font_choice(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: bold word starts. Only core/bold_starts.py is ported: which letters
+# at the front of each word are bold. core/bold_spans.py turns the answer into
+# Tk "line.column" places, which a browser has no use for, so it is left out.
+# ---------------------------------------------------------------------------
+
+SOFT_HYPHEN = "\u00ad"
+ACUTE = "\u0301"
+
+# The cases of the desktop's tests/test_bold_starts.py, and more of the same
+# kind, so each rule of the module has a text that exercises it.
+BOLD_TEXTS = [
+    "a", "I", "of", "the", "that", "about", "people", "NASA", "iPhone",
+    "The quick brown fox.", "reading", "JavaScript", "internationalization",
+    "pneumonoultramicroscopicsilicovolcanoconiosis", "a" + "bc" * 40,
+    "journey", "audience", "rhythms", "because", "brrrrrrr", "boat", "chair",
+    "\u043c\u0430\u043c\u0430\u044a\u043c\u0430\u043c",
+    "\u043a\u043a\u043a\u043a\u0439\u0438\u0438\u0438",
+    "babbbbbb", "abbbbbbb", "AUDIENCE",
+    "\u041c\u0410\u041c\u0410\u042a\u041c\u0410\u041c",
+    "well-known", "state-of-the-art", "mother-in-law",
+    "word-word", "word\u2010word", "word\u2011word", "word\u2013word",
+    "word\u2014word", "word/word", "word_word", "word.word", "word,word",
+    "word:word", "word;word", "word(word", "word)word",
+    "foo\u200bbar",
+    "don't", "don\u2019t", "O'Brien", "I'm", "\u043c\u02bc\u044f\u0441\u043e",
+    "dogs'", "'tis", "rock 'n' roll", "'", "'' ' ''", "'tis 5",
+    "r\u00ade\u00ada\u00add\u00adi\u00adn\u00adg", "inter\u00adnational",
+    "exam\u00ad", "rea\u200cding", "rea\u200dding", "rea\u2060ding",
+    "cafe\u0301", "ca\u0301fe", "e\u0301", " \u0301 ", "1\u0301",
+    "\u041f\u0440\u0438\u0432\u0435\u0442", "\u043a\u044a\u0449\u0430",
+    "\u039a\u03b1\u03bb\u03b7\u03bc\u03ad\u03c1\u03b1", "\u03c4\u03b9\u037e",
+    "\u4f60\u597d\u4e16\u754c", "\u3053\u3093\u306b\u3061\u306f",
+    "\u0645\u0631\u062d\u0628\u0627", "\u05e9\u05dc\u05d5\u05dd",
+    "\u0e2a\u0e27\u0e31\u0e2a\u0e14\u0e35", "hello\u4f60\u597d",
+    "2024", "3.14", "3rd", "2nd", "H2O", "mp3", "x86", "version2", "1990's",
+    "m\u00b2", "COVID-19", "3-D", "5 apples",
+    # A number written with a character that is numeric but not a digit
+    # (str.isnumeric() is true for it, the Unicode category is a letter).
+    "hello\u4e09", "\u4e09hello", "hello\u00bd", "hello\u2167", "\u2460hello",
+    "see https://example.com/long-path now", "www.example.org is",
+    "go (https://x.org/a) now", "mail bob@example.com please",
+    "alice.smith+tag@mail.example.co.uk", "http://x", "HTTP://x.org y",
+    "foohttp://x.org y", "a@b", "a@b.c d", "bare example.com here",
+    # Addresses after an emoji, which counts as two UTF-16 units in a browser.
+    "\U0001F600 see https://x.org now", "\U0001F600 bob@example.com ok",
+    "\U0001F600\U0001F600 www.x.org end", "a\U0001F600b https://x.org/\U0001F600 tail",
+    "", " ", "   \n\t  ", "!!! ... ???", "-- -- --", "12 34 56",
+    "hello \U0001F600 world", "ab\ncd", "ab\r\ncd", "ab\u2028cd", "ab\x0bcd",
+    "\U0001F600abc", "abc\U0001F600def", "\U0001D7D8abc", "a\U00020000b",
+    "The well-known state-of-the-art audience\ndon't read https://example.com/a-b now\n\n"
+    "\u041f\u0440\u0438\u0432\u0435\u0442 \u043a\u044a\u0449\u0430 cafe\u0301 3rd\n"
+    "inter\u00adnational 1990's",
+    "Hello, world! It's a well-known fact (see https://example.com/x) that "
+    "internationalization costs 3 times more than don't-care attitudes; "
+    "e.g. rock 'n' roll, state_of_the_art, O'Brien\u2014and \u041f\u0440\u0438\u0432\u0435\u0442 "
+    "cafe\u0301 \U0001F600 inter\u00adnational 1990's H2O.",
+    # Other cases the rules cover: Turkish dotted capital I (lower-cases to two
+    # characters), ligatures, the Latin-1 and extended letters, capitals.
+    "\u0130stanbul", "\ufb01nancial", "\u00c6ther", "\u0153uvre", "\u00d8resund",
+    "\u0131\u0131\u0131\u0131\u0131\u0131\u0131", "\u0259\u0259\u0259\u0259\u0259\u0259\u0259",
+    "\u00fcber", "stra\u00dfe", "\u00c9COLE", "na\u00efve", "r\u00e9sum\u00e9",
+    "\u0391\u0398\u0397\u039d\u0391\u0399\u039f\u0399", "\u1f08\u03b8\u03ae\u03bd\u03b1",
+    "\u0407\u0436\u0430\u043a", "\u0457\u0436\u0430\u043a\u0457\u0436\u0430\u043a",
+]
+
+
+def bold_random_texts():
+    """Deterministic made-up texts: words of every length made of vowels and
+    consonants of several alphabets, with the things that change a word (an
+    apostrophe, a soft hyphen, a combining mark, a digit) dropped in."""
+    rng = random.Random(20261124)
+    alphabets = [
+        ("aeiouy", "bcdfghjklmnpqrstvwxz"),
+        ("AEIOUY", "BCDFGHJKLMNPQRSTVWXZ"),
+        ("\u00e0\u00e9\u00ee\u00f6\u00fc\u0153", "\u00e7\u00f1\u00df\u0161\u017e"),
+        ("\u0430\u0435\u0438\u043e\u0443\u044b\u044f", "\u0431\u0432\u0433\u0434\u0439\u043a\u043b\u043c\u044a\u044c"),
+        ("\u03b1\u03b5\u03b7\u03b9\u03bf\u03c5\u03c9", "\u03b2\u03b3\u03b4\u03b6\u03b8\u03bb\u03bc\u03c3\u03c2"),
+    ]
+    extras = ["'", "\u2019", SOFT_HYPHEN, ACUTE, "1", "-", "\u200c"]
+    texts = []
+    for _ in range(300):
+        words = []
+        for _ in range(rng.randint(1, 8)):
+            vowels, consonants = rng.choice(alphabets)
+            word = "".join(
+                rng.choice(vowels if rng.random() < 0.4 else consonants)
+                for _ in range(rng.randint(1, 24))
+            )
+            if rng.random() < 0.25:
+                at = rng.randint(0, len(word))
+                word = word[:at] + rng.choice(extras) + word[at:]
+            words.append(word)
+        texts.append(rng.choice([" ", " ", "-", "\n", ", "]).join(words))
+    return texts
+
+
+def build_bold_starts(core):
+    import core.bold_starts as bold
+
+    # Every letter the word finder accepts, put in the one place where it
+    # decides between a vowel and a consonant. In "bbbbXba" the bold stretch is
+    # 4 letters when X is a vowel and 6 when it is not, so the answer for each
+    # letter records what _is_vowel() decided.
+    letters = [chr(n) for n in range(0x110000) if bold._kind(chr(n)) == "L"]
+    vowel_probes = ["bbbb" + letter + "ba" for letter in letters]
+
+    texts = unique(
+        BOLD_TEXTS + TEXTS + EXTRA_WORDS + bold_random_texts() + vowel_probes
+        + ["b" * n for n in range(1, 40)]
+        + ["ab" * n for n in range(1, 25)]
+        + ["ba" * n for n in range(1, 25)]
+    )
+
+    def kind_ranges(kind):
+        return ranges(lambda ch: bold._kind(ch) == kind)
+
+    return {
+        "fixation_length": [call(bold.fixation_length, n) for n in list(range(-3, 80)) + [1000, 10**6]],
+        "bold_ranges": [call(bold.bold_ranges, text) for text in texts],
+        # The word finder's own character classes, as ranges: L a letter it
+        # bolds, M a combining mark, A an apostrophe, I invisible glue.
+        "kind_ranges": [[[], {kind: kind_ranges(kind) for kind in "LMAI"}]],
+        # What str.isnumeric() accepts. Used to look at the character next to a
+        # word. It is wider than the Unicode number categories.
+        "numeric_ranges": [[[], ranges(str.isnumeric)]],
+    }
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -2866,6 +2995,7 @@ MODULES = {
     "importers": build_importers,
     "letter_spacing": build_letter_spacing,
     "font_choice": build_font_choice,
+    "bold_starts": build_bold_starts,
 }
 
 
