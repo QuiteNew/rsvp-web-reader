@@ -286,7 +286,7 @@
   border: 0;
   border-radius: 0.5rem;
   resize: none;
-  font-family: system-ui, sans-serif;
+  font-family: var(--font-text);
   font-weight: 400;
 }
 

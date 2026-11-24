@@ -64,6 +64,9 @@
 
   --font-heading: 'Fredoka', system-ui, sans-serif;
   --font-body: 'Quicksand', system-ui, sans-serif;
+  /* The transcript's text box, in the system's font, as the desktop's edit
+     box uses its toolkit's font and not Quicksand. */
+  --font-text: system-ui, sans-serif;
 
   color-scheme: light;
   font-family: var(--font-body);
@@ -80,6 +83,7 @@
 :root[data-font='dyslexic'] {
   --font-heading: 'OpenDyslexic', system-ui, sans-serif;
   --font-body: 'OpenDyslexic', system-ui, sans-serif;
+  --font-text: 'OpenDyslexic', system-ui, sans-serif;
 }
 
 /* Drop-down lists use the system's font unless told otherwise. With the

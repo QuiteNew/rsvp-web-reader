@@ -76,6 +76,8 @@ test('off, the page uses Quicksand and Fredoka, and never fetches OpenDyslexic',
   await startPaused(page, 'Reading information carefully helps');
   expect(await page.evaluate<string>(fontOf('body'))).toBe('500 Quicksand');
   expect(await page.evaluate<string>(fontOf('[data-testid=word]'))).toBe('600 Fredoka');
+  await page.getByRole('button', { name: 'Stop reading' }).click();
+  expect(await page.evaluate<string>(fontOf('textarea'))).toBe('400 system-ui');
   expect(fetched.filter((url) => url.includes('OpenDyslexic'))).toEqual([]);
 });
 
@@ -90,6 +92,9 @@ test('on, every font follows, and the files come from the site itself', async ({
   await setSwitch(page, true);
   await expect.poll(() => page.evaluate<string>(fontOf('body'))).toBe('500 OpenDyslexic');
   expect(await page.evaluate<string>(fontOf('[data-testid=word]'))).toBe('600 OpenDyslexic');
+  // The transcript's text box too, which is in the system's font when off.
+  await page.getByRole('button', { name: 'Stop reading' }).click();
+  expect(await page.evaluate<string>(fontOf('textarea'))).toBe('400 OpenDyslexic');
   // Strings, because this file is checked as Node code and has no `document`.
   await expect
     .poll(() => page.evaluate('document.fonts.check("400 16px OpenDyslexic")'))
