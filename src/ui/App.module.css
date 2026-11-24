@@ -300,13 +300,32 @@
   font-weight: 600;
 }
 
-/* Normalize at the left, Start reading in the middle and a short message
-   at the right. The two outer columns are equal, so Start reading stays in
+/* The text with bold word starts, in the text box's place. It keeps the
+   text box's lines and wrapping, and scrolls the same way. */
+.boldView {
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.boldView:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.6;
+}
+
+/* Normalize and the bold word starts button at the left, Start reading in
+   the middle and a short message at the right. The two outer columns are equal, so Start reading stays in
    the middle. */
 .startRow {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
+  gap: 0.5rem;
+}
+
+.editTools {
+  justify-self: start;
+  display: flex;
   gap: 0.5rem;
 }
 

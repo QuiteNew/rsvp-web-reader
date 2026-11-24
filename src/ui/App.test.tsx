@@ -2634,3 +2634,102 @@ describe('a click does not keep the keyboard', () => {
     expect(plus).toHaveFocus();
   });
 });
+
+describe('bold word starts', () => {
+  function boldButton(): HTMLElement {
+    return screen.getByRole('button', { name: 'Bold word starts' });
+  }
+
+  // The bold pieces of the text box, in order.
+  function boldPieces(): string[] {
+    const box = screen.getByRole('textbox', { name: 'Transcript text' });
+    return Array.from(box.querySelectorAll('b'), (piece) => piece.textContent);
+  }
+
+  function openNotes(text: string): Page {
+    const page = renderPage();
+    addTranscript('Notes');
+    paste(text);
+    return page;
+  }
+
+  test('it starts off, with the text box to type in', () => {
+    openNotes('well-known words');
+    expect(boldButton()).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('Transcript text').tagName).toBe('TEXTAREA');
+  });
+
+  test('a click shows the start of every word in bold, read only, and saves it', () => {
+    openNotes('The well-known reader');
+    press('Bold word starts');
+    expect(boldButton()).toHaveAttribute('aria-pressed', 'true');
+    const box = screen.getByRole('textbox', { name: 'Transcript text' });
+    expect(box.tagName).toBe('DIV');
+    expect(box).toHaveAttribute('aria-readonly', 'true');
+    expect(box.textContent).toBe('The well-known reader');
+    expect(boldPieces()).toEqual(['Th', 'we', 'kno', 'rea']);
+    expect(savedSettings().saved().bold_starts_enabled).toBe(true);
+  });
+
+  test('a second click gives the text box back, with the same text', () => {
+    const page = openNotes('The well-known reader');
+    press('Bold word starts');
+    press('Bold word starts');
+    expect(boldButton()).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByLabelText('Transcript text')).toHaveValue('The well-known reader');
+    expect(savedSettings().saved().bold_starts_enabled).toBe(false);
+    expect(page.store.getSnapshot().transcripts[0]?.rawText).toBe('The well-known reader');
+  });
+
+  test('the text itself is never changed, and reading is the same', () => {
+    const page = openNotes('one two three');
+    press('Bold word starts');
+    expect(page.store.getSnapshot().transcripts[0]?.rawText).toBe('one two three');
+    press('Start reading');
+    expect(word()).toBe('one');
+  });
+
+  test('a saved look is used from the start', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ bold_starts_enabled: true }));
+    renderPage();
+    addTranscript('Notes');
+    expect(boldButton()).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('textbox', { name: 'Transcript text' }).tagName).toBe('DIV');
+  });
+
+  test('anything but a real true leaves it off', () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ bold_starts_enabled: 'true' }));
+    openNotes('hello world');
+    expect(boldButton()).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('Normalize still works, and the bold follows the new text', () => {
+    openNotes('hello   world');
+    press('Bold word starts');
+    press('Normalize the text');
+    expect(screen.getByRole('textbox', { name: 'Transcript text' }).textContent).toBe(
+      'hello world',
+    );
+    expect(boldPieces()).toEqual(['hel', 'wor']);
+  });
+
+  test('with no text it says how to type, since it cannot be typed in', () => {
+    openNotes('');
+    press('Bold word starts');
+    const box = screen.getByRole('textbox', { name: 'Transcript text' });
+    expect(box).toBeEmptyDOMElement();
+    expect(box).toHaveAttribute(
+      'data-placeholder',
+      'Turn off bold word starts to type or paste here.',
+    );
+  });
+
+  test('it is not part of Reset to Original Defaults', () => {
+    openNotes('hello');
+    press('Bold word starts');
+    openSettings();
+    press('Reset to Original Defaults');
+    press('Apply');
+    expect(savedSettings().saved().bold_starts_enabled).toBe(true);
+  });
+});

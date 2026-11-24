@@ -29,10 +29,12 @@ import type { SavedSettingsStore } from '../store/settingsStore';
 import styles from './App.module.css';
 import { Dialog, MessageDialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
+import { BoldText } from './BoldText';
 import { BookmarksDialog } from './BookmarksDialog';
 import { ChunkingDialog } from './ChunkingDialog';
 import { IMPORT_ACCEPT, largeImportWarning, readPickedFile } from './fileImport';
 import {
+  BoldStartsIcon,
   BookmarkIcon,
   NormalizeIcon,
   PauseIcon,
@@ -226,6 +228,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
 
   // The surrounding-words line is built by the engine only when it is on.
   const showContext = preferences.peripheralContextEnabled;
+  const boldStarts = preferences.boldStartsEnabled;
   useEffect(() => {
     engine.setPeripheralContext(showContext);
   }, [engine, showContext]);
@@ -770,32 +773,57 @@ export function App({ store, settings, health, ...parts }: AppProps) {
               startReading(selected);
             }}
           >
-            <textarea
-              className={styles.text}
-              aria-label="Transcript text"
-              placeholder="Paste a transcript or any text here."
-              value={selected.rawText}
-              onChange={(event) => {
-                changeText(selected, event.target.value);
-              }}
-            />
+            {boldStarts ? (
+              <BoldText
+                className={`${styles.text} ${styles.boldView}`}
+                label="Transcript text"
+                placeholder="Turn off bold word starts to type or paste here."
+                text={selected.rawText}
+              />
+            ) : (
+              <textarea
+                className={styles.text}
+                aria-label="Transcript text"
+                placeholder="Paste a transcript or any text here."
+                value={selected.rawText}
+                onChange={(event) => {
+                  changeText(selected, event.target.value);
+                }}
+              />
+            )}
             {problem !== '' && (
               <p role="alert" className={styles.problem}>
                 {problem}
               </p>
             )}
             <div className={styles.startRow}>
-              <button
-                type="button"
-                className={styles.normalize}
-                aria-label={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
-                title={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
-                onClick={() => {
-                  normalize(selected);
-                }}
-              >
-                {offersRevert ? <RevertIcon /> : <NormalizeIcon />}
-              </button>
+              <div className={styles.editTools}>
+                <button
+                  type="button"
+                  className={styles.normalize}
+                  aria-label={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
+                  title={offersRevert ? 'Revert to the original text' : 'Normalize the text'}
+                  onClick={() => {
+                    normalize(selected);
+                  }}
+                >
+                  {offersRevert ? <RevertIcon /> : <NormalizeIcon />}
+                </button>
+                {/* Bold word starts: a look for the text box only, never the
+                    reader. Saved at once, as on the desktop. */}
+                <button
+                  type="button"
+                  className={styles.normalize}
+                  aria-label="Bold word starts"
+                  aria-pressed={boldStarts}
+                  title="Bold word starts. The text is read only while they are on."
+                  onClick={() => {
+                    settings.set('boldStartsEnabled', !boldStarts);
+                  }}
+                >
+                  <BoldStartsIcon on={boldStarts} />
+                </button>
+              </div>
               <button
                 type="submit"
                 className={styles.start}
