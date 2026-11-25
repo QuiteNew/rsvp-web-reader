@@ -1,4 +1,5 @@
 import { describe, expect, test, vi } from 'vitest';
+import { ProfileError } from '../core/profiles';
 import { DEFAULT_SAVED_SETTINGS, settingsView } from '../core/settings';
 import { SETTINGS_KEY } from './schema';
 import { DAMAGED_SETTINGS_KEY, SavedSettingsStore } from './settingsStore';
@@ -203,5 +204,99 @@ describe('an import in Replace mode', () => {
     expect(store.saved().profiles).toEqual(profiles);
     store.replaceFromBundle({ profiles: [] });
     expect(store.saved().profiles).toEqual([]);
+  });
+});
+
+describe('reading profiles', () => {
+  test('saving one writes it at once and tells, with the current settings in it', () => {
+    const kept = storage();
+    const store = new SavedSettingsStore(kept);
+    store.set('skipWordCount', 25);
+    const told = vi.fn();
+    store.subscribe(told);
+    const profile = store.saveProfile('  Fast   skim ');
+    expect(profile.name).toBe('Fast skim');
+    expect(profile.values.skip_word_count).toBe(25);
+    // Following the theme, so saved as null.
+    expect(profile.values.guide_mark_color).toBeNull();
+    expect(told).toHaveBeenCalledTimes(1);
+    expect(store.getSnapshot().profiles).toEqual([profile]);
+    expect((savedIn(kept) as { profiles: unknown }).profiles).toEqual([profile]);
+  });
+
+  // The desktop's test_every_kind_of_change_is_saved_straight_away.
+  test('every kind of change is saved straight away', () => {
+    const kept = storage();
+    const store = new SavedSettingsStore(kept);
+    store.saveProfile('Fast skim');
+    store.set('pauseOnSkip', true);
+    store.saveProfile('Careful read');
+    store.set('skipWordCount', 30);
+    store.updateProfile('Fast skim');
+    store.renameProfile('Careful read', 'Slow');
+    store.deleteProfile('Fast skim');
+    const saved = savedIn(kept) as {
+      profiles: { name: string; values: Record<string, unknown> }[];
+    };
+    expect(saved.profiles.map((profile) => profile.name)).toEqual(['Slow']);
+    expect(saved.profiles[0]?.values.pause_on_skip).toBe(true);
+    expect(saved.profiles[0]?.values.skip_word_count).toBe(10);
+  });
+
+  // The desktop's test_updating_a_profile_replaces_its_settings_and_keeps_its_name.
+  test('updating a profile replaces its settings and keeps its name', () => {
+    const store = new SavedSettingsStore(storage());
+    store.set('skipWordCount', 30);
+    store.saveProfile('Mine');
+    store.set('skipWordCount', 9);
+    const updated = store.updateProfile('mine');
+    expect(updated.name).toBe('Mine');
+    expect(store.getSnapshot().profiles.map((profile) => profile.name)).toEqual(['Mine']);
+    expect(store.getSnapshot().profiles[0]?.values.skip_word_count).toBe(9);
+  });
+
+  test('profiles are still there for the next store on the same storage', () => {
+    const kept = storage();
+    const first = new SavedSettingsStore(kept);
+    first.set('letterSpacingLevel', 2);
+    first.saveProfile('Spaced');
+    const again = new SavedSettingsStore(kept);
+    expect(again.getSnapshot().profiles).toEqual(first.getSnapshot().profiles);
+    expect(again.getSnapshot().profiles[0]?.values.letter_spacing_level).toBe(2);
+  });
+
+  test('a refused change throws, and saves and tells nothing', () => {
+    const kept = storage();
+    const store = new SavedSettingsStore(kept);
+    store.saveProfile('Mine');
+    const before = kept.items.get(SETTINGS_KEY);
+    const told = vi.fn();
+    store.subscribe(told);
+    expect(() => store.saveProfile('MINE')).toThrow(ProfileError);
+    expect(() => store.updateProfile('Nope')).toThrow('There is no profile called "Nope".');
+    expect(() => store.renameProfile('Mine', '')).toThrow('Give the profile a name.');
+    expect(() => store.deleteProfile('Nope')).toThrow(ProfileError);
+    expect(() => store.applyProfile('Nope', '#3B2E27')).toThrow(ProfileError);
+    expect(told).not.toHaveBeenCalled();
+    expect(kept.items.get(SETTINGS_KEY)).toBe(before);
+    expect(store.getSnapshot().profiles.map((profile) => profile.name)).toEqual(['Mine']);
+  });
+
+  // The desktop's test_an_applied_profile_is_written_to_settings_json.
+  test('an applied profile is written at once, and the page reads it', () => {
+    const kept = storage();
+    const store = new SavedSettingsStore(kept);
+    store.set('skipWordCount', 30);
+    store.setGuideMarkColor('#112233');
+    store.saveProfile('Mine');
+    store.set('skipWordCount', 5);
+    store.setGuideMarkColor('#AABBCC');
+    store.applyProfile('mine', '#3B2E27');
+    expect(store.getSnapshot().skipWordCount).toBe(30);
+    expect(store.getSnapshot().guideMarkColor).toBe('#112233');
+    const saved = savedIn(kept) as Record<string, unknown>;
+    expect(saved.skip_word_count).toBe(30);
+    expect(saved.guide_mark_color).toBe('#112233');
+    expect(saved.guide_mark_color_is_default).toBe(false);
   });
 });

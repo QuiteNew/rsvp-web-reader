@@ -9,6 +9,8 @@
 // wait for: the settings are read when the store is made, and every change
 // is written before the method returns.
 import type { Settings } from '../core/models';
+import type { Profile } from '../core/profiles';
+import * as profileRules from '../core/savedProfiles';
 import type { SavedSettings } from '../core/savedShapes';
 import {
   DEFAULT_SAVED_SETTINGS,
@@ -92,6 +94,53 @@ export class SavedSettingsStore implements SettingsStore {
   /** Give the guide marks the theme's colour, if they still follow the theme. */
   resyncGuideMarkColorDefault(color: string): void {
     this.become(resyncGuideMarkColorDefault(this.settings, color));
+  }
+
+  // ---- Reading profiles ----
+  // Each change is saved straight away, as on the desktop. A name that cannot
+  // be used, or a profile that is not there, throws ProfileError with a
+  // message to show as it is, and then nothing changes and nothing is saved.
+
+  /** Save the current settings as a new profile, and give it back as saved. */
+  saveProfile(name: string): Profile {
+    const change = profileRules.addProfile(
+      this.settings,
+      name,
+      profileRules.snapshotValues(this.settings),
+    );
+    this.become(change.saved);
+    return change.profile;
+  }
+
+  /** Replace what a profile holds with the current settings. */
+  updateProfile(name: string): Profile {
+    const change = profileRules.updateProfile(
+      this.settings,
+      name,
+      profileRules.snapshotValues(this.settings),
+    );
+    this.become(change.saved);
+    return change.profile;
+  }
+
+  /** Give a profile a new name, and give it back as saved. */
+  renameProfile(name: string, newName: string): Profile {
+    const change = profileRules.renameProfile(this.settings, name, newName);
+    this.become(change.saved);
+    return change.profile;
+  }
+
+  deleteProfile(name: string): void {
+    this.become(profileRules.deleteProfile(this.settings, name));
+  }
+
+  /**
+   * Put a profile's settings to use. themeGuideMarkColor is the colour the
+   * theme on screen gives the guide marks, for a profile that saved them as
+   * following the theme.
+   */
+  applyProfile(name: string, themeGuideMarkColor: string): void {
+    this.become(profileRules.applyProfile(this.settings, name, themeGuideMarkColor));
   }
 
   /** An import in Replace mode: the file's settings in place of these. */

@@ -15,6 +15,7 @@
 // holds the current value, saves it and loads it.
 
 import type { Library, Settings, SpeakerCustom, Transcript } from '../core/models';
+import type { Profile } from '../core/profiles';
 import type { SavedSettings } from '../core/savedShapes';
 
 // Where a value is kept. One for the library, one for the settings. The
@@ -168,6 +169,18 @@ export interface SettingsStore {
   // Used by a bundle import in Replace mode. Takes the "settings" part of
   // the file as it is. Profiles already here are kept when the file has none.
   replaceFromBundle(settings: SavedSettings): void;
+
+  // Reading profiles, saved straight away. The list is getSnapshot().profiles.
+  // Each throws ProfileError, with a message to show as it is, when a name
+  // cannot be used or the profile is not there, and then changes nothing.
+  // Saving and updating take a snapshot of the current settings.
+  saveProfile(name: string): Profile;
+  updateProfile(name: string): Profile;
+  renameProfile(name: string, newName: string): Profile;
+  deleteProfile(name: string): void;
+  // themeGuideMarkColor is the colour the theme on screen gives the guide
+  // marks, for a profile that saved them as following the theme.
+  applyProfile(name: string, themeGuideMarkColor: string): void;
 }
 
 // An export file, or a file being imported. On disk it has the desktop
