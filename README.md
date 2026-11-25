@@ -83,6 +83,12 @@ project.
 - Letter spacing for the flashing word, in four levels (Off, Small, Medium,
   Large), with the highlighted letter kept on its spot and the words of a chunk
   kept apart
+- An OpenDyslexic font switch for the whole page
+- Optional bold word starts in the text box: one button next to Normalize bolds
+  the beginning of every word, and a copy out of the text box (Ctrl+C) carries
+  the bold into Word or an email. While it is on, the text box is read only, so
+  you turn it off to type or paste. Both this and the font are comfort settings
+  you can try by eye, not a treatment, and the app does not claim they help
 - Light / Dark / System theme support, with reading colors that automatically
   follow the active theme unless you've customized them
 - Picks up where you left off: the last transcript reopens at launch, paused
@@ -262,7 +268,7 @@ rsvp-web-reader/
 │   │   ├── BookmarksDialog.tsx  # The bookmarks list
 │   │   ├── DataSettings.tsx     # Export and import
 │   │   ├── fileImport.ts        # Adding a transcript from a file: the picker, the heads-up
-│   │   └── fonts/               # Bundled Fredoka and Quicksand font files, with their licenses
+│   │   └── fonts/               # Bundled Fredoka, Quicksand and OpenDyslexic font files, with their licenses
 │   └── testing/             # Helpers shared by tests: a fake clock, fixtures, store steps
 ├── tools/
 │   └── fixtures/
@@ -291,7 +297,7 @@ and [src/ui](src/ui/README.md), says what may import what. For the plan and the 
 - [Vitest](https://vitest.dev/) with [Testing Library](https://testing-library.com/) - the unit and component tests
 - [Playwright](https://playwright.dev/) - the browser tests, in Chromium, Firefox and WebKit
 - [ESLint](https://eslint.org/) & [Prettier](https://prettier.io/) - the layer rule, and formatting
-- [Fredoka](https://fonts.google.com/specimen/Fredoka) & [Quicksand](https://fonts.google.com/specimen/Quicksand) - bundled fonts
+- [Fredoka](https://fonts.google.com/specimen/Fredoka), [Quicksand](https://fonts.google.com/specimen/Quicksand) & [OpenDyslexic](https://opendyslexic.org/) - bundled fonts
 - [pdf.js](https://mozilla.github.io/pdf.js/) - reading the text of a PDF, loaded only when a PDF is picked
 
 ## Settings and Configuration
@@ -303,7 +309,7 @@ Settings are organized into three tabs, and changes take effect when you press *
   marks, pacing, skipping, the surrounding-words line, reopening the last
   transcript at launch, and more. A live search filters them by name or by
   description. **Configure chunking** opens its own window
-- **Appearance** - Light / Dark / System theme, and letter spacing
+- **Appearance** - Light / Dark / System theme, letter spacing, and the OpenDyslexic font
 - **Data** - export everything (transcripts, Spaces and settings) to a file, or
   import one, choosing whether to replace what's here or add to it. The version,
   the license and a link to the source are at the bottom
@@ -316,20 +322,24 @@ Settings are organized into three tabs, and changes take effect when you press *
 - ~~Saved data in the browser, with export and import~~
 - ~~The reading experience: guide marks, surrounding words, progress slider, bookmarks, chunking, keyboard shortcuts, themes, fitting wide flashes~~
 - ~~Importing files (PDF, Word, HTML, subtitles and Markdown), read in the browser only~~
-- Comfort features: ~~letter spacing~~, a dyslexia-friendly font, bold word starts, reading profiles, speaker cues
+- Comfort features: ~~letter spacing~~, ~~a dyslexia-friendly font~~, ~~bold word starts~~, reading profiles, speaker cues
 - Offline use and installing as an app, accessibility, and a help page
 
 ## License
 
 Released under the MIT License. See [LICENSE](LICENSE) for the full text.
 
-The bundled Fredoka and Quicksand fonts are each released under
+The bundled Fredoka, Quicksand and OpenDyslexic fonts are each released under
 the SIL Open Font License, not the MIT license. A copy of each font's license
 sits next to the font files in [src/ui/fonts](src/ui/fonts), and the fonts are
 credited under Acknowledgments. pdf.js is released by Mozilla under the Apache
 License 2.0. The build writes the licenses of every library built into the
 site to `third-party-licenses.md`, next to the site's own files. The MIT
 license covers the project's own code.
+
+The bold word starts look is similar to the one sold as Bionic Reading, a
+trademark of BRCG Casutt GmbH. This project is not affiliated with or endorsed by
+them and does not use their software.
 
 ## Acknowledgments
 
@@ -342,4 +352,7 @@ license covers the project's own code.
 - [Quicksand](https://fonts.google.com/specimen/Quicksand), by Andrew
   Paglinawan, licensed under the SIL Open Font License. See
   [OFL-Quicksand.txt](src/ui/fonts/OFL-Quicksand.txt)
+- [OpenDyslexic](https://opendyslexic.org/), by Abbie Gonzalez, licensed under
+  the SIL Open Font License. See
+  [OFL-OpenDyslexic.txt](src/ui/fonts/OFL-OpenDyslexic.txt)
 - [React](https://react.dev/) by Meta and its contributors

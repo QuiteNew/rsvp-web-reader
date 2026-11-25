@@ -4,13 +4,13 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 [phase-6.md](phase-6.md). Phase 5 was called done by the owner on
 2026-11-22 and released as `v1.1.0`. Phase 6 started on 2026-11-23.
 
-| Step                                   | State                                     |
-| -------------------------------------- | ----------------------------------------- |
-| 1. What the desktop app does, and plan | Done, below                               |
-| 2. Design notes from the owner         | Done on 2026-11-23, below                 |
-| 3. Build, one feature at a time        | 2 of 6 built. Letter spacing is in 1.2.0  |
-| 4. The owner tries each feature        | The font is waiting for the owner         |
-| 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own |
+| Step                                   | State                                                                            |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| 1. What the desktop app does, and plan | Done, below                                                                      |
+| 2. Design notes from the owner         | Done on 2026-11-23, below                                                        |
+| 3. Build, one feature at a time        | 3 of 6 built. Letter spacing is in 1.2.0, the font and bold word starts in 1.3.0 |
+| 4. The owner tries each feature        | The font and bold word starts are waiting for the owner's eye check              |
+| 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own                                        |
 
 ## Step 1: what the desktop app does
 
@@ -373,8 +373,7 @@ pass in both.
 
 ### 2. The OpenDyslexic font
 
-Built on 2026-11-23, for 1.3.0. The release is not prepared yet: bold word
-starts goes out with it.
+Built on 2026-11-23, for 1.3.0, which it shares with bold word starts below.
 
 What was added. The two font files and their licence text, copied from the
 desktop's `assets/fonts/` byte for byte (the md5 sums match, and nothing was
@@ -447,3 +446,103 @@ Left for phase 7: the font files must be cached for offline use, and the
 licence texts (`OFL-*.txt`) are in the repository next to the fonts but are
 not part of the built site. The owner put the licences link off to later
 (phase 5 question 5), and this joins it.
+
+### 3. Bold word starts
+
+Built on 2026-11-24, for 1.3.0, in seven commits: the port of the rules
+(`ff22fd7`), the cutting of a text into pieces (`ef903ab`), two helpers the
+browser tests needed (`a53ee0b`, `48b14e9`), the view and its button
+(`66b3e40`), the port of the clipboard HTML (`2bac167`) and copying out of the
+view (`3de3b60`).
+
+What was ported. All of `core/bold_starts.py` into `src/core/boldStarts.ts`:
+which letters of each word are bold, with the length curve, the nudge to a
+vowel and consonant boundary, the plain digits and the plain web and email
+addresses. `fixtures/core/bold_starts.json` holds 2,439 cases generated from
+the desktop at `eccfc89`, and the tests also sweep every Unicode character
+against Python's own answer. The desktop counts characters as code points and
+the browser counts UTF-16 units, so positions are kept in code points
+(`characters()` in `pythonText.ts`) and `boldSegments()` turns them into
+pieces only at the edge. Then `core/rich_copy.py` into `src/core/richCopy.ts`,
+checked against `fixtures/core/rich_copy.json`, 1,094 cases. Each answer is the
+fragment cut out of the desktop's real `cf_html()` at the places its own header
+names, so the real code is what is compared. The header of Windows'
+clipboard format is not ported, because a browser writes its own.
+
+The two choices the notes left open, made by the owner:
+
+- A text box cannot show bold, so while the look is on a read-only view takes
+  the text box's place (`BoldText.tsx`). It has the textarea's class, so font,
+  size, padding and lines are the same. The text is typed and pasted in the
+  box with the look off, as the placeholder says. The view is a `div` with
+  `role="textbox"` and `aria-readonly`, and its bold pieces are built straight
+  into the page and not by React, which would compare a hundred thousand of
+  them at every draw of a long text.
+- A normal copy carries the bold. There is no separate "Copy with bold"
+  button or menu item, which the desktop has because Tk has no other way to
+  offer it.
+
+How it differs from the desktop, on purpose:
+
+- The 4,000-character line limit is not ported. It exists because Tk's cost
+  for a line grows with the square of its words. In a browser the total size
+  of the text is what counts. Measured in Chromium by the assistant: 100,000
+  characters switch on in 0.16 s, 500,000 in 0.8 to 1.7 s and 2 million in
+  about 3 s. The owner's probe, run in all three browsers at once on one
+  machine, gave 0.7, 0.8 and 1.8 s at 100,000 characters (Chromium, WebKit,
+  Firefox), 2.6, 2.4 and 4.2 s at 500,000, and 16.6 s in Firefox at 2 million
+  (Chromium and WebKit did not get that far, see below). Switching off took
+  0.2 to 1.0 s up to 500,000. So no limit was added.
+- The view is read only, so there is no Cut, and nothing to undo in it.
+- Not in profiles, as on the desktop. Saved on its own as
+  `bold_starts_enabled`, at once, not at Apply.
+- The button sits next to Normalize, with an icon that shows on or off.
+  The app never says "Bionic Reading".
+
+How copying works. The `copy` event is caught on the whole page, because where
+the browser sends it differs. `copyWithBold()` acts only when the selection is
+inside the view. It reads the pieces off the page as they are shown, plain or
+bold in reading order, writes the plain text and the HTML, and calls
+`preventDefault()`. As on the desktop, if the pieces do not add up to exactly
+the selected text, or the selection reaches outside the view, it does nothing
+and the browser's own copy happens. Without this handler the browser's copy
+also carried the page's text colour, font and grey box background into Word,
+which was seen while building it. Ctrl+A (Cmd+A on a Mac) in the view selects
+its text only, because in a part of the page that is not a text box the
+browser would select the whole page.
+
+What was run, on 2026-11-24 and 2026-11-25:
+
+- `npm run check`: 1,529 Vitest tests at the last commit, in the logic,
+  importers and ui projects.
+- The Playwright tests in Chromium by the assistant (65 of them, 4 in
+  `e2e/boldStarts.spec.ts` for the view and 2 more for copying), and by the
+  owner in Chromium, Firefox and WebKit. A real Ctrl+C read back from the
+  clipboard runs in Chromium only, since the other two do not let a test read
+  the clipboard. The copy event itself is tested in all three.
+- Eight deliberate breaks of the copy code, each caught by a test, in
+  Chromium.
+- The fixtures were generated in a scratch copy of the desktop. The desktop
+  clone was checked to be as it was before.
+
+Two races in the browser tests were found on the way, both in the tests and
+not in the page. Reading advances on the page's own timers, so a test that
+clicks Start reading and then Pause could be too slow, most in WebKit when
+three browsers ran at once. `installClock()` and `startReadingPaused()` in
+`e2e/helpers.ts` hold the page's clock for the two clicks (`a53ee0b`). The
+text box also did not follow the OpenDyslexic switch, because its font was set
+to the system font in the stylesheet. `--font-text` fixes that (`48b14e9`).
+
+A speed finding that is not about bold. The probe could not put 2 million
+characters into the text box in Chromium and WebKit: the step of filling the
+box took longer than the four minutes the test had. At 500,000 characters it
+took 88 s in Chromium and 62 s in WebKit, and 0.7 s in Firefox. Run alone in
+Chromium, a bare `<textarea>` on an empty page took 78 s and the app 84 s, so
+the time is the browser's, not the app's. Both were measured with Playwright's
+`fill`. A real paste was not measured, and may behave the same or not.
+
+Not done: the eye check, next to the desktop app. The copy into Word itself was
+not tried, only what is on the clipboard. Whether a large text freezes the
+page when it is pasted in a real Chromium is not known. The French patent
+publication the desktop note names (FR1755215) was not looked up, and the note
+says the owner should know of it before a public release.

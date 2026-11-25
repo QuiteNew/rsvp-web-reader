@@ -3,18 +3,20 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-23. Phases 0 to 5 are done (phase 5 called done by
+Last updated: 2026-11-25. Phases 0 to 5 are done (phase 5 called done by
 the owner on 2026-11-22). The first release, `v1.0.0`, is out: tagged by
 the owner on 2026-11-18 on `aebce68`. `v1.1.0`, which adds importing files,
-is out too: tagged on `74b3323`. See "The first release" and "Version
-1.1.0" below for what each has and does not have. Phase 6 has started:
+is out too: tagged on `74b3323`, and so is `v1.2.0`, with letter spacing,
+tagged on `4187651`. See "The first release" and "Version 1.1.0" below for
+what the first two have and do not have. Phase 6 has started:
 [handoff/phase-6-progress.md](handoff/phase-6-progress.md) has what the
 desktop app does, what its design notes add, the plan, and each feature as
 it is built. Phase 6 is released in four minor versions, as the owner set
-on 2026-11-23: `v1.2.0` letter spacing (prepared, see "Version 1.2.0"
-below), `v1.3.0` the OpenDyslexic font and bold word starts, `v1.4.0`
-reading profiles, `v1.5.0` speaker cues and the HTML import fix. Each adds
-features and breaks nothing, so none is a major version.
+on 2026-11-23: `v1.2.0` letter spacing (out, see "Version 1.2.0" below),
+`v1.3.0` the OpenDyslexic font and bold word starts (prepared, see "Version
+1.3.0" below), `v1.4.0` reading profiles, `v1.5.0` speaker cues and the
+HTML import fix. Each adds features and breaks nothing, so none is a major
+version.
 
 ## Phases
 
@@ -26,7 +28,7 @@ features and breaks nothing, so none is a major version.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing built and prepared as 1.2.0. Then 1.3.0, 1.4.0 and 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                                                                                     |
+| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing is out as 1.2.0. The OpenDyslexic font and bold word starts are built and prepared as 1.3.0. Then 1.4.0 and 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                            |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
@@ -498,6 +500,61 @@ What it still does not have, besides the lists for 1.0.0 and 1.1.0 above:
 - The desktop's note under Letter spacing also says the level is saved in
   reading profiles. That part waits for profiles.
 - The HTML import fix that phase 5 left open.
+
+## Version 1.3.0
+
+Prepared on 2026-11-25, the second of the four phase 6 releases:
+`APP_VERSION`, `package.json` and `package-lock.json` at 1.3.0.
+
+What it adds:
+
+- The OpenDyslexic font, a switch on the Appearance tab under Letter
+  spacing. It changes every font on the page, not only the reader's. It
+  applies when Apply is pressed, where the desktop needs a restart. The
+  font files are fetched only when the switch is on. Not saved in reading
+  profiles, as on the desktop.
+- Bold word starts, a button next to Normalize. While it is on, the text
+  box is replaced by a read-only view with the start of every word in bold,
+  by the desktop's rules. The text itself never changes. It is remembered
+  between visits and is not in profiles. The reader is not affected.
+- Copying with bold: a copy out of the view (Ctrl+C or the browser's Copy)
+  puts the plain text and HTML with the bold on the clipboard, so Word or
+  an email keeps it. Ctrl+A in the view selects its text only.
+- The text box follows the font switch too.
+
+How it was checked: the font choice, the bold rules and the clipboard HTML
+against fixtures made from the desktop code (13, 2,439 and 1,094 cases), the
+bold rules also against Python for every Unicode character, and the page in
+the browser tests, in Chromium by the assistant and in all three browsers by
+the owner as each part was built. The last runs before the tag are the
+owner's `npm run check` and `npm run e2e`, as RELEASING.md says. The look
+next to the desktop app is the owner's eye check, which the assistant cannot
+do.
+
+What it still does not have, besides the lists for 1.0.0 to 1.2.0 above:
+
+- The rest of phase 6: reading profiles, speaker cues and the HTML import
+  fix. Letter spacing is to be saved in profiles when they exist. The font
+  switch and bold word starts stay out of them, as on the desktop.
+- The eye check of both features next to the desktop app. For the font:
+  OpenDyslexic is much taller than Fredoka and has a wide space, so the
+  guide marks and the focus letter may sit differently than on the desktop.
+- No limit on very long texts for bold word starts, which the desktop has at
+  4,000 characters a line. Switching it on took 2 to 4 s for 500,000
+  characters in every browser the probe ran in, and 17 s in Firefox for 2
+  million. Not tried in Chromium and WebKit at that size.
+- Putting 500,000 characters into the text box took over a minute in Chromium
+  and WebKit when the test did it with Playwright's `fill`. A bare text box on
+  an empty page was as slow, so it is the browser's. A real paste was not
+  measured.
+- The copy into Word was not tried by hand, only what lands on the clipboard.
+  The test that reads the real clipboard runs in Chromium only.
+- The font files are not yet cached for offline use, and the licence texts
+  are not part of the built site. Both are phase 7.
+- The desktop's design note lists a French patent publication (FR1755215) about
+  a look like bold word starts and says its status was never checked. It was
+  not checked here either. The owner should know of it before a public
+  release. This is not legal advice.
 
 ## Decisions
 
