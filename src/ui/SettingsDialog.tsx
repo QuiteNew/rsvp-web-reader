@@ -440,8 +440,8 @@ export function SettingsDialog({
           </label>
           <p className={quiet}>
             Adds room between the letters of the flashing word, and between the words of a chunk. It
-            applies as soon as you press Apply. The right amount differs from person to person, so
-            try the levels by eye.
+            applies as soon as you press Apply and is saved in reading profiles. The right amount
+            differs from person to person, so try the levels by eye.
           </p>
           {toggle('Use the OpenDyslexic font', form.dyslexiaFontEnabled, (on) => {
             change({ dyslexiaFontEnabled: on });

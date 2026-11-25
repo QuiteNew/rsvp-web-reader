@@ -2116,6 +2116,13 @@ describe('letter spacing', () => {
     expect(shownGap()).toBe('0.3em');
   });
 
+  // The desktop's note says so too. It was left out until profiles existed.
+  test('the note under it says the level is saved in reading profiles', () => {
+    renderPage();
+    openSettings('Appearance');
+    expect(screen.getByText(/is saved in reading profiles/)).toBeInTheDocument();
+  });
+
   test('Reset to Original Defaults leaves it alone, as it does the theme', () => {
     renderPage();
     openSettings('Appearance');
