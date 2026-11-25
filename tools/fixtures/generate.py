@@ -1328,6 +1328,57 @@ def build_settings(core):
         ):
             guide_marks.append(call(guide_mark, current, method, arguments))
 
+    # Reading profiles (phase 6): the store's profile methods, driven through
+    # a script aimed at what the desktop's own tests leave out. Blank, padded
+    # and non-text names, names that only match once case is folded the
+    # Python way, and an unknown name for every method. Each step is recorded
+    # the way desktop_tests.json records a profile call: the profiles before,
+    # the method and its arguments, then "ok" and what came back, or "error"
+    # and the message, with the profiles after.
+    import copy
+    from core.profiles import ProfileError
+
+    def profile_step(store, method, arguments):
+        before = copy.deepcopy(store.export_settings()["profiles"])
+        try:
+            answer = getattr(store, method)(*arguments)
+            outcome = ["ok", None if answer is None else answer.to_dict()]
+        except ProfileError as error:
+            outcome = ["error", str(error)]
+        return [[before, method, list(arguments)], outcome + [store.export_settings()["profiles"]]]
+
+    script = [
+        ("get_profile", ["A"]), ("update_profile", ["A", {}]), ("rename_profile", ["A", "B"]),
+        ("delete_profile", ["A"]),
+        ("add_profile", ["Fast skim", {"skip_word_count": 25, "guide_mark_color": None, "wpm": 600}]),
+        ("add_profile", ["  Careful \t read  ", {"pause_on_skip": True, "letter_spacing_level": 2,
+                                                  "dyslexia_font_enabled": True}]),
+        ("add_profile", ["New", "not a dict"]), ("add_profile", [42, {}]), ("add_profile", ["\ufeffFast", {}]),
+        ("add_profile", ["x" * 31, {}]), ("add_profile", ["\U0001f600" * 30, {"font_size_step": 3}]),
+        ("add_profile", ["Stra\u00dfe", {}]), ("add_profile", ["STRASSE", {}]),
+        ("add_profile", ["\ufb01le", {"skip_word_count": 3}]), ("add_profile", ["FILE", {}]),
+        ("add_profile", ["\u212aelvin", {}]), ("add_profile", ["kelvin", {}]),
+        ("add_profile", ["\u0130stanbul", {}]), ("add_profile", ["istanbul", {}]),
+        ("get_profile", [""]), ("get_profile", ["   "]), ("get_profile", [" fast  SKIM "]),
+        ("get_profile", ["STRASSE"]), ("get_profile", ["file"]), ("get_profile", ["KELVIN"]),
+        ("get_profile", [42]), ("get_profile", ["Nope"]), ("get_profile", ["i\u0307stanbul"]),
+        ("update_profile", [" FAST skim ", {"skip_word_count": 7, "made_up": 1}]),
+        ("update_profile", ["", {}]), ("update_profile", ["   ", {}]), ("update_profile", ["file", None]),
+        ("rename_profile", ["fast skim", "  FAST   SKIM "]), ("rename_profile", ["FAST SKIM", "strasse"]),
+        ("rename_profile", ["Stra\u00dfe", "STRASSE"]), ("rename_profile", ["kelvin", "KELVIN"]),
+        ("rename_profile", ["Nope", "x"]), ("rename_profile", ["file", "x" * 31]),
+        ("rename_profile", ["file", ""]), ("rename_profile", ["file", "Fast\x00skim"]),
+        ("rename_profile", ["careful read", "Careful read"]),
+        ("delete_profile", ["   "]), ("delete_profile", ["istanbul"]), ("delete_profile", ["i\u0307stanbul"]),
+        ("delete_profile", ["\u0130STANBUL"]), ("add_profile", ["\u0130stanbul", {"warm_up_enabled": True}]),
+        ("delete_profile", ["FAST SKIM"]), ("add_profile", ["fast skim", {}]),
+    ]
+    profile_steps = []
+    with tempfile.TemporaryDirectory() as folder:
+        store = store_from(folder, None)
+        for method, arguments in script:
+            profile_steps.append(profile_step(store, method, arguments))
+
     return {
         "constants": constants,
         "defaults": [call(defaults)],
@@ -1335,6 +1386,7 @@ def build_settings(core):
         "load_saved_only": [call(load_saved_only, t) for t in odd_texts],
         "replace_from_bundle": replaces,
         "guide_mark": guide_marks,
+        "profile_steps": profile_steps,
     }
 
 
@@ -1595,6 +1647,7 @@ def build_desktop_tests(core):
     import core.data_bundle as data_bundle
     import core.settings_store as settings_store
     import core.storage as storage
+    from core.profiles import ProfileError
     from core.settings_store import SettingsStore
     from core.transcript_store import TranscriptStore
 
@@ -1631,7 +1684,7 @@ def build_desktop_tests(core):
 
     events = {name: [] for name in (
         "store_step", "parse_data", "save_state", "parse_bundle", "build_bundle",
-        "settings_load", "settings_replace", "settings_guide_mark",
+        "settings_load", "settings_replace", "settings_guide_mark", "settings_profile",
     )}
     left_out = {"not JSON": 0}
     now = {"test": None, "events": [], "busy": False}
@@ -1771,6 +1824,48 @@ def build_desktop_tests(core):
             return answer
         return run
 
+    def watch_profiles(name):
+        """The store's reading profile methods. They change the list of
+        profiles and nothing else, so only that list is recorded, before and
+        after, and the script stops if any other setting moved. A ProfileError
+        is recorded with its message, which the port has to match too."""
+        real = getattr(SettingsStore, name)
+        signature = inspect.signature(real)
+
+        def others(settings):
+            return {key: value for key, value in settings.items() if key != "profiles"}
+
+        def run(self, *arguments, **named):
+            if not recording():
+                return real(self, *arguments, **named)
+            try:
+                bound = signature.bind(self, *arguments, **named)
+                bound.apply_defaults()
+                given = plain(copy.deepcopy(list(bound.arguments.values())[1:]))
+                before = plain(self.export_settings())
+            except NotRecordable:
+                left_out["not JSON"] += 1
+                return real(self, *arguments, **named)
+            # Any other exception is the test's business, and nothing is
+            # recorded for it.
+            outcome = None
+            now["busy"] = True
+            try:
+                answer = real(self, *arguments, **named)
+                outcome = ["ok", plain(answer)]
+            except ProfileError as error:
+                outcome = ["error", str(error)]
+                raise
+            finally:
+                now["busy"] = False
+                if outcome is not None:
+                    after = plain(self.export_settings())
+                    if others(after) != others(before):
+                        raise SystemExit(f"{name} changed settings other than the profiles")
+                    record("settings_profile", [before["profiles"], name, given], outcome + [after["profiles"]])
+            return answer
+        return run
+
     originals = []
 
     def swap(owner, name, replacement):
@@ -1799,6 +1894,8 @@ def build_desktop_tests(core):
     swap(SettingsStore, "replace_from_bundle", watch_settings("replace_from_bundle", "settings_replace"))
     for name in ("set_guide_mark_color", "restore_guide_mark_color", "resync_guide_mark_color_default"):
         swap(SettingsStore, name, watch_settings(name, "settings_guide_mark"))
+    for name in ("get_profile", "add_profile", "update_profile", "rename_profile", "delete_profile"):
+        swap(SettingsStore, name, watch_profiles(name))
     # Modules that took a function by name hold the old one. Give them the new.
     by_name = {real_parse_data: parse_data, real_save_state: save_state,
                real_parse_bundle: parse_bundle, real_build_bundle: build_bundle}

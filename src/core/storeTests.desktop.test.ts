@@ -12,10 +12,11 @@
 //
 // What a replay cannot show is listed in docs/handoff/phase-3-progress.md:
 // tests that only call code with no port (one setter per setting, files on
-// a disk, saving, renaming or deleting a profile) record nothing. Loading
-// and importing profiles do record, since phase 6.
+// a disk) record nothing. The reading profile methods record, since phase 6,
+// and so do loading and importing profiles.
 import { describe, expect, test } from 'vitest';
 import { expectToMatchFixture, loadFixture } from '../testing/fixtures';
+import { PROFILE_METHODS, runProfileStep } from '../testing/profileSteps';
 import { STORE_STEPS } from '../testing/storeSteps';
 import { buildBundle, parseBundle } from './bundle';
 import { mergeAll, replaceAll } from './library';
@@ -130,6 +131,17 @@ describe('SettingsStore', () => {
       return resyncGuideMarkColorDefault(saved, color);
     });
   });
+
+  test('the reading profile methods, with their messages', () => {
+    expectToMatchFixture(fixture, 'settings_profile', ([, before, method, args]) =>
+      runProfileStep(before, method as string, args as readonly unknown[]),
+    );
+  });
+
+  test('the desktop tests reach every profile method', () => {
+    const used = new Set((fixture.functions.settings_profile ?? []).map(([args]) => args[2]));
+    expect([...used].sort()).toEqual([...PROFILE_METHODS].sort());
+  });
 });
 
 // The settings the desktop checks when it reads them. The fixture records
@@ -162,6 +174,6 @@ describe('how much of the desktop tests this covers', () => {
     // are not in the list at all.)
     expect(rows.length - passed.length).toBe(7);
     expect(passed.length).toBe(611);
-    expect(recorded.length).toBe(338);
+    expect(recorded.length).toBe(376);
   });
 });
