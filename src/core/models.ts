@@ -8,6 +8,8 @@
 // The defaults are the dataclass defaults from models.py. They are also the
 // right values for a field that is missing from an old save file.
 
+import type { Profile } from './profiles';
+
 // A reading position saved on purpose. A transcript holds at most one
 // bookmark per word index, and keeps them sorted by index.
 export interface Bookmark {
@@ -188,7 +190,9 @@ export interface Settings {
   readonly transcriptSort:
     'title_az' | 'title_za' | 'newest' | 'oldest' | 'most_read' | 'most_time';
 
-  // Saved reading profiles. Their shape is settled in phase 6, from
-  // core/profiles.py. Until then they are carried along untouched.
-  readonly profiles: readonly unknown[];
+  // Saved reading profiles, each checked when the settings are read
+  // (cleanProfileList in profiles.ts). Their values keep the snake_case names
+  // the settings are saved under, because that is the form they are saved
+  // and exported in.
+  readonly profiles: readonly Profile[];
 }

@@ -1241,6 +1241,17 @@ def build_settings(core):
         return json.dumps(values)
 
     profile = {"name": "Fast", "values": {"default_wpm": 450}}
+    # Every way a saved profile can be wrong: not a profile at all, a name
+    # that clashes once case and spaces are set aside, a name too long, values
+    # that are not a dict, and values of the wrong kind or for settings a
+    # profile no longer holds. Each bad entry goes on its own.
+    damaged = [
+        "junk", None, profile, {"name": "  fast ", "values": {"default_wpm": 300}},
+        {"name": "Old", "values": {"wpm": 600, "skip_word_count": 25, "guide_mark_color": None}},
+        {"name": "Bad", "values": "nope"}, {"name": "x" * 31, "values": {}},
+        {"name": "  Careful   read ", "values": {"skip_word_count": 1.5, "pause_on_skip": True,
+                                                 "guide_mark_color": "#AABBCC"}},
+    ]
     custom = text(
         default_wpm=420, default_font_size=40, skip_word_count=5, pause_on_skip=True,
         appearance_mode="dark", guide_mark_color="#112233", guide_mark_color_is_default=False,
@@ -1258,9 +1269,11 @@ def build_settings(core):
         # Keys this version does not know are dropped, the rest stays.
         text(header_height=80, default_wpm=350), text(a_setting_from_the_future=[1, 2], pause_on_skip=True),
         text(data_directory="D:/somewhere", default_wpm=350),
-        # Profiles: anything that is not a list is no profiles.
+        # Profiles: anything that is not a list is no profiles, and each entry
+        # of a list is checked on its own.
         text(profiles=None), text(profiles="x"), text(profiles={}), text(profiles=[]),
         text(profiles=[profile]), text(profiles=[profile], something_unknown=1),
+        text(profiles=damaged, default_wpm=350),
         # Not settings at all.
         "[]", "null", "5", '"text"', "true", "{", "", "not json", '{"default_wpm": }',
     ]
@@ -1295,7 +1308,7 @@ def build_settings(core):
         {"default_wpm": 500}, {"default_wpm": 500, "from_a_newer_version": True},
         {"data_directory": "E:/other", "pause_on_skip": True},
         {"profiles": []}, {"profiles": [{"name": "Slow", "values": {"default_wpm": 200}}]},
-        {"profiles": "junk"}, {"profiles": None},
+        {"profiles": "junk"}, {"profiles": None}, {"profiles": damaged},
         {"guide_mark_color": "#445566"}, {"default_wpm": "fast", "skip_word_count": 999},
     ]
     replaces = [call(replace_from_bundle, current, incoming)
@@ -1582,7 +1595,6 @@ def build_desktop_tests(core):
     import core.data_bundle as data_bundle
     import core.settings_store as settings_store
     import core.storage as storage
-    from core.profiles import clean_profile_list
     from core.settings_store import SettingsStore
     from core.transcript_store import TranscriptStore
 
@@ -1617,18 +1629,11 @@ def build_desktop_tests(core):
                         bookmark["created_at"] = "NOW"
         return state
 
-    def clean_profiles(holder):
-        """Whether the profiles in these settings are ones the desktop keeps
-        as they are. Checking each profile is not ported yet (phase 6)."""
-        if not isinstance(holder, dict) or not isinstance(holder.get("profiles"), list):
-            return True
-        return clean_profile_list(copy.deepcopy(holder["profiles"])) == holder["profiles"]
-
     events = {name: [] for name in (
         "store_step", "parse_data", "save_state", "parse_bundle", "build_bundle",
         "settings_load", "settings_replace", "settings_guide_mark",
     )}
-    left_out = {"not JSON": 0, "profiles to check": 0}
+    left_out = {"not JSON": 0}
     now = {"test": None, "events": [], "busy": False}
 
     def record(kind, arguments, result):
@@ -1730,13 +1735,6 @@ def build_desktop_tests(core):
         real_settings_init(self, settings_directory)
         if not known or text is None:
             return
-        try:
-            parsed = json.loads(text)
-        except ValueError:
-            parsed = None
-        if not clean_profiles(parsed):
-            left_out["profiles to check"] += 1
-            return
         if self.damaged_file is not None:
             record("settings_load", [text], None)
             return
@@ -1761,9 +1759,6 @@ def build_desktop_tests(core):
                 left_out["not JSON"] += 1
                 return real(self, *arguments)
             answer = real(self, *arguments)
-            if not (clean_profiles(before) and all(clean_profiles(item) for item in given)):
-                left_out["profiles to check"] += 1
-                return answer
             try:
                 after = plain(self.export_settings())
             except NotRecordable:

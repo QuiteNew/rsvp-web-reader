@@ -13,6 +13,7 @@
 // data_directory is the one desktop setting that is not here. It is a
 // folder on one computer, and the desktop leaves it out of an export too.
 import type { Settings } from './models';
+import { cleanProfileList } from './profiles';
 import type { SavedSettings } from './savedShapes';
 import { DEFAULT_SORT, knownSort } from './transcriptSort';
 
@@ -110,16 +111,6 @@ function overDefaults(data: SavedSettings): SavedSettings {
   return settings;
 }
 
-/**
- * Saved profiles, as far as they are checked for now. Anything that is not
- * a list is no profiles. The desktop also checks every entry
- * (clean_profile_list in core/profiles.py). That comes with the profiles
- * themselves, in phase 6. Until then the entries are carried as they are.
- */
-function profileList(raw: unknown): unknown[] {
-  return Array.isArray(raw) ? (raw as unknown[]) : [];
-}
-
 function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -141,14 +132,18 @@ export function loadSavedSettings(parsed: unknown): SavedSettings | null {
       : DEFAULT_SAVED_SETTINGS.guide_mark_color;
     data.guide_mark_color_is_default = color === DEFAULT_SAVED_SETTINGS.guide_mark_color;
   }
-  data.profiles = profileList(data.profiles);
+  // Clean the saved profiles instead of trusting them. A bad entry is
+  // dropped on its own, so one damaged profile cannot make the whole load
+  // fail and put every other setting back to its default.
+  data.profiles = cleanProfileList(data.profiles);
   return overDefaults(data);
 }
 
 /**
  * The settings after an import in Replace mode: the file's settings, with
  * the default for any it does not have. Profiles are the exception. A file
- * with a "profiles" list replaces them. A file from before profiles
+ * with a "profiles" key replaces them, each entry checked, and anything
+ * that is not a list there means no profiles. A file from before profiles
  * existed has no such key, and then the ones already here are kept.
  * `replace_from_bundle` on the desktop.
  */
@@ -156,7 +151,7 @@ export function replaceFromBundle(current: SavedSettings, incoming: SavedSetting
   return overDefaults({
     ...incoming,
     profiles: Object.hasOwn(incoming, 'profiles')
-      ? profileList(incoming.profiles)
+      ? cleanProfileList(incoming.profiles)
       : current.profiles,
   });
 }
@@ -281,7 +276,9 @@ export function settingsView(saved: SavedSettings): Settings {
     lastTranscriptId: typeof lastId === 'number' && Number.isInteger(lastId) ? lastId : null,
     transcriptSort: knownSort(saved.transcript_sort),
 
-    profiles: profileList(saved.profiles),
+    // Already clean when they were read. Cleaning a clean list changes
+    // nothing, and it is what lets the type promise a list of profiles.
+    profiles: cleanProfileList(saved.profiles),
   };
 }
 
@@ -306,7 +303,8 @@ export function withChanges(saved: SavedSettings, changes: Partial<Settings>): S
   let changed = false;
   for (const key of keys) {
     const name = savedName(key);
-    // Profiles are a list, and a list that was handed in is taken as it is.
+    // Profiles handed in here were made by profiles.ts, so they are taken
+    // as they are.
     next[name] = key === 'profiles' ? changes.profiles : cleaned[key];
     if (next[name] !== saved[name]) changed = true;
   }

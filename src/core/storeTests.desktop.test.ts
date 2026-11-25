@@ -12,7 +12,8 @@
 //
 // What a replay cannot show is listed in docs/handoff/phase-3-progress.md:
 // tests that only call code with no port (one setter per setting, files on
-// a disk, profiles) record nothing.
+// a disk, saving, renaming or deleting a profile) record nothing. Loading
+// and importing profiles do record, since phase 6.
 import { describe, expect, test } from 'vitest';
 import { expectToMatchFixture, loadFixture } from '../testing/fixtures';
 import { STORE_STEPS } from '../testing/storeSteps';
@@ -161,6 +162,6 @@ describe('how much of the desktop tests this covers', () => {
     // are not in the list at all.)
     expect(rows.length - passed.length).toBe(7);
     expect(passed.length).toBe(611);
-    expect(recorded.length).toBe(334);
+    expect(recorded.length).toBe(338);
   });
 });

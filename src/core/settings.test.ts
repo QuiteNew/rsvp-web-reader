@@ -128,6 +128,22 @@ describe('what the page reads', () => {
     expect(Object.hasOwn(DEFAULT_SAVED_SETTINGS, 'data_directory')).toBe(false);
     expect(load('{"data_directory": "D:/x"}')).toEqual(DEFAULT_SAVED_SETTINGS);
   });
+
+  // Settings that were read are clean already, so the fixtures cannot show
+  // this. It is what lets Settings promise a list of real profiles.
+  test('the profiles read are always checked, even from settings that were not', () => {
+    const saved = {
+      ...DEFAULT_SAVED_SETTINGS,
+      profiles: [
+        'junk',
+        { name: ' Fast ', values: { wpm: 600, skip_word_count: 25 } },
+        { name: 'FAST', values: {} },
+      ],
+    };
+    expect(settingsView(saved).profiles).toEqual([
+      { name: 'Fast', values: { skip_word_count: 25 } },
+    ]);
+  });
 });
 
 describe('changing settings from the page', () => {
