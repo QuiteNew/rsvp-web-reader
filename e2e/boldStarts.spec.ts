@@ -116,10 +116,12 @@ test('Ctrl+A selects the text, and a copy carries the bold', async ({ page }) =>
   const view = page.getByRole('textbox', { name: 'Transcript text' });
   await view.focus();
   await page.keyboard.press('ControlOrMeta+a');
-  // Only the text of the view, not the whole page.
-  expect(await page.evaluate<string>('document.getSelection().toString()')).toBe(
-    'hello world\nnext line',
-  );
+  // Only the text of the view, not the whole page. Firefox on Windows gives
+  // the selected text with Windows line breaks (\r\n), and the other browsers
+  // with \n, so the line breaks are made the same before comparing. What
+  // lands on the clipboard is checked below, without this.
+  const selected = await page.evaluate<string>('document.getSelection().toString()');
+  expect(selected.replaceAll('\r\n', '\n')).toBe('hello world\nnext line');
   const copied = await page.evaluate<{ handled: boolean; plain: string; html: string }>(COPY);
   expect(copied).toEqual({
     handled: true,
