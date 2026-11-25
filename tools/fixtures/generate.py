@@ -376,6 +376,8 @@ def build_charsets(core):
         "unassigned": ranges(lambda ch: unicodedata.category(ch) == "Cn"),
         "re_word": ranges(lambda ch: word.fullmatch(ch) is not None),
         "str_islower": ranges(str.islower),
+        # What a reading profile name may hold (core/profiles.py).
+        "str_isprintable": ranges(str.isprintable),
         # Not ranges: every character str.casefold() changes, with what it
         # becomes. Surrogates are left out, they are not characters.
         "str_casefold": [
@@ -3058,6 +3060,338 @@ def build_rich_copy(core):
     }
 
 
+# ---------------------------------------------------------------------------
+# Phase 6: reading profiles. core/profiles.py holds the rules: which settings
+# a profile holds, what a valid value is, and what makes a good name.
+# core/profile_apply.py works out what applying a profile does. Both are pure.
+# The store's save, update, rename and delete come from the desktop's own
+# store tests, in desktop_tests.json, not from here.
+#
+# Three things are kept out of the cases on purpose, and checked below:
+#
+# - A float that is a whole number, such as 10.0. Python says it is not a
+#   whole number of a setting, but JSON.parse() reads "10.0" as 10, so the
+#   port cannot see the difference. Those cases are in a list of their own,
+#   value_is_valid_whole_floats, so the port's test can name the difference
+#   instead of hiding it.
+# - NaN and the infinities. JSON has no way to write them, and one of them
+#   would make the whole file unreadable in JavaScript.
+# - Half of a surrogate pair on its own, such as "\ud800". JSON.parse()
+#   takes it, but Vite's JSON reader does not, and the tests load every
+#   fixture file at once, so one such string stops all of them. What Python
+#   says about these is in charsets.json (str_isprintable: none of them can be
+#   shown), and the port tests them by hand.
+# - A KeyError. build_values(), clamp_value() and plan_profile() raise one
+#   when the caller and the module disagree about the keys. In TypeScript the
+#   types make that mistake impossible to write, so there is nothing to
+#   record. The desktop tests for it are ported as tests of their own.
+# ---------------------------------------------------------------------------
+
+SMILE = "\U0001f600"
+# Given out in Unicode 16, after Python 3.13's tables (15.1). Python says it
+# cannot be shown, a browser with newer tables says it can.
+NEWER_EMOJI = "\U0001fae9"
+
+# Names, with the characters Python and JavaScript disagree about: spaces only
+# Python splits on, the byte order mark that JavaScript's trim() takes for a
+# space, format and private use characters, letters whose case folding is more
+# than lower-casing, and characters that are one in Python and two in
+# JavaScript.
+PROFILE_NAMES = [
+    "Fast skim", "fast skim", "FAST SKIM", "Careful read", "careful READ", "Speed run", "A", "B",
+    "  Fast   skim \t", "Fast\tskim", "Fast\nskim", "Fast\r\nskim", "\tFast skim\n",
+    "", " ", "   ", "\t\n", "\r\n",
+    "x" * 29, "x" * 30, "x" * 31, "  " + "x" * 30 + "  ", "x" * 15 + "   " + "x" * 14,
+    "x" * 15 + " " + "x" * 15,
+    "Fast\x00skim", "Fast\x07skim", "Fast\x7fskim", "Fast\x9fskim",
+    "\x1cFast\x1d skim\x1e", "\x1fFast", "\x85Fast\x85", "Fast\x0bskim", "Fast\x0cskim",
+    "Fast\xa0skim", "Fast\u2007skim", "Fast\u3000skim", "Fast\u2028skim", "Fast\u2029skim",
+    "Fast \xa0 \u3000 skim",
+    "\ufeffFast", "Fast\ufeff", "Fast\u200bskim", "Fast\u00adskim", "Fast\u200dskim",
+    "Fast\u2060skim", "\u061cFast", "\ue000", "Fast\U000f0000",
+    "Fast" + NEWER_EMOJI, NEWER_EMOJI,
+    SMILE, SMILE * 29, SMILE * 30, SMILE * 31, "x" * 29 + SMILE, "x" * 30 + SMILE,
+    "\U0001f468\u200d\U0001f469\u200d\U0001f467", "\U0001f44d\U0001f3fd",
+    "Cafe\u0301", "Caf\u00e9", "CAF\u00c9",
+    "\u0395\u03bb\u03bb\u03b7\u03bd\u03b9\u03ba\u03ac",
+    "\u039f\u0394\u039f\u03a3", "\u03bf\u03b4\u03bf\u03c2", "\u03bf\u03b4\u03bf\u03c3",
+    "\u041a\u0438\u0440\u0438\u043b\u043b\u0438\u0446\u0430",
+    "\u043a\u0438\u0440\u0438\u043b\u043b\u0438\u0446\u0430",
+    "Stra\u00dfe", "STRASSE", "strasse", "\u1e9e",
+    "\ufb01le", "FILE", "file",
+    "\u212aelvin", "kelvin", "\u0130stanbul", "istanbul", "i\u0307stanbul", "\u0131stanbul",
+    "\u01c5ungla", "\u01c6ungla", "\u01c4UNGLA",
+    "\u0663 three", "\uff26ast",
+]
+
+PROFILE_NOT_TEXT = [None, 42, 0, True, False, 1.5, [], {}, ["Fast skim"], {"name": "Fast skim"}]
+
+PROFILE_EXISTING = [
+    [], ["Fast skim"], ["  Fast   skim "], ["Fast skim", "Careful read"], ["FAST SKIM"],
+    [None, 7, True, "Fast skim"], ["", "  "], ["x" * 31], ["Fast\x00skim"],
+    ["Stra\u00dfe"], ["\u039f\u0394\u039f\u03a3"], ["\ufb01le"], ["\u212aelvin"],
+    ["\u0130stanbul"], [SMILE * 30], ["\ufeffFast"],
+]
+
+# Keys that are not profile keys. The last few are names every JavaScript
+# object has through its prototype, which a lookup in a plain object would
+# find even though no one put them there.
+PROFILE_OTHER_KEYS = [
+    "window_width", "wpm", "font_size", "dyslexia_font_enabled", "bold_starts_enabled",
+    "appearance_mode", "default_font_color", "default_chunk_size", "guide_mark_color_is_default",
+    "GUIDE_MARK_COLOR", "", "__proto__", "constructor", "toString", "hasOwnProperty", "valueOf",
+]
+
+PROFILE_VALUES = [
+    True, False, None, 0, 1, -1, 2, 3, 4, 10, 25, -50, 999, 5000, 2**31, 2**53, -(2**53), 10**20,
+    1.5, -0.5, 2.25, "", "10", "true", "None",
+    "#3B2E27", "#3b2e27", "#AABBCC", "#aAbB09", "#000000", "#FFFFFF",
+    "3B2E27", "#3B2E2", "#3B2E277", "#GGGGGG", "red", "#3B2E27\n", "\n#3B2E27", " #3B2E27",
+    "#3B2E27 ", "#\uff13B2E27", "#\u0663B2E27", "#3B2E2\U0001d7d7",
+    [], {}, ["#3B2E27"], {"value": 1}, [1],
+]
+
+WHOLE_FLOATS = [0.0, -0.0, 1.0, 2.0, 3.0, 10.0, 300.0, -3.0, 1e20]
+
+
+def profile_check_input(value, where):
+    """Stops the script if a case holds something the tests would read
+    differently, or could not read: a whole-number float, NaN or an
+    infinity, or any surrogate code point. Two halves next to each other are
+    two code points in Python, and JSON.parse() joins them into one. One on
+    its own stops Vite's JSON reader."""
+    if isinstance(value, float):
+        if value != value or value in (float("inf"), float("-inf")):
+            raise SystemExit(f"{where}: NaN or an infinity cannot go into JSON")
+        if value.is_integer():
+            raise SystemExit(f"{where}: {value!r} is a whole-number float, which JavaScript reads as an int")
+    elif isinstance(value, str):
+        if any("\ud800" <= character <= "\udfff" for character in value):
+            raise SystemExit(f"{where}: {value!r} holds a surrogate code point")
+    elif isinstance(value, dict):
+        for key, item in value.items():
+            profile_check_input(key, where)
+            profile_check_input(item, where)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            profile_check_input(item, where)
+
+
+def profile_random_values(rng, current):
+    """A dict of the kind a profile's values could be after a hand edit or an
+    old version: some profile keys, some other keys, in any order, with right
+    and wrong kinds of value."""
+    from core.profiles import PROFILE_KEYS
+
+    keys = list(PROFILE_KEYS) + PROFILE_OTHER_KEYS
+    chosen = rng.sample(keys, rng.randint(0, 12))
+    values = {}
+    for key in chosen:
+        roll = rng.random()
+        if roll < 0.45 and key in current:
+            # A value of the right kind, often outside its range.
+            value = current[key]
+            if isinstance(value, bool):
+                value = rng.choice([True, False])
+            elif isinstance(value, int):
+                value = rng.choice([value, value + rng.randint(-60, 60), -5, 0, 7000])
+            elif key == "guide_mark_color":
+                value = rng.choice([None, "#112233", "#aabbcc", "#3B2E27"])
+            values[key] = value
+        else:
+            values[key] = rng.choice(PROFILE_VALUES)
+    return values
+
+
+def build_profiles(core):
+    import core.profile_apply as apply
+    import core.profiles as profiles
+    from core.settings_store import AppSettings
+
+    rng = random.Random(1755)
+    keys = profiles.PROFILE_KEYS
+    defaults = {key: getattr(AppSettings(), key) for key in keys}
+
+    def as_dict(profile):
+        return None if profile is None else profile.to_dict()
+
+    def plan(*arguments):
+        result = apply.plan_profile(*arguments)
+        return {"values": result.values, "guide_mark_follows_theme": result.guide_mark_follows_theme}
+
+    # --- Names ---
+    names = PROFILE_NAMES + PROFILE_NOT_TEXT
+    name_problem = [call(profiles.name_problem, name, []) for name in names]
+    # A clash is only looked for once a name passed the other checks, so
+    # only those names are tried against the lists of names already saved.
+    usable = [name for name in PROFILE_NAMES if profiles.name_problem(name, []) is None]
+    name_problem += [
+        call(profiles.name_problem, name, existing)
+        for existing in PROFILE_EXISTING[1:]
+        for name in usable
+    ]
+    pair = ["Fast skim", "Careful read"]
+    own_names = [None, "Fast skim", "  fast SKIM ", "FAST SKIM", "Careful read", "Nope", "", 42]
+    renames = ["Fast skim", "FAST SKIM", "fast  skim", "Careful read", "careful READ", "Speed run", "", None]
+    name_problem += [
+        call(profiles.name_problem, name, pair, own)
+        for own in own_names
+        for name in renames
+    ]
+
+    # --- Values ---
+    every_key = list(keys) + PROFILE_OTHER_KEYS
+    value_is_valid = [call(profiles.value_is_valid, key, value) for key in every_key for value in PROFILE_VALUES]
+    whole_floats = [
+        call(profiles.value_is_valid, key, value)
+        for key in ("skip_word_count", "highlight_offset_px", "letter_spacing_level", "default_wpm",
+                    "pause_on_skip", "guide_mark_color", "window_width")
+        for value in WHOLE_FLOATS
+    ]
+
+    in_profile_order = dict(reversed(list(defaults.items())))
+    fixed_values = [
+        None, [], "text", 5, True, [["skip_word_count", 5]],
+        {}, dict(defaults), {**defaults, "guide_mark_color": None}, in_profile_order,
+        {"skip_word_count": 10, "window_width": 1000, "made_up": 1, "wpm": 300},
+        {"skip_word_count": "many", "pause_on_skip": 1, "guide_mark_color": "red", "resume_rewind_words": 4},
+        {"guide_mark_color": None, "skip_word_count": None},
+        {"pause_on_skip": True, "highlight_offset_px": 1},
+        {"letter_spacing_level": 2, "dyslexia_font_enabled": True, "skip_word_count": 25},
+        {"wpm": 600, "font_size": 28, "skip_word_count": 25},
+        {"__proto__": {"skip_word_count": 5}, "constructor": 3, "toString": True, "skip_word_count": 7},
+        {"valueOf": 1, "hasOwnProperty": "#112233"},
+    ]
+    random_values = [profile_random_values(rng, defaults) for _ in range(200)]
+    sanitize_values = [call(profiles.sanitize_values, values) for values in fixed_values + random_values]
+
+    # build_values copies whatever it is given, and checks nothing but the
+    # keys that follow the theme.
+    numbered = {key: index for index, key in enumerate(keys)}
+    with_extras = {**defaults, "window_width": 1234, "default_font_color": "#112233", "dyslexia_font_enabled": True}
+    odd_kinds = {**defaults, "skip_word_count": "many", "pause_on_skip": None, "guide_mark_color": "red"}
+    build_values = [call(profiles.build_values, settings) for settings in (defaults, numbered, with_extras, odd_kinds)]
+    build_values += [
+        call(profiles.build_values, settings, following)
+        for settings in (defaults, with_extras, {**defaults, "guide_mark_color": "#112233"})
+        for following in ([], ["guide_mark_color"], ["guide_mark_color", "guide_mark_color"],
+                          ["skip_word_count"], ["window_width"], ["guide_mark_color", "skip_word_count"], [""])
+    ]
+
+    # --- Loading ---
+    raw_profiles = [None, "text", 5, True, [], ["Fast", {}], {}]
+    raw_profiles += [{"name": name, "values": {"skip_word_count": 25}} for name in names]
+    raw_profiles += [
+        {"values": {}}, {"name": "A"}, {"NAME": "A", "values": {}}, {"name": "A", "values": {}, "extra": 1},
+        {"name": "A", "Values": {}},
+    ]
+    raw_profiles += [
+        {"name": "A", "values": values}
+        for values in (None, [], "nope", 5, True, {}, {"skip_word_count": 25, "guide_mark_color": "red"},
+                       {"guide_mark_color": None}, in_profile_order,
+                       {"__proto__": {"skip_word_count": 5}, "constructor": 3})
+    ]
+    profile_from_dict = [call(lambda raw: as_dict(profiles.profile_from_dict(raw)), raw) for raw in raw_profiles]
+
+    def entry(name, values=None):
+        return {"name": name, "values": {"skip_word_count": 25} if values is None else values}
+
+    fixed_lists = [
+        None, {}, "text", 5, entry("A"), [],
+        [entry("B", {"skip_word_count": 20}), entry("A", {"skip_word_count": 30})],
+        ["junk", None, entry("Good", {"skip_word_count": 30}), {"name": "", "values": {}}],
+        [entry("Fast", {"skip_word_count": 40}), entry("FAST", {"skip_word_count": 10})],
+        [entry("Old", {"wpm": 600, "font_size": 28, "skip_word_count": 25})],
+        [entry("  Fast   skim "), entry("fast skim"), entry("FAST\tSKIM")],
+        [entry("Stra\u00dfe"), entry("STRASSE"), entry("strasse")],
+        [entry("\u039f\u0394\u039f\u03a3"), entry("\u03bf\u03b4\u03bf\u03c2"), entry("\u03bf\u03b4\u03bf\u03c3")],
+        [entry("\ufb01le"), entry("FILE")],
+        [entry("\u212aelvin"), entry("kelvin")],
+        [entry("\u0130stanbul"), entry("istanbul"), entry("i\u0307stanbul")],
+        [entry(""), entry("A"), {"name": "a", "values": "nope"}, entry("a")],
+        [{"name": "A", "values": None}, entry("a")],
+        [entry("x" * 31), entry("x" * 30)],
+        [entry(SMILE * 30), entry(SMILE * 31)],
+        [entry("Fast\x00skim"), entry("Fast skim")],
+        [entry("\ufeffFast"), entry("Fast")],
+        [entry("Fast" + NEWER_EMOJI), entry("Fast")],
+    ]
+    pool = [item for item in raw_profiles if not isinstance(item, (list, type(None)))]
+    pool += [entry(name, profile_random_values(rng, defaults)) for name in rng.sample(PROFILE_NAMES, 30)]
+    random_lists = [[rng.choice(pool) for _ in range(rng.randint(0, 7))] for _ in range(150)]
+    clean_profile_list = [call(profiles.clean_profile_list, raw) for raw in fixed_lists + random_lists]
+
+    # --- Applying ---
+    clamp_value = [
+        call(apply.clamp_value, key, value)
+        for key, (low, high) in apply.NUMBER_RANGES.items()
+        for value in unique([low - 1000, low - 1, low, low + 1, (low + high) // 2, high - 1, high,
+                             high + 1, high + 1000, 0, 10**20, -(10**20)])
+    ]
+
+    currents = [
+        defaults,
+        {**defaults, "skip_word_count": 7, "warm_up_enabled": True, "guide_mark_color": "#112233"},
+        {**defaults, "skip_word_count": 999, "letter_spacing_level": 3, "default_wpm": 450},
+        {**defaults, **{key: not value for key, value in defaults.items() if isinstance(value, bool)}},
+        {**defaults, "window_width": 1000, "default_font_color": "#3B2E27"},
+    ]
+    themes = ["#3B2E27", "#F2E8DC"]
+    older = {key: value for key, value in defaults.items()
+             if key not in ("default_wpm", "default_font_size", "font_size_step",
+                            "split_long_paragraphs_enabled", "scrub_pause_enabled", "letter_spacing_level")}
+    fixed_plans = [
+        {}, None, [], "text", older,
+        {"skip_word_count": 999, "highlight_offset_px": -50, "guide_mark_thickness_px": 1,
+         "guide_mark_length_percent": 100, "resume_rewind_words": 0},
+        {"default_wpm": 5000, "default_font_size": 4, "font_size_step": 99},
+        {"letter_spacing_level": 99}, {"letter_spacing_level": -4}, {"letter_spacing_level": 0},
+        {"skip_word_count": "many", "pause_on_skip": 0}, {"skip_word_count": True},
+        {"wpm": 600, "font_size": 28, "window_width": 1200, "skip_word_count": 25},
+        {"guide_mark_color": None}, {"guide_mark_color": "#AABBCC"}, {"guide_mark_color": "#F2E8DC"},
+        {"guide_mark_color": "red"}, {"skip_word_count": 999, "guide_mark_color": None},
+        {**defaults, "guide_mark_color": None},
+    ]
+    # Whether the colour follows the theme matters when the profile has no
+    # colour, and the theme's colour when it stores None, so two pairs that
+    # differ in both are enough for the fixed cases.
+    plan_profile = [
+        call(plan, values, current, follows, theme)
+        for values in fixed_plans
+        for current in currents
+        for follows, theme in ((True, themes[0]), (False, themes[1]))
+    ]
+    plan_profile += [
+        call(plan, profile_random_values(rng, defaults), rng.choice(currents), rng.choice([True, False]),
+             rng.choice(themes))
+        for _ in range(120)
+    ]
+
+    functions = {
+        "PROFILE_KEYS": [[[], list(keys)]],
+        "THEME_COLOR_KEYS": [[[], list(profiles.THEME_COLOR_KEYS)]],
+        "MAX_NAME_LENGTH": [[[], profiles.MAX_NAME_LENGTH]],
+        "NUMBER_RANGES": [[[], {key: list(limits) for key, limits in apply.NUMBER_RANGES.items()}]],
+        "defaults": [[[], defaults]],
+        "clean_name": [call(profiles.clean_name, name) for name in names],
+        "name_problem": name_problem,
+        "value_is_valid": value_is_valid,
+        "sanitize_values": sanitize_values,
+        "build_values": build_values,
+        "profile_from_dict": profile_from_dict,
+        "clean_profile_list": clean_profile_list,
+        "clamp_value": clamp_value,
+        "plan_profile": plan_profile,
+    }
+    for name, cases in functions.items():
+        profile_check_input(cases, f"profiles.{name}")
+    for case in whole_floats:
+        if case[1] is not False:
+            raise SystemExit(f"Python took a whole-number float as valid: {case}")
+    functions["value_is_valid_whole_floats"] = whole_floats
+    return functions
+
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -3087,6 +3421,7 @@ MODULES = {
     "font_choice": build_font_choice,
     "bold_starts": build_bold_starts,
     "rich_copy": build_rich_copy,
+    "profiles": build_profiles,
 }
 
 
