@@ -16,3 +16,4 @@ fixtures
 src/core/pythonCasefoldTable.ts
 src/core/pythonLowerTable.ts
 src/core/pythonDigitTable.ts
+src/core/pythonPrintableTable.ts

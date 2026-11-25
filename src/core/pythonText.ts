@@ -11,6 +11,7 @@
 import { CASEFOLD_EXCEPTIONS } from './pythonCasefoldTable';
 import { DECIMAL_ZEROS, DIGIT_RANGES } from './pythonDigitTable';
 import { LOWER } from './pythonLowerTable';
+import { PRINTABLE_RANGES } from './pythonPrintableTable';
 
 // Every character Python treats as whitespace: str.isspace(), str.split(),
 // str.strip() and \s in a regular expression all use this one list. Written
@@ -215,6 +216,38 @@ export function isPyDigit(character: string): boolean {
   const code = character.codePointAt(0);
   if (code === undefined) return false;
   return DIGIT_RANGES.some(([first, last]) => code >= first && code <= last);
+}
+
+/**
+ * Python's str.isprintable() for a whole text: true when every character
+ * in it can be shown, and for an empty text. Control and format characters,
+ * every space but the plain one, private use characters and half of a
+ * surrogate pair cannot. Neither can a character Python 3.13 does not know
+ * yet, and that is why the list comes from Python: a browser's Unicode
+ * tables are newer, and \p{...} would call those characters printable.
+ */
+export function isPyPrintable(text: string): boolean {
+  for (const character of text) {
+    if (!inRuns(PRINTABLE_RANGES, character.codePointAt(0) ?? 0)) return false;
+  }
+  return true;
+}
+
+// Whether a code point falls inside one of the runs, which are in order and
+// do not overlap. The printable list has some 700 runs, so this halves it at
+// each step instead of walking it.
+function inRuns(runs: readonly (readonly [number, number])[], code: number): boolean {
+  let low = 0;
+  let high = runs.length - 1;
+  while (low <= high) {
+    const middle = Math.floor((low + high) / 2);
+    const run = runs[middle];
+    if (run === undefined) return false;
+    if (code < run[0]) high = middle - 1;
+    else if (code > run[1]) low = middle + 1;
+    else return true;
+  }
+  return false;
 }
 
 /**

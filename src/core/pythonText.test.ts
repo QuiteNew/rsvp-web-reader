@@ -7,6 +7,7 @@ import {
   characters,
   isPyAlnum,
   isPyLower,
+  isPyPrintable,
   isPySpace,
   pyCasefold,
   pyLength,
@@ -104,6 +105,20 @@ describe('against every character Python knows', () => {
     expect(changes.size).toBeGreaterThan(1000);
     expect(wrong).toEqual([]);
   });
+
+  // Unlike the checks above, nothing is skipped here. The characters Python
+  // does not know yet are the reason this is a list and not \p{...}, and
+  // half of a surrogate pair can reach a name typed or pasted in the page.
+  test('isPyPrintable agrees with str.isprintable() on every code point', () => {
+    const python = toSet('str_isprintable');
+    const wrong: string[] = [];
+    for (let number = 0; number <= LAST_CHARACTER; number += 1) {
+      if (isPyPrintable(String.fromCodePoint(number)) !== (python[number] === 1)) {
+        wrong.push(`U+${number.toString(16).toUpperCase().padStart(4, '0')}`);
+      }
+    }
+    expect(wrong).toEqual([]);
+  });
 });
 
 describe('pySplitlines, against str.splitlines()', () => {
@@ -148,6 +163,39 @@ describe('pyCasefold', () => {
     expect('ΟΔΟΣ'.toLowerCase()).toBe('οδος');
     expect(pyCasefold('ΟΔΟΣ')).toBe('οδοσ');
     expect(pyCasefold('οδος')).toBe('οδοσ');
+  });
+});
+
+describe('isPyPrintable', () => {
+  test('an empty text is printable, as in Python', () => {
+    expect(isPyPrintable('')).toBe(true);
+  });
+
+  test('the plain space is printable, other spaces and controls are not', () => {
+    expect(isPyPrintable('Fast skim')).toBe(true);
+    expect(isPyPrintable('Fast\tskim')).toBe(false);
+    expect(isPyPrintable('Fast\u00a0skim')).toBe(false);
+    expect(isPyPrintable('Fast\u0000skim')).toBe(false);
+  });
+
+  test('format characters are not, the byte order mark and the joiner included', () => {
+    expect(isPyPrintable('\ufeffFast')).toBe(false);
+    expect(isPyPrintable('\u{1F468}\u200d\u{1F469}')).toBe(false);
+  });
+
+  test('an emoji is, but not one given out after Python 3.13', () => {
+    expect(isPyPrintable('\u{1F600}'.repeat(30))).toBe(true);
+    // U+1FAE9 came in Unicode 16. Python 3.13 has 15.1.
+    expect(isPyPrintable('Fast\u{1FAE9}')).toBe(false);
+  });
+
+  test('half of a surrogate pair is not', () => {
+    expect(isPyPrintable('a\ud800b')).toBe(false);
+    expect(isPyPrintable('\udc00')).toBe(false);
+  });
+
+  test('one bad character anywhere is enough', () => {
+    expect(isPyPrintable(`${'x'.repeat(29)}\u0007`)).toBe(false);
   });
 });
 

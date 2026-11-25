@@ -1367,6 +1367,31 @@ def digit_table():
     return "\n".join(lines)
 
 
+def printable_table():
+    """The source of src/core/pythonPrintableTable.ts: which characters
+    str.isprintable() is true for. A browser can be asked about Unicode
+    categories with \\p{...}, but its Unicode tables are newer than Python's,
+    and every character given out since then is one Python says cannot be
+    shown. So the list comes from Python, as it is."""
+    runs = ranges(str.isprintable)
+    lines = [
+        "// Written by tools/fixtures/generate.py. Do not edit by hand.",
+        "//",
+        f"// Printable characters as Python {EXPECTED_PYTHON[0]}.{EXPECTED_PYTHON[1]} knows them (Unicode {unicodedata.unidata_version}).",
+        "",
+        "// The first and last code point of every run of characters that",
+        "// str.isprintable() is true for, in order. Everything else is a",
+        "// control or format character, a space other than the plain one, a",
+        "// private use character, half of a surrogate pair, or a character that",
+        "// had not been given out yet. Four runs to a line.",
+        "export const PRINTABLE_RANGES: readonly (readonly [number, number])[] = [",
+    ]
+    for i in range(0, len(runs), 4):
+        lines.append("  " + " ".join(f"[0x{first:x}, 0x{last:x}]," for first, last in runs[i:i + 4]))
+    lines += ["];", ""]
+    return "\n".join(lines)
+
+
 NORMALIZER_PIECES = [
     # List markers of every kind, at the start of a line and inside one.
     "1. Mix", "2. Bake", "3. Eat", "1) First", "2) Second", "(1) One", "[2] Two", "1: Intro",
@@ -3517,6 +3542,9 @@ def main():
     print(f"{table.name}: written")
     table = table.with_name("pythonDigitTable.ts")
     table.write_text(digit_table(), encoding="ascii", newline="\n")
+    print(f"{table.name}: written")
+    table = table.with_name("pythonPrintableTable.ts")
+    table.write_text(printable_table(), encoding="ascii", newline="\n")
     print(f"{table.name}: written")
 
 
