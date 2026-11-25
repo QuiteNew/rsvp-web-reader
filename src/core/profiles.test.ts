@@ -93,6 +93,11 @@ describe('against the Python fixtures', () => {
       buildValues(settings as Record<string, unknown>, following as string[] | undefined);
     expectToMatchFixture(fixture, 'build_values', run);
     expectSameKeyOrder('build_values', run);
+    // The settings in the fixtures are already in profile order, so they are
+    // also given reversed here, and the answer must still be in that order.
+    expectSameKeyOrder('build_values', ([settings, following]) =>
+      run([Object.fromEntries(Object.entries(settings as object).reverse()), following]),
+    );
   });
 
   test('profile_from_dict', () => {
