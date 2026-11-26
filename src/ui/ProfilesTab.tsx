@@ -1,8 +1,8 @@
 import { useState, useSyncExternalStore } from 'react';
 
-import { ProfileError } from '../core/profiles';
+import { ProfileError, cleanName } from '../core/profiles';
 import type { SavedSettingsStore } from '../store/settingsStore';
-import { NameDialog } from './Dialog';
+import { ConfirmDialog, NameDialog } from './Dialog';
 import styles from './Dialog.module.css';
 
 // Says what a profile is, and what it is not. The second part matters: a
@@ -17,14 +17,20 @@ export const PROFILES_EXPLANATION =
   'colours or chunking, and Speed and Word size only set where new transcripts start. To keep ' +
   'different texts apart, use Spaces.';
 
-// Saving or applying first applies what was changed on the other tabs, the
-// way Apply does, because both work from the settings as they are saved.
-// Apply itself is hidden on this tab, so the note does not point at it.
+// Saving, updating or applying first applies what was changed on the other
+// tabs, the way Apply does, because all three work from the settings as they
+// are saved. Apply itself is hidden on this tab, so the note does not point
+// at it.
 export const PROFILES_APPLY_FIRST =
-  "Saving or applying a profile first applies any changes you've made in the other tabs.";
+  "Saving, updating or applying a profile first applies any changes you've made in the other tabs.";
 
 export const NO_PROFILES_TEXT =
   'No profiles yet. Set things up the way you like in Settings, then save them here.';
+
+// The one window this tab may have open over Settings at a time.
+type Popup =
+  | { readonly kind: 'save' }
+  | { readonly kind: 'rename' | 'update' | 'delete'; readonly name: string };
 
 interface ProfilesTabProps {
   readonly settings: SavedSettingsStore;
@@ -47,9 +53,9 @@ interface ProfilesTabProps {
 }
 
 // The Profiles tab of Settings: the explanation, a button to save the
-// current settings as a new profile, the saved profiles, and Apply for the
-// selected one. Clicking a profile selects it, and clicking it again
-// unselects it.
+// current settings as a new profile, the saved profiles, and Apply, Update,
+// Rename and Delete for the selected one. Clicking a profile selects it, and
+// clicking it again unselects it, which switches the four buttons off.
 export function ProfilesTab({
   settings,
   themeGuideMarkColor,
@@ -59,7 +65,7 @@ export function ProfilesTab({
   onApplied,
 }: ProfilesTabProps) {
   const { profiles } = useSyncExternalStore(settings.subscribe, settings.getSnapshot);
-  const [naming, setNaming] = useState(false);
+  const [popup, setPopup] = useState<Popup | null>(null);
   const [message, setMessage] = useState('');
   // A profile that is no longer saved is not selected.
   const selected = profiles.some((profile) => profile.name === chosen) ? chosen : null;
@@ -77,6 +83,23 @@ export function ProfilesTab({
     return true;
   }
 
+  // For the name dialogs: a refused name is named in the dialog, which
+  // stays open, so a typo does not cost the person the whole dialog.
+  function named(change: () => void): string | null {
+    try {
+      change();
+    } catch (error) {
+      if (!(error instanceof ProfileError)) throw error;
+      return error.message;
+    }
+    setMessage('');
+    return null;
+  }
+
+  function closePopup(): void {
+    setPopup(null);
+  }
+
   function applySelected(): void {
     if (selected === null || !onPrepare()) return;
     if (run(() => settings.applyProfile(selected, themeGuideMarkColor))) onApplied();
@@ -92,7 +115,7 @@ export function ProfilesTab({
         type="button"
         className={styles.action}
         onClick={() => {
-          if (onPrepare()) setNaming(true);
+          if (onPrepare()) setPopup({ kind: 'save' });
         }}
       >
         Save current settings as…
@@ -128,6 +151,36 @@ export function ProfilesTab({
         >
           Apply
         </button>
+        <button
+          type="button"
+          className={styles.action}
+          disabled={selected === null}
+          onClick={() => {
+            if (selected !== null && onPrepare()) setPopup({ kind: 'update', name: selected });
+          }}
+        >
+          Update
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          disabled={selected === null}
+          onClick={() => {
+            if (selected !== null) setPopup({ kind: 'rename', name: selected });
+          }}
+        >
+          Rename
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          disabled={selected === null}
+          onClick={() => {
+            if (selected !== null) setPopup({ kind: 'delete', name: selected });
+          }}
+        >
+          Delete
+        </button>
       </div>
       {message !== '' && (
         <p className={styles.problem} role="alert">
@@ -135,25 +188,60 @@ export function ProfilesTab({
         </p>
       )}
 
-      {naming && (
+      {popup?.kind === 'save' && (
         <NameDialog
           title="Save Profile"
           label="Profile name"
           confirm="Save"
-          onClose={() => {
-            setNaming(false);
-          }}
-          onSubmit={(name) => {
-            try {
+          onClose={closePopup}
+          onSubmit={(name) =>
+            named(() => {
               // Selected by the name it was saved under, which is tidied.
               onChoose(settings.saveProfile(name).name);
-            } catch (error) {
-              if (!(error instanceof ProfileError)) throw error;
-              return error.message;
-            }
-            setMessage('');
-            return null;
+            })
+          }
+        />
+      )}
+
+      {popup?.kind === 'rename' && (
+        <NameDialog
+          title="Rename Profile"
+          label="Profile name"
+          confirm="Rename"
+          initialValue={popup.name}
+          selectText
+          onClose={closePopup}
+          onSubmit={(name) =>
+            named(() => {
+              // The same name, tidied, is no change, and nothing is saved.
+              if (cleanName(name) === popup.name) return;
+              onChoose(settings.renameProfile(popup.name, name).name);
+            })
+          }
+        />
+      )}
+
+      {popup?.kind === 'update' && (
+        <ConfirmDialog
+          title="Update Profile"
+          message={`Replace what "${popup.name}" holds with the settings you are using now? The old settings can't be brought back.`}
+          confirm="Update"
+          onConfirm={() => {
+            run(() => settings.updateProfile(popup.name));
           }}
+          onClose={closePopup}
+        />
+      )}
+
+      {popup?.kind === 'delete' && (
+        <ConfirmDialog
+          title="Delete Profile"
+          message={`Delete the profile "${popup.name}"? This can't be undone.`}
+          confirm="Delete"
+          onConfirm={() => {
+            if (run(() => settings.deleteProfile(popup.name))) onChoose(null);
+          }}
+          onClose={closePopup}
         />
       )}
     </>

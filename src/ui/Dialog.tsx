@@ -67,6 +67,8 @@ interface NameDialogProps {
   readonly initialValue?: string;
   // A word of caution under the name, such as for a very long file.
   readonly warning?: string;
+  // Select the starting name, so typing replaces it. For renaming.
+  readonly selectText?: boolean;
 }
 
 // A dialog that asks for one name: a new Space, or a new transcript's title.
@@ -78,6 +80,7 @@ export function NameDialog({
   onSubmit,
   initialValue = '',
   warning,
+  selectText = false,
 }: NameDialogProps) {
   const inputId = useId();
   return (
@@ -102,6 +105,13 @@ export function NameDialog({
           autoFocus
           autoComplete="off"
           defaultValue={initialValue}
+          onFocus={
+            selectText
+              ? (event) => {
+                  event.currentTarget.select();
+                }
+              : undefined
+          }
           onInput={(event) => {
             event.currentTarget.setCustomValidity('');
           }}
@@ -135,6 +145,41 @@ export function MessageDialog({ title, message, onClose }: MessageDialogProps) {
       <div className={`${styles.buttons} ${styles.alone}`}>
         <button type="button" className={styles.action} autoFocus onClick={onClose}>
           OK
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+interface ConfirmDialogProps {
+  readonly title: string;
+  readonly message: string;
+  // The text of the button that goes ahead, such as Delete.
+  readonly confirm: string;
+  readonly onConfirm: () => void;
+  readonly onClose: () => void;
+}
+
+// Asks before something that cannot be taken back, like the desktop's
+// ProfileConfirmDialog. Cancel has the focus, so Enter never goes ahead:
+// the desktop leaves Enter out of these on purpose. Escape cancels.
+export function ConfirmDialog({ title, message, confirm, onConfirm, onClose }: ConfirmDialogProps) {
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <p className={styles.message}>{message}</p>
+      <div className={styles.buttons}>
+        <button type="button" className={styles.action} autoFocus onClick={onClose}>
+          Cancel
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          onClick={() => {
+            onConfirm();
+            onClose();
+          }}
+        >
+          {confirm}
         </button>
       </div>
     </Dialog>

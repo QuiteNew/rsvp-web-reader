@@ -48,6 +48,11 @@ async function letterGap(page: Page): Promise<string> {
     .evaluate((word) => word.parentElement?.style.getPropertyValue('--letter-gap') ?? '');
 }
 
+// A button of the Profiles tab. Only there, since the page has other
+// buttons whose names start the same, such as "Delete Spacing".
+const tabButton = (page: Page, name: string) =>
+  page.getByRole('tabpanel', { name: 'Profiles' }).getByRole('button', { name, exact: true });
+
 const savedProfile = (page: Page, name: string) =>
   page.getByRole('list', { name: 'Saved profiles' }).getByRole('button', { name });
 
@@ -94,4 +99,59 @@ test('profiles are kept after a reload', async ({ page }) => {
   await page.reload();
   await openProfiles(page);
   await expect(savedProfile(page, 'Mine')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('update, rename and delete, the whole way round', async ({ page }) => {
+  await startPaused(page);
+  await chooseLevel(page, 'Small');
+  await openProfiles(page);
+  await saveProfile(page, 'Spaced');
+  await page.keyboard.press('Escape');
+
+  // Update it to Large, then put the reader back to Off.
+  await chooseLevel(page, 'Large');
+  await openProfiles(page);
+  await savedProfile(page, 'Spaced').click();
+  await tabButton(page, 'Update').click();
+  const update = page.getByRole('dialog', { name: 'Update Profile' });
+  await update.getByRole('button', { name: 'Update' }).click();
+  await expect(update).toHaveCount(0);
+
+  await tabButton(page, 'Rename').click();
+  const rename = page.getByRole('dialog', { name: 'Rename Profile' });
+  // The name is selected, so typing replaces it.
+  await page.keyboard.type('Wide');
+  await rename.getByRole('button', { name: 'Rename' }).click();
+  await expect(rename).toHaveCount(0);
+  await expect(savedProfile(page, 'Wide')).toHaveAttribute('aria-pressed', 'true');
+  await page.keyboard.press('Escape');
+
+  await chooseLevel(page, 'Off');
+  await openProfiles(page);
+  await savedProfile(page, 'Wide').click();
+  await page
+    .getByRole('tabpanel', { name: 'Profiles' })
+    .getByRole('button', { name: 'Apply' })
+    .click();
+  expect(await letterGap(page)).toBe('0.3em');
+
+  await openProfiles(page);
+  await savedProfile(page, 'Wide').click();
+  await tabButton(page, 'Delete').click();
+  await page
+    .getByRole('dialog', { name: 'Delete Profile' })
+    .getByRole('button', { name: 'Delete' })
+    .click();
+  await expect(page.getByText(/No profiles yet/)).toBeVisible();
+});
+
+test('Enter in the Delete dialog does not delete', async ({ page }) => {
+  await page.goto('./');
+  await openProfiles(page);
+  await saveProfile(page, 'Mine');
+  await tabButton(page, 'Delete').click();
+  await expect(page.getByRole('dialog', { name: 'Delete Profile' })).toHaveCount(1);
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('dialog', { name: 'Delete Profile' })).toHaveCount(0);
+  await expect(savedProfile(page, 'Mine')).toHaveCount(1);
 });

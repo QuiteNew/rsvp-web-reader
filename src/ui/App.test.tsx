@@ -2904,6 +2904,150 @@ describe('reading profiles', () => {
     });
   });
 
+  function inDialog(title: string) {
+    return within(screen.getByRole('dialog', { name: title }));
+  }
+
+  function rename(to: string): void {
+    press('Rename');
+    fireEvent.change(inDialog('Rename Profile').getByRole('textbox'), { target: { value: to } });
+    fireEvent.click(inDialog('Rename Profile').getByRole('button', { name: 'Rename' }));
+  }
+
+  const names = () => (savedSettings().saved().profiles as { name: string }[]).map((p) => p.name);
+
+  test('Update, Rename and Delete are off until a profile is selected', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    for (const name of ['Apply', 'Update', 'Rename', 'Delete']) {
+      expect(screen.getByRole('button', { name })).toBeEnabled();
+    }
+    fireEvent.click(profileButton('Mine'));
+    for (const name of ['Apply', 'Update', 'Rename', 'Delete']) {
+      expect(screen.getByRole('button', { name })).toBeDisabled();
+    }
+  });
+
+  test('Update asks first, and Cancel changes nothing', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+    fireEvent.click(pacing());
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    press('Update');
+    expect(
+      inDialog('Update Profile').getByText(
+        'Replace what "Mine" holds with the settings you are using now? ' +
+          "The old settings can't be brought back.",
+      ),
+    ).toBeInTheDocument();
+    // Cancel has the focus, so Enter never goes ahead.
+    expect(inDialog('Update Profile').getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    fireEvent.click(inDialog('Update Profile').getByRole('button', { name: 'Cancel' }));
+    expect(savedSettings().saved().profiles).toEqual([
+      expect.objectContaining({
+        values: expect.objectContaining({ length_pacing_enabled: false }),
+      }),
+    ]);
+  });
+
+  test('Update replaces what a profile holds with the settings now, keeping its name', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+    fireEvent.click(pacing());
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    press('Update');
+    fireEvent.click(inDialog('Update Profile').getByRole('button', { name: 'Update' }));
+    expect(screen.queryByRole('dialog', { name: 'Update Profile' })).toBeNull();
+    expect(profileButton('Mine')).toHaveAttribute('aria-pressed', 'true');
+    expect(savedSettings().saved().profiles).toEqual([
+      expect.objectContaining({
+        name: 'Mine',
+        values: expect.objectContaining({ length_pacing_enabled: true }),
+      }),
+    ]);
+  });
+
+  test('a wrong number on another tab stops Update before it asks', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /Thickness of the vertical guide marks/ }),
+      {
+        target: { value: '9' },
+      },
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    press('Update');
+    expect(screen.queryByRole('dialog', { name: 'Update Profile' })).toBeNull();
+    expect(screen.getByRole('alert')).toHaveTextContent('The guide mark thickness must be between');
+  });
+
+  test('Rename starts from the name, selected, and keeps the profile selected', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    press('Rename');
+    const box = inDialog('Rename Profile').getByRole('textbox') as HTMLInputElement;
+    expect(box).toHaveValue('Mine');
+    expect(box).toHaveFocus();
+    expect([box.selectionStart, box.selectionEnd]).toEqual([0, 4]);
+    fireEvent.click(inDialog('Rename Profile').getByRole('button', { name: 'Cancel' }));
+    rename('  Fast   skim ');
+    expect(screen.queryByRole('dialog', { name: 'Rename Profile' })).toBeNull();
+    expect(names()).toEqual(['Fast skim']);
+    expect(profileButton('Fast skim')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('a profile may change only the capitals of its name, but not take another name', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Other');
+    saveProfile('Mine');
+    rename('MINE');
+    expect(names()).toEqual(['Other', 'MINE']);
+    rename('other');
+    const box = inDialog('Rename Profile').getByRole('textbox') as HTMLInputElement;
+    expect(box.validationMessage).toBe('There is already a profile called "Other".');
+    expect(names()).toEqual(['Other', 'MINE']);
+  });
+
+  test('renaming to the same name, spaces aside, closes the dialog and saves nothing', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    const writes = vi.spyOn(Storage.prototype, 'setItem');
+    rename('  Mine ');
+    expect(screen.queryByRole('dialog', { name: 'Rename Profile' })).toBeNull();
+    expect(writes).not.toHaveBeenCalled();
+    writes.mockRestore();
+    expect(names()).toEqual(['Mine']);
+  });
+
+  test('Delete asks first, and then the profile is gone and its name free', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    press('Delete');
+    expect(
+      inDialog('Delete Profile').getByText(`Delete the profile "Mine"? This can't be undone.`),
+    ).toBeInTheDocument();
+    fireEvent.click(inDialog('Delete Profile').getByRole('button', { name: 'Cancel' }));
+    expect(names()).toEqual(['Mine']);
+    press('Delete');
+    fireEvent.click(inDialog('Delete Profile').getByRole('button', { name: 'Delete' }));
+    expect(names()).toEqual([]);
+    expect(screen.getByText(/No profiles yet/)).toBeInTheDocument();
+    saveProfile('mine');
+    expect(names()).toEqual(['mine']);
+  });
+
   test('profiles are still there after a reload', () => {
     renderPage();
     openSettings('Profiles');
