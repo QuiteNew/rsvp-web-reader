@@ -3,6 +3,6 @@
 // A test fails if the two differ, or if a release tag is newer than this.
 
 export const APP_NAME = 'RSVP Web Reader';
-export const APP_VERSION = '1.3.0';
+export const APP_VERSION = '1.4.0';
 export const REPO_URL = 'https://github.com/QuiteNew/rsvp-web-reader';
 export const LICENSE_NAME = 'MIT';

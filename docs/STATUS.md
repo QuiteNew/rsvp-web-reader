@@ -3,7 +3,7 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-25. Phases 0 to 5 are done (phase 5 called done by
+Last updated: 2026-11-26. Phases 0 to 5 are done (phase 5 called done by
 the owner on 2026-11-22). The first release, `v1.0.0`, is out: tagged by
 the owner on 2026-11-18 on `aebce68`. `v1.1.0`, which adds importing files,
 is out too: tagged on `74b3323`, and so is `v1.2.0`, with letter spacing,
@@ -13,9 +13,9 @@ what the first two have and do not have. Phase 6 has started:
 desktop app does, what its design notes add, the plan, and each feature as
 it is built. Phase 6 is released in four minor versions, as the owner set
 on 2026-11-23: `v1.2.0` letter spacing (out, see "Version 1.2.0" below),
-`v1.3.0` the OpenDyslexic font and bold word starts (prepared, see "Version
-1.3.0" below), `v1.4.0` reading profiles, `v1.5.0` speaker cues and the
-HTML import fix. Each adds features and breaks nothing, so none is a major
+`v1.3.0` the OpenDyslexic font and bold word starts (see "Version 1.3.0"
+below), `v1.4.0` reading profiles (prepared, see "Version 1.4.0" below),
+`v1.5.0` speaker cues and the HTML import fix. Each adds features and breaks nothing, so none is a major
 version.
 
 ## Phases
@@ -28,7 +28,7 @@ version.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing is out as 1.2.0. The OpenDyslexic font and bold word starts are built and prepared as 1.3.0. Then 1.4.0 and 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                                            |
+| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing is out as 1.2.0. The OpenDyslexic font and bold word starts are out as 1.3.0. Reading profiles are built and prepared as 1.4.0. Then 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                   |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
@@ -555,6 +555,52 @@ What it still does not have, besides the lists for 1.0.0 to 1.2.0 above:
   a look like bold word starts and says its status was never checked. It was
   not checked here either. The owner should know of it before a public
   release. This is not legal advice.
+
+## Version 1.4.0
+
+Prepared on 2026-11-26, the third of the four phase 6 releases:
+`APP_VERSION`, `package.json` and `package-lock.json` at 1.4.0.
+
+What it adds:
+
+- Reading profiles, on a new Profiles tab of Settings after Appearance. A
+  profile is a name and a snapshot of 18 reading settings: speed, word size
+  and its step, the focus letter offset, the guide marks, the
+  surrounding-words line, the pacing, skipping, the resume rewind, splitting
+  long paragraphs, pausing when the slider is dragged and the letter spacing
+  level. It never holds colours,
+  chunking, speaker cues, the theme, the font switch or bold word starts,
+  as on the desktop.
+- Save current settings as a new profile, Apply, Update, Rename and Delete.
+  Names are unique with capitals aside and at most 30 characters. Update and
+  Delete ask first. There are no starter profiles. Saving, updating or
+  applying a profile first applies any changes made in the other tabs.
+- Applying a profile closes Settings, as on the desktop. A setting a profile
+  does not hold is left alone.
+- The sentence under Letter spacing now ends by saying the level is saved in
+  reading profiles, as the desktop's does.
+- Profiles are saved with the other settings and travel in an export. A
+  damaged profile list is cleaned when settings are read and when a bundle
+  is imported, so one bad entry never costs the rest.
+
+How it was checked: the rules (`core/profiles.py`, `core/profile_apply.py`)
+and the saved-list operations against fixtures generated from the desktop at
+`eccfc89`, and the desktop's three profile test files replayed under their
+Python names. The desktop's settings-store tests are replayed too, 376 of
+them now. The page is covered by component tests and by browser tests in
+Chromium (by the assistant) and in all three browsers (by the owner, up to
+the Profiles tab with saving and applying). `npm run check` passed with 1,737
+tests at the last code commit. The look next to the desktop app is the
+owner's eye check, which the assistant cannot do.
+
+What it still does not have, besides the lists for 1.0.0 to 1.3.0 above:
+
+- The rest of phase 6: speaker cues and the HTML import fix.
+- The eye check of the Profiles tab next to the desktop app, in Light and
+  Dark.
+- The Firefox and WebKit run of the Update, Rename and Delete tests was not
+  reported when this was written.
+- The French patent note under 1.3.0 is still unchecked.
 
 ## Decisions
 

@@ -83,6 +83,11 @@ project.
 - Letter spacing for the flashing word, in four levels (Off, Small, Medium,
   Large), with the highlighted letter kept on its spot and the words of a chunk
   kept apart
+- Reading profiles: save the current reading settings (speed, word size, guide
+  marks, pacing, skipping, letter spacing and the rest of the 18 on the desktop)
+  under a name, and apply, update, rename or delete them from the Profiles tab
+  of Settings. A profile never holds colours, chunking, the theme or the font
+  switch
 - An OpenDyslexic font switch for the whole page
 - Optional bold word starts in the text box: one button next to Normalize bolds
   the beginning of every word, and a copy out of the text box (Ctrl+C) carries
@@ -302,7 +307,7 @@ and [src/ui](src/ui/README.md), says what may import what. For the plan and the 
 
 ## Settings and Configuration
 
-Settings are organized into three tabs, and changes take effect when you press **Apply**:
+Settings are organized into four tabs, and changes take effect when you press **Apply**:
 
 - **Defaults** - the speed, colours and word size new transcripts start with,
   and the reader settings that apply to every transcript straight away: guide
@@ -310,6 +315,9 @@ Settings are organized into three tabs, and changes take effect when you press *
   transcript at launch, and more. A live search filters them by name or by
   description. **Configure chunking** opens its own window
 - **Appearance** - Light / Dark / System theme, letter spacing, and the OpenDyslexic font
+- **Profiles** - save the current reading settings under a name and bring them
+  back later: Save, Apply, Update, Rename and Delete. Applying a profile closes
+  Settings
 - **Data** - export everything (transcripts, Spaces and settings) to a file, or
   import one, choosing whether to replace what's here or add to it. The version,
   the license and a link to the source are at the bottom
@@ -322,7 +330,7 @@ Settings are organized into three tabs, and changes take effect when you press *
 - ~~Saved data in the browser, with export and import~~
 - ~~The reading experience: guide marks, surrounding words, progress slider, bookmarks, chunking, keyboard shortcuts, themes, fitting wide flashes~~
 - ~~Importing files (PDF, Word, HTML, subtitles and Markdown), read in the browser only~~
-- Comfort features: ~~letter spacing~~, ~~a dyslexia-friendly font~~, ~~bold word starts~~, reading profiles, speaker cues
+- Comfort features: ~~letter spacing~~, ~~a dyslexia-friendly font~~, ~~bold word starts~~, ~~reading profiles~~, speaker cues
 - Offline use and installing as an app, accessibility, and a help page
 
 ## License

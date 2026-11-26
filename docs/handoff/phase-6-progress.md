@@ -4,13 +4,13 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 [phase-6.md](phase-6.md). Phase 5 was called done by the owner on
 2026-11-22 and released as `v1.1.0`. Phase 6 started on 2026-11-23.
 
-| Step                                   | State                                                                            |
-| -------------------------------------- | -------------------------------------------------------------------------------- |
-| 1. What the desktop app does, and plan | Done, below                                                                      |
-| 2. Design notes from the owner         | Done on 2026-11-23, below                                                        |
-| 3. Build, one feature at a time        | 3 of 6 built. Letter spacing is in 1.2.0, the font and bold word starts in 1.3.0 |
-| 4. The owner tries each feature        | The font and bold word starts are waiting for the owner's eye check              |
-| 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own                                        |
+| Step                                   | State                                                                                                       |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1. What the desktop app does, and plan | Done, below                                                                                                 |
+| 2. Design notes from the owner         | Done on 2026-11-23, below                                                                                   |
+| 3. Build, one feature at a time        | 4 of 6 built. Letter spacing is in 1.2.0, the font and bold word starts in 1.3.0, reading profiles in 1.4.0 |
+| 4. The owner tries each feature        | The font, bold word starts and profiles are waiting for the owner's eye check                               |
+| 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own                                                                   |
 
 ## Step 1: what the desktop app does
 
@@ -546,3 +546,77 @@ not tried, only what is on the clipboard. Whether a large text freezes the
 page when it is pasted in a real Chromium is not known. The French patent
 publication the desktop note names (FR1755215) was not looked up, and the note
 says the owner should know of it before a public release.
+
+### 4. Reading profiles
+
+Built on 2026-11-25 and 2026-11-26, for 1.4.0, in about a dozen commits: the
+port of Python's printable rule (`b159d4d`), the profile rules (`de9f4a4`),
+what applying does (`ddef04a`), the check of every saved profile when settings
+are read (`31ce9ab`), the saved-list operations (`5e386ce`), the store
+(`f0fe216`), the sentence under Letter spacing (`cfea979`), then the Profiles
+tab (`66f889d`) and its Update, Rename and Delete buttons (`792e228`). The
+check that selected text compares the same in every browser (`b7672b0`) came
+first, from a Firefox failure on Windows in the 1.3.0 bold test (the
+selection has `\r\n` there), fixed in the test only.
+
+What was ported, from desktop `eccfc89`:
+
+- `core/profiles.py` into `src/core/profiles.ts`: the 18 keys, the name rules,
+  `valueIsValid`, `buildValues`, `profileFromDict` and `cleanProfileList`.
+  `fixtures/core/profiles.json` holds the cases. Bad input throws
+  `ProfileError`, a `RangeError`, where Python raises `ValueError`.
+- `core/profile_apply.py` into `src/core/profileApply.ts`: `planProfile`, which
+  says what a profile changes. A key a profile does not hold is left alone.
+  The number ranges are the same objects `settings.ts` uses.
+- The profile methods of `settings_store.py` as pure functions over the saved
+  settings in `src/core/savedProfiles.ts`. The store only saves what they
+  return, at once. Recorded in `fixtures/core/settings.json` by a script of 51
+  steps, and in the 376 replayed store tests.
+- `models.profiles`, checked on load and on a bundle import, and again in
+  `settingsView()`.
+
+Python traps met, all with a test:
+
+- `str.isprintable()` decides which names are allowed. The browser's Unicode
+  is newer than Python 3.13's, so a range table written from Python itself is
+  used (`src/core/pythonPrintableTable.ts`, made by the fixture script and
+  left out of Prettier).
+- `casefold` against `toLowerCase`: names that differ by Straße and STRASSE,
+  a ligature or the Kelvin sign are the same name.
+- `str.split()` whitespace, which includes `\x1c` to `\x1f` and `\x85` but not
+  the byte order mark, and code point length, so an emoji counts once.
+- Keys like `constructor` and `__proto__` in a saved profile: a `Map` and
+  `Object.hasOwn` are used, never a plain object lookup.
+- The order of a snapshot's keys is the order of `PROFILE_KEYS`. The fixture
+  comparison ignores key order, so a test runs the cases again with the input
+  reversed. A deliberate break showed this was not covered at first.
+- Python's `10.0` and `10` are one number to `JSON.parse`. That cannot be told
+  apart in the browser, so the generator stops on a whole-number float and the
+  difference is only written down. Lone surrogates were left out of the
+  fixtures too, because they break Vite's JSON reader.
+
+The page. The Profiles tab holds Save current settings as…, a list of the saved
+profiles (a row is selected with a click and unselected with a second click),
+and Apply, Update, Rename and Delete, off while nothing is selected. Settings'
+own Apply is hidden on that tab. The choice of profile is kept in
+`SettingsDialog`, because the tabs unmount when one switches (found by a page
+test). `ConfirmDialog` in `Dialog.tsx` puts the focus on Cancel, so Enter never
+confirms Update or Delete. The messages are the desktop's.
+
+Decision made with the owner: applying a profile closes Settings, as on the
+desktop, so no window shows old values. The guide mark colour keeps its
+"follows the theme" flag through a profile: it is stored as null while it
+follows the theme, and `restoreGuideMarkColor` is the one rule that can turn
+that back on.
+
+What was run: `npm run check` (1,737 tests at the last code commit, with lint,
+Prettier, types and the build) and all 70 browser tests in Chromium by the
+assistant. Eight deliberate breaks of the Update, Rename and Delete page, seven
+caught. The eighth, Delete forgetting to clear the selection, cannot show on
+any page, because a name that is no longer saved is never selected. It is kept
+because the desktop does it.
+
+Not run: Firefox and WebKit for the Update, Rename and Delete tests (the
+owner's `npm run e2e`), the eye check next to the desktop app in Light and
+Dark, and the desktop's `docs/usage.md` check. The desktop's window tests in
+`test_gui_smoke.py` are covered by page tests, not ported one to one.
