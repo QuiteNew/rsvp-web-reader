@@ -1181,6 +1181,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
           settings={settings}
           library={library}
           store={store}
+          themeGuideMarkColor={themeGuideMarkColor(isDark)}
           onConfigureChunking={() => {
             setChunkingOpen(true);
           }}

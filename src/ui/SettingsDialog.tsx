@@ -28,11 +28,12 @@ import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
 import { DataSettings } from './DataSettings';
 import { Dialog } from './Dialog';
+import { ProfilesTab } from './ProfilesTab';
 import appStyles from './App.module.css';
 import styles from './Dialog.module.css';
 
-type Tab = 'Defaults' | 'Appearance' | 'Data';
-const TABS: readonly Tab[] = ['Defaults', 'Appearance', 'Data'];
+type Tab = 'Defaults' | 'Appearance' | 'Profiles' | 'Data';
+const TABS: readonly Tab[] = ['Defaults', 'Appearance', 'Profiles', 'Data'];
 
 // The speed slider moves in steps of 10, as the desktop's 90 steps from 100
 // to 1000 do.
@@ -42,6 +43,9 @@ interface SettingsDialogProps {
   readonly settings: SavedSettingsStore;
   readonly library: Library;
   readonly store: SavedLibraryStore;
+  // The colour the theme on screen gives the guide marks, for applying a
+  // reading profile.
+  readonly themeGuideMarkColor: string;
   readonly onConfigureChunking: () => void;
   readonly onImported: () => void;
   readonly onClose: () => void;
@@ -54,13 +58,15 @@ interface SettingsDialogProps {
 // The skip amount and pausing on a skip are the exception: they are saved
 // at once, as the note above them says.
 //
-// The desktop's Layout, Profiles and Stats tabs are not here: the page has
-// no window to size, and profiles come in phase 6. Its Storage tab is Data
-// here, which holds export and import.
+// The desktop's Layout and Stats tabs are not here: the page has no window
+// to size, and the stats are not ported. Its Storage tab is Data here, which
+// holds export and import. On the Profiles tab Apply is hidden, as on the
+// desktop: saving or applying a profile applies the other tabs first.
 export function SettingsDialog({
   settings,
   library,
   store,
+  themeGuideMarkColor,
   onConfigureChunking,
   onImported,
   onClose,
@@ -70,6 +76,9 @@ export function SettingsDialog({
   const [query, setQuery] = useState('');
   const [inDescriptions, setInDescriptions] = useState(false);
   const [problem, setProblem] = useState<FormProblem | null>(null);
+  // The profile selected on the Profiles tab. Kept here and not in the tab,
+  // so it is still selected after a visit to another tab.
+  const [profileChosen, setProfileChosen] = useState<string | null>(null);
   const boxes = useRef(new Map<FormProblem['field'], HTMLInputElement>());
 
   // After a failed Apply, the box with the problem gets the cursor, with
@@ -86,18 +95,26 @@ export function SettingsDialog({
     setForm((current) => ({ ...current, ...changes }));
   }
 
-  function apply(): void {
+  // Saves what the tabs hold. When a typed number is wrong it takes the
+  // person to it instead, and gives false. The Profiles tab uses this on its
+  // own, before saving or applying a profile, as the desktop does.
+  function applyForm(): boolean {
     const check = checkSettingsForm(form);
     if (!check.ok) {
       // Take the person to the box: its tab, and no search hiding it.
       setTab('Defaults');
       setQuery('');
       setProblem(check.problem);
-      return;
+      return false;
     }
+    setProblem(null);
     settings.update(check.changes);
     settings.setGuideMarkColor(form.guideMarkColor);
-    onClose();
+    return true;
+  }
+
+  function apply(): void {
+    if (applyForm()) onClose();
   }
 
   function numberBox(field: FormProblem['field'], label: string): ReactNode {
@@ -455,6 +472,19 @@ export function SettingsDialog({
         </div>
       )}
 
+      {tab === 'Profiles' && (
+        <div role="tabpanel" aria-label="Profiles" className={styles.panel}>
+          <ProfilesTab
+            settings={settings}
+            themeGuideMarkColor={themeGuideMarkColor}
+            chosen={profileChosen}
+            onChoose={setProfileChosen}
+            onPrepare={applyForm}
+            onApplied={onClose}
+          />
+        </div>
+      )}
+
       {tab === 'Data' && (
         <div role="tabpanel" aria-label="Data" className={styles.panel}>
           <DataSettings
@@ -474,11 +504,13 @@ export function SettingsDialog({
           {problem.message}
         </p>
       )}
-      <div className={styles.footer}>
-        <button type="button" className={styles.action} onClick={apply}>
-          Apply
-        </button>
-      </div>
+      {tab !== 'Profiles' && (
+        <div className={styles.footer}>
+          <button type="button" className={styles.action} onClick={apply}>
+            Apply
+          </button>
+        </div>
+      )}
     </Dialog>
   );
 }

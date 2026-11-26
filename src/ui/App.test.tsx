@@ -51,7 +51,7 @@ function press(name: string): void {
 }
 
 // Opens Settings, on another tab than Defaults when asked.
-function openSettings(tab?: 'Appearance' | 'Data'): void {
+function openSettings(tab?: 'Appearance' | 'Profiles' | 'Data'): void {
   press('Settings');
   if (tab !== undefined) fireEvent.click(screen.getByRole('tab', { name: tab }));
 }
@@ -2738,5 +2738,179 @@ describe('bold word starts', () => {
     press('Reset to Original Defaults');
     press('Apply');
     expect(savedSettings().saved().bold_starts_enabled).toBe(true);
+  });
+});
+
+describe('reading profiles', () => {
+  const pacing = () => screen.getByLabelText('Slow down for long words');
+
+  function profileButton(name: string): HTMLElement {
+    return within(screen.getByRole('list', { name: 'Saved profiles' })).getByRole('button', {
+      name,
+    });
+  }
+
+  // The name dialog opens over Settings, so it is found by its title.
+  function saveProfile(name: string): void {
+    press('Save current settings as…');
+    const dialog = screen.getByRole('dialog', { name: 'Save Profile' });
+    fireEvent.change(within(dialog).getByRole('textbox'), { target: { value: name } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Save' }));
+  }
+
+  test('the tab comes after Appearance, and Apply is not on it', () => {
+    renderPage();
+    openSettings();
+    expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'Defaults',
+      'Appearance',
+      'Profiles',
+      'Data',
+    ]);
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    const panel = screen.getByRole('tabpanel', { name: 'Profiles' });
+    expect(within(panel).getByText(/Applying one never changes a transcript/)).toBeInTheDocument();
+    expect(within(panel).getByText(/No profiles yet/)).toBeInTheDocument();
+    // The one Apply there is the profile's, off while nothing is selected.
+    expect(screen.getAllByRole('button', { name: 'Apply' })).toHaveLength(1);
+    expect(within(panel).getByRole('button', { name: 'Apply' })).toBeDisabled();
+  });
+
+  test('saving one keeps the current settings under the tidied name, and selects it', () => {
+    renderPage();
+    openSettings();
+    fireEvent.click(pacing());
+    press('Apply');
+    openSettings('Profiles');
+    saveProfile('  Long   words ');
+    expect(screen.queryByRole('dialog', { name: 'Save Profile' })).toBeNull();
+    expect(profileButton('Long words')).toHaveAttribute('aria-pressed', 'true');
+    expect(savedSettings().saved().profiles).toEqual([
+      expect.objectContaining({
+        name: 'Long words',
+        values: expect.objectContaining({ length_pacing_enabled: true }),
+      }),
+    ]);
+  });
+
+  test('a name that cannot be used is named, and the name dialog stays open', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    saveProfile('MINE');
+    const dialog = screen.getByRole('dialog', { name: 'Save Profile' });
+    expect((within(dialog).getByRole('textbox') as HTMLInputElement).validationMessage).toBe(
+      'There is already a profile called "Mine".',
+    );
+    expect(savedSettings().saved().profiles).toHaveLength(1);
+  });
+
+  test('saving first applies what was changed on the other tabs', () => {
+    renderPage();
+    openSettings();
+    fireEvent.click(pacing());
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    saveProfile('Long words');
+    expect(savedSettings().saved().length_pacing_enabled).toBe(true);
+    expect(savedSettings().saved().profiles).toEqual([
+      expect.objectContaining({
+        values: expect.objectContaining({ length_pacing_enabled: true }),
+      }),
+    ]);
+  });
+
+  test('a wrong number on another tab stops the save and is shown there', () => {
+    renderPage();
+    openSettings();
+    fireEvent.change(
+      screen.getByRole('textbox', { name: /Thickness of the vertical guide marks/ }),
+      {
+        target: { value: '9' },
+      },
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    press('Save current settings as…');
+    expect(screen.queryByRole('dialog', { name: 'Save Profile' })).toBeNull();
+    expect(screen.getByRole('tab', { name: 'Defaults' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'The guide mark thickness must be between 2 and 6.',
+    );
+  });
+
+  test('clicking the selected profile again unselects it', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    fireEvent.click(profileButton('Mine'));
+    expect(profileButton('Mine')).toHaveAttribute('aria-pressed', 'false');
+    const panel = screen.getByRole('tabpanel', { name: 'Profiles' });
+    expect(within(panel).getByRole('button', { name: 'Apply' })).toBeDisabled();
+    fireEvent.click(profileButton('Mine'));
+    expect(profileButton('Mine')).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  test('applying one puts its settings back and closes Settings', () => {
+    renderPage();
+    openSettings();
+    fireEvent.click(pacing());
+    press('Apply');
+    openSettings('Profiles');
+    saveProfile('Long words');
+    press('Close');
+    openSettings();
+    fireEvent.click(pacing());
+    press('Apply');
+    expect(savedSettings().saved().length_pacing_enabled).toBe(false);
+    openSettings('Profiles');
+    fireEvent.click(profileButton('Long words'));
+    press('Apply');
+    expect(screen.queryByRole('dialog', { name: 'Settings' })).toBeNull();
+    expect(savedSettings().saved().length_pacing_enabled).toBe(true);
+    openSettings();
+    expect(pacing()).toBeChecked();
+  });
+
+  test('a profile that follows the theme takes the new theme chosen in the same visit', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Themed');
+    fireEvent.click(screen.getByRole('tab', { name: 'Appearance' }));
+    fireEvent.change(screen.getByLabelText('Colour theme'), { target: { value: 'dark' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    // Still selected after the visit to Appearance, as on the desktop.
+    expect(profileButton('Themed')).toHaveAttribute('aria-pressed', 'true');
+    press('Apply');
+    expect(savedSettings().saved()).toMatchObject({
+      appearance_mode: 'dark',
+      guide_mark_color: '#F2E8DC',
+      guide_mark_color_is_default: true,
+    });
+  });
+
+  // No theme change on the way, so nothing else puts the colour right: the
+  // colour applied has to be the one of the theme on screen.
+  test("in Dark, a profile that follows the theme gets Dark's guide mark colour back", () => {
+    window.localStorage.setItem(SETTINGS_KEY, JSON.stringify({ appearance_mode: 'dark' }));
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Themed');
+    fireEvent.click(screen.getByRole('tab', { name: 'Defaults' }));
+    fireEvent.change(screen.getByLabelText('Mark colour'), { target: { value: '#112233' } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Profiles' }));
+    press('Apply');
+    expect(savedSettings().saved()).toMatchObject({
+      guide_mark_color: '#F2E8DC',
+      guide_mark_color_is_default: true,
+    });
+  });
+
+  test('profiles are still there after a reload', () => {
+    renderPage();
+    openSettings('Profiles');
+    saveProfile('Mine');
+    cleanup();
+    renderPage();
+    openSettings('Profiles');
+    expect(profileButton('Mine')).toHaveAttribute('aria-pressed', 'false');
   });
 });
