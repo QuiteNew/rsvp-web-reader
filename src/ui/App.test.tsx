@@ -3336,6 +3336,23 @@ describe('speaker cues', () => {
     expect(store.getSnapshot().transcripts).toHaveLength(1);
   });
 
+  test("the window's speaker list renames a speaker, saved with the transcript and read at once", () => {
+    const { page, store } = readTalk();
+    openSettings();
+    press('Configure speaker cues…');
+    const cues = within(screen.getByRole('dialog', { name: 'Speaker cues' }));
+    expect(cues.getByText('Talk')).toBeInTheDocument();
+    fireEvent.change(cues.getByRole('textbox', { name: 'Name shown for Alice' }), {
+      target: { value: 'Ann' },
+    });
+    fireEvent.click(cues.getByRole('button', { name: 'Apply' }));
+    expect(store.getSnapshot().transcripts[0]?.speakerCustom).toEqual({ alice: 'Ann', bob: 'Bob' });
+    fireEvent.click(cues.getByRole('button', { name: 'Close' }));
+    expect(tag()?.textContent).toBe('Ann');
+    wait(page, FIRST_TURN_MS);
+    expect(tag()?.textContent).toBe('Bob');
+  });
+
   test('the Settings search finds Speaker cues by its words', () => {
     readTalk();
     openSettings();

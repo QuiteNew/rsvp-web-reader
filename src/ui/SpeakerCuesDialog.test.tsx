@@ -1,17 +1,30 @@
 // The Speaker cues window on its own, following the desktop's
-// tests/test_speaker_cues_window.py for the part for the whole app, under its
-// test names where one fits. The speaker list comes with the next step.
+// tests/test_speaker_cues_window.py, under its test names where one fits.
+// Its tests of the window's size in pixels have no web counterpart: the
+// page lays the window out, and a long list scrolls.
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 import { CHANGE_PATTERN, SPEAKER_PATTERNS, type ChimeNotes } from '../core/chime';
 import { FakeClock } from '../testing/fakeClock';
+import type { SpeakerCustom } from '../core/models';
 import {
+  NO_NAMES_NOTE,
   NO_SOUND_NOTE,
+  NO_TRANSCRIPT_NOTE,
+  SAME_NAME_NOTE,
   SOUND_NOTE,
   SpeakerCuesDialog,
   type ListenPlayer,
   type SpeakerCueChoice,
+  type SpeakerListSource,
 } from './SpeakerCuesDialog';
+
+// The desktop test's text: Ann and Bob start two lines each, Cat one.
+const TEXT = 'Ann: hi\nBob: yo\nCat: once\nAnn: and\nBob: so';
+
+function talk(rawText = TEXT, speakerCustom: SpeakerCustom = null): SpeakerListSource {
+  return { id: 7, title: 'Talk', rawText, speakerCustom };
+}
 
 const SAVED: SpeakerCueChoice = {
   speakerCuesEnabled: false,
@@ -41,21 +54,38 @@ class FakePlayer implements ListenPlayer {
 function open(
   saved: Partial<SpeakerCueChoice> = {},
   player: ListenPlayer | null = new FakePlayer(),
+  transcript: SpeakerListSource | null = talk(),
 ) {
   const clock = new FakeClock();
   const onApply = vi.fn();
+  const onApplySpeakers = vi.fn();
   const onClose = vi.fn();
   const view = render(
     <SpeakerCuesDialog
       saved={{ ...SAVED, ...saved }}
+      transcript={transcript}
       player={player}
       clock={clock}
       onApply={onApply}
+      onApplySpeakers={onApplySpeakers}
       onClose={onClose}
     />,
   );
-  return { clock, onApply, onClose, player: player as FakePlayer, view };
+  return { clock, onApply, onApplySpeakers, onClose, player: player as FakePlayer, view };
 }
+
+// Each row as [tick, name, how often], in order.
+function rows(): [boolean, string, string][] {
+  return screen.getAllByRole('listitem').map((item) => {
+    const tick = item.querySelector<HTMLInputElement>('input[type=checkbox]')!;
+    const name = item.querySelector<HTMLInputElement>('input[type=text]')!;
+    return [tick.checked, name.value, item.querySelector('span')!.textContent];
+  });
+}
+const mode = () => screen.getByTestId('list-mode').textContent;
+const rowTick = (label: string) => box(`Show ${label} as a speaker`);
+const rowName = (label: string) =>
+  screen.getByRole('textbox', { name: `Name shown for ${label}` }) as HTMLInputElement;
 
 const box = (name: string) => screen.getByRole('checkbox', { name }) as HTMLInputElement;
 const choice = (name: string) => screen.getByRole('combobox', { name }) as HTMLSelectElement;
@@ -105,9 +135,119 @@ describe('what it shows', () => {
   });
 });
 
+describe('the speaker list', () => {
+  test('every_label_gets_a_row_as_auto_has_it', () => {
+    open();
+    expect(rows().map(([tick, name]) => [tick, name])).toEqual([
+      [true, 'Ann'],
+      [true, 'Bob'],
+      [false, 'Cat'],
+    ]);
+    expect(mode()).toBe('Automatic');
+    expect(screen.getByText('Talk')).toBeInTheDocument();
+    expect(screen.getByText(SAME_NAME_NOTE)).toBeInTheDocument();
+  });
+
+  test('rows_follow_the_transcripts_own_list', () => {
+    open({}, undefined, talk(TEXT, { cat: 'Kat' }));
+    expect(rows().map(([tick, name]) => [tick, name])).toEqual([
+      [false, 'Ann'],
+      [false, 'Bob'],
+      [true, 'Kat'],
+    ]);
+    expect(mode()).toBe('Custom');
+  });
+
+  test('each_row_says_how_often_the_name_starts_a_line', () => {
+    open();
+    expect(rows().map(([, , seen]) => seen)).toEqual([
+      'seen 2 times',
+      'seen 2 times',
+      'seen 1 time',
+    ]);
+  });
+
+  test('a damaged saved list shows what the reader makes of it', () => {
+    // A name that is not a string is dropped, the rest is kept.
+    open({}, undefined, talk(TEXT, { cat: 'Kat', bob: 3 } as unknown as SpeakerCustom));
+    expect(rows().map(([tick, name]) => [tick, name])).toEqual([
+      [false, 'Ann'],
+      [false, 'Bob'],
+      [true, 'Kat'],
+    ]);
+  });
+
+  test('with_no_transcript_open_there_is_no_list', () => {
+    const { onApply, onApplySpeakers } = open({}, undefined, null);
+    expect(screen.getByText(NO_TRANSCRIPT_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).toBeNull();
+    expect(screen.queryByTestId('list-mode')).toBeNull();
+    press('Apply');
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApplySpeakers).not.toHaveBeenCalled();
+  });
+
+  test('a_transcript_with_no_names_has_no_rows_and_saves_no_list', () => {
+    const { onApply, onApplySpeakers } = open({}, undefined, talk('just some words'));
+    expect(screen.getByText(NO_NAMES_NOTE)).toBeInTheDocument();
+    expect(screen.queryByRole('listitem')).toBeNull();
+    expect(mode()).toBe('Automatic');
+    press('Apply');
+    expect(onApply).toHaveBeenCalledTimes(1);
+    expect(onApplySpeakers).not.toHaveBeenCalled();
+  });
+
+  test('ticking_a_row_makes_the_list_custom_and_unticking_makes_it_automatic', () => {
+    open();
+    fireEvent.click(rowTick('Cat'));
+    expect(mode()).toBe('Custom');
+    fireEvent.click(rowTick('Cat'));
+    expect(mode()).toBe('Automatic');
+  });
+
+  test('typing_a_name_makes_the_list_custom', () => {
+    open();
+    fireEvent.change(rowName('Ann'), { target: { value: 'Annie' } });
+    expect(mode()).toBe('Custom');
+  });
+
+  test('back_to_automatic_puts_every_row_back', () => {
+    open({}, undefined, talk(TEXT, { cat: 'Kat' }));
+    press('Back to automatic');
+    expect(rows().map(([tick, name]) => [tick, name])).toEqual([
+      [true, 'Ann'],
+      [true, 'Bob'],
+      [false, 'Cat'],
+    ]);
+    expect(mode()).toBe('Automatic');
+  });
+
+  test('apply_saves_a_changed_list', () => {
+    const { onApplySpeakers } = open();
+    fireEvent.click(rowTick('Cat'));
+    fireEvent.change(rowName('Bob'), { target: { value: 'Ann' } });
+    press('Apply');
+    expect(onApplySpeakers).toHaveBeenCalledWith(7, { ann: 'Ann', bob: 'Ann', cat: 'Cat' });
+  });
+
+  test('apply_after_back_to_automatic_saves_automatic', () => {
+    const { onApplySpeakers } = open({}, undefined, talk(TEXT, { cat: 'Kat' }));
+    press('Back to automatic');
+    press('Apply');
+    expect(onApplySpeakers).toHaveBeenCalledWith(7, null);
+  });
+
+  test('a change in the list takes the "Applied." away', () => {
+    open();
+    press('Apply');
+    fireEvent.click(rowTick('Cat'));
+    expect(screen.getByRole('status')).toHaveTextContent('');
+  });
+});
+
 describe('Apply', () => {
   test('apply_hands_back_what_is_on_screen', () => {
-    const { onApply, onClose } = open();
+    const { onApply, onApplySpeakers, onClose } = open();
     fireEvent.click(box('Speaker cues'));
     fireEvent.click(box("The speaker's name"));
     pick('Chime', 'per_speaker');
@@ -123,6 +263,8 @@ describe('Apply', () => {
       speakerCueSound: 'per_speaker',
       speakerCueStyle: 'wood',
     });
+    // The list as it was loaded is Automatic, saved as null.
+    expect(onApplySpeakers).toHaveBeenCalledWith(7, null);
     expect(screen.getByRole('status')).toHaveTextContent('Applied.');
     // The window stays open after Apply.
     expect(onClose).not.toHaveBeenCalled();

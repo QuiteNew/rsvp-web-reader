@@ -191,3 +191,18 @@ test('Listen plays the chosen style, even with the sound saved as Off', async ({
   expect(await page.evaluate('window.chimesPlayed')).toEqual([{ length: 30870, rate: 44100 }]);
   expect(await page.evaluate('window.audioContextsMade')).toBe(1);
 });
+
+test("a speaker renamed in the window's list is shown by that name at once", async ({ page }) => {
+  await readTalk(page);
+  await expect(tag(page)).toHaveText('Alice');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Configure speaker cues…' }).click();
+  const cues = page.getByRole('dialog', { name: 'Speaker cues' });
+  await expect(cues.getByTestId('list-mode')).toHaveText('Automatic');
+  await cues.getByRole('textbox', { name: 'Name shown for Alice' }).fill('Ann');
+  await expect(cues.getByTestId('list-mode')).toHaveText('Custom');
+  await cues.getByRole('button', { name: 'Apply' }).click();
+  await cues.getByRole('button', { name: 'Close' }).click();
+  await page.keyboard.press('Escape');
+  await expect(tag(page)).toHaveText('Ann');
+});

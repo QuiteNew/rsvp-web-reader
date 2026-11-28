@@ -35,6 +35,10 @@ export const POSITION_LABELS: Readonly<Record<Position, string>> = {
   top_right: 'Top right',
 };
 
+/** What the speaker list says it is: following the text, or the transcript's own. */
+export const LIST_AUTOMATIC = 'Automatic';
+export const LIST_CUSTOM = 'Custom';
+
 /** How many speakers' chimes Listen plays when the sound is Per speaker. */
 export const PREVIEW_SPEAKERS = 3;
 

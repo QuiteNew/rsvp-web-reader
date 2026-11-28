@@ -187,6 +187,80 @@
   gap: 0.5rem;
 }
 
+/* The speaker list: the transcript's title, with Automatic or Custom at the
+   right, as on the desktop. */
+.listTitle {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 0.25rem 0 0.5rem;
+}
+
+/* A fieldset is as wide as its contents by default, and the name boxes
+   would push it past the window's edge. */
+.listGroup {
+  min-width: 0;
+}
+
+/* Up to four rows show, then the list scrolls, as on the desktop. Each row
+   is a tick box, the name, which takes the room left, and how often. */
+.speakerList {
+  display: grid;
+  gap: 0.25rem;
+  max-height: 9.5rem;
+  margin: 0 0 0.5rem;
+  padding: 0.4rem 0.5rem;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--taupe);
+  border-radius: 0.6rem;
+}
+
+.speakerList li {
+  /* Rows of a grid are as wide as their contents unless told otherwise. */
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.speakerList input[type='text'] {
+  /* A text box asks for about 20 letters of room. Starting from nothing
+     and taking what is left keeps "seen 2 times" in view. */
+  flex: 1 1 0;
+  width: 0;
+  min-width: 0;
+  padding: 0.2rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.3rem;
+  background: var(--text-box);
+}
+
+.speakerList li span {
+  /* As wide for "seen 1 time" as for "seen 12 times", so the name boxes
+     line up. */
+  min-width: 6.5rem;
+  text-align: right;
+  white-space: nowrap;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.listFooter {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.listFooter p {
+  flex: 1;
+  margin: 0;
+}
+
+.listFooter button {
+  white-space: nowrap;
+}
+
 /* A choice that belongs to the tick box above it, pushed in under its text. */
 .indented {
   padding-left: 1.6rem;

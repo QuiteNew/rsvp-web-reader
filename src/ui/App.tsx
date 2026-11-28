@@ -1287,11 +1287,24 @@ export function App({ store, settings, health, chimePlayer, ...parts }: AppProps
             speakerCueSound: preferences.speakerCueSound,
             speakerCueStyle: preferences.speakerCueStyle,
           }}
+          transcript={
+            selected === null
+              ? null
+              : {
+                  id: selected.id,
+                  title: selected.title,
+                  rawText: selected.rawText,
+                  speakerCustom: selected.speakerCustom,
+                }
+          }
           player={player}
           clock={clock}
           // Saved at once, and the reader on screen follows (useSpeakerCues).
           onApply={(choice) => {
             settings.update(choice);
+          }}
+          onApplySpeakers={(id, custom) => {
+            store.setSpeakers(id, custom);
           }}
           onClose={() => {
             setSpeakerCuesOpen(false);

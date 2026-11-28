@@ -4,6 +4,8 @@ import { describe, expect, test } from 'vitest';
 import { CHANGE_PATTERN, CHIME_STYLES, SPEAKER_PATTERNS } from './chime';
 import { SPEAKER_CUE_SOUNDS, SPEAKER_CUE_TAG_POSITIONS } from './settings';
 import {
+  LIST_AUTOMATIC,
+  LIST_CUSTOM,
   POSITION_LABELS,
   PREVIEW_PAUSE_MS,
   PREVIEW_SPEAKERS,
@@ -19,6 +21,10 @@ describe('test_speaker_cues_window.py, the pieces with no window', () => {
     expect(Object.values(SOUND_LABELS)).toEqual(['Off', 'One chime', 'Per speaker']);
     expect(Object.keys(STYLE_LABELS)).toEqual([...CHIME_STYLES]);
     expect(Object.values(STYLE_LABELS)).toEqual(['Bell', 'Soft', 'Glass', 'Wood']);
+  });
+
+  test('the list says Automatic or Custom', () => {
+    expect([LIST_AUTOMATIC, LIST_CUSTOM]).toEqual(['Automatic', 'Custom']);
   });
 
   test('appearances_are_counted_in_words', () => {
