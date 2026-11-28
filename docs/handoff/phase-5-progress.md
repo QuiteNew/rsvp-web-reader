@@ -423,8 +423,10 @@ UTF-16 label taken as UTF-16, and leaving out `dd`, `figcaption`, `th`,
 and a browser moves text that is loose in a table out of it, so it cannot
 make a difference.
 
-Found in the desktop app, for the owner. Not fixed there. The port copies
-the first one, as PORTING.md says, until the desktop changes:
+Found in the desktop app, for the owner. Not fixed there. The port copied
+the first one, as PORTING.md says, until the owner decided. Since `0753ac4`
+(2026-11-28) the web keeps that text, a written difference, and dropping it
+again fails eight tests (see phase-6-progress.md):
 
 - **Text right after a dropped element is lost.** lxml counts the text
   after an element as part of it, so removing a `<script>`, `<style>`,
@@ -630,6 +632,7 @@ For the owner, none of them blocking. Answered on 2026-11-23:
 
 1. The heads-up: the desktop's wording. Done in the commit after `v1.1.0`.
 2. The copied HTML bug: fixed at the end of phase 6, in a commit of its own.
+   Done on 2026-11-28 in `0753ac4`.
 3. The CJK character maps: at a later date.
 4. Real files: the owner tries them later.
 5. The licenses link in Settings: later.

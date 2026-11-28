@@ -40,9 +40,10 @@ differ, and one when a release tag is newer than the number written there.
 
    `npm run check` is lint, formatting, types, the unit tests and a build.
    `npm run e2e` builds the site and runs the browser tests in Chromium,
-   Firefox and WebKit, which the everyday CI run does not do. Every test should
-   pass. It needs `npx playwright install` once, and again after Playwright is
-   updated.
+   Firefox and WebKit, as CI does on every push. On Windows, WebKit runs one
+   test at a time (see `playwright.config.ts`), so it takes a while. Every
+   test should pass. It needs `npx playwright install` once, and again after
+   Playwright is updated.
 
 3. **Make the docs commits.** Update the docs the release touches. Then, in
    the last commit, update the README (features, roadmap), this file if the

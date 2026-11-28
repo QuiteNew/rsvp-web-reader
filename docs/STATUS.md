@@ -3,20 +3,21 @@
 Where the port stands. Update this at the end of every phase, and whenever a
 decision is made. The plan itself is in [WEB_PORT_BRIEF.md](../WEB_PORT_BRIEF.md).
 
-Last updated: 2026-11-26. Phases 0 to 5 are done (phase 5 called done by
+Last updated: 2026-11-28. Phases 0 to 5 are done (phase 5 called done by
 the owner on 2026-11-22). The first release, `v1.0.0`, is out: tagged by
 the owner on 2026-11-18 on `aebce68`. `v1.1.0`, which adds importing files,
-is out too: tagged on `74b3323`, and so is `v1.2.0`, with letter spacing,
-tagged on `4187651`. See "The first release" and "Version 1.1.0" below for
-what the first two have and do not have. Phase 6 has started:
+is out too: tagged on `74b3323`, and so are `v1.2.0`, with letter spacing,
+tagged on `4187651`, `v1.3.0` on `11430ac` and `v1.4.0` on `d021786`. See
+"The first release" and the version sections below for what each has and
+does not have. Phase 6 is built and waits for the owner to call it done:
 [handoff/phase-6-progress.md](handoff/phase-6-progress.md) has what the
 desktop app does, what its design notes add, the plan, and each feature as
 it is built. Phase 6 is released in four minor versions, as the owner set
 on 2026-11-23: `v1.2.0` letter spacing (out, see "Version 1.2.0" below),
 `v1.3.0` the OpenDyslexic font and bold word starts (see "Version 1.3.0"
-below), `v1.4.0` reading profiles (prepared, see "Version 1.4.0" below),
-`v1.5.0` speaker cues and the HTML import fix. Each adds features and breaks nothing, so none is a major
-version.
+below), `v1.4.0` reading profiles (see "Version 1.4.0" below), `v1.5.0`
+speaker cues and the HTML import fix (prepared, see "Version 1.5.0" below).
+Each adds features and breaks nothing, so none is a major version.
 
 ## Phases
 
@@ -28,7 +29,7 @@ version.
 | 3     | Saved data                             | Saving works: the library and the settings are kept in the browser, with export and import. The normalizer is ported and the desktop's store tests are replayed. Confirmed by the owner on 2026-11-16. See [handoff/phase-3-progress.md](handoff/phase-3-progress.md)                                                                                                                   |
 | 4     | The reading experience                 | Done. Colours, settings search, themes, guide marks, the surrounding-words line, the position slider, bookmarks, chunking, keyboard shortcuts, auto-fit and the scrollbar for wide flashes, the Settings window, the Normalize button. Confirmed by the owner on 2026-11-17. See [handoff/phase-4-progress.md](handoff/phase-4-progress.md). Released as 1.0.0, see "The first release" |
 | 5     | Importing files                        | Done. Text, subtitles, Markdown, web pages, Word and PDF, read in the browser. pdf.js for PDF, own code for the rest. Called done by the owner on 2026-11-22. See [handoff/phase-5-progress.md](handoff/phase-5-progress.md). Released as 1.1.0                                                                                                                                         |
-| 6     | Comfort and the rest                   | Started on 2026-11-23. Steps 1 and 2 (what the desktop does, the plan, the design notes) done. Letter spacing is out as 1.2.0. The OpenDyslexic font and bold word starts are out as 1.3.0. Reading profiles are built and prepared as 1.4.0. Then 1.5.0 for the rest. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                   |
+| 6     | Comfort and the rest                   | Built. Letter spacing is out as 1.2.0, the OpenDyslexic font and bold word starts as 1.3.0, reading profiles as 1.4.0. Speaker cues and the HTML import fix are prepared as 1.5.0. Waiting for the owner's eye and ear checks and for the owner to call the phase done. See [handoff/phase-6-progress.md](handoff/phase-6-progress.md)                                                  |
 | 7     | Offline and polish                     | Not started                                                                                                                                                                                                                                                                                                                                                                             |
 
 ## Phase 0: what was checked, and where
@@ -284,12 +285,18 @@ run**, because the workspace cannot download Playwright's browsers. Their
 first run is the owner's `npm run e2e` or the CI job. Treat a failure there
 as news, not as a flaky test.
 
-This used to say that CI has a second job, `e2e`, and that the deploy waits
-for it. That was wrong: `.github/workflows/ci.yml` has the `check` and
-`deploy` jobs only, so the everyday CI run does no browser tests. They run
-by hand (`npm run e2e`) and in the Release workflow, which installs the
-three browsers. Adding them to the everyday run is possible, and would add a
-minute or two to every push.
+Since 2026-11-26 the everyday CI run has a second job, `e2e`, which runs
+the browser tests in all three browsers on every push, and the Pages deploy
+waits for it. The owner added it to `.github/workflows/ci.yml` (committed
+with `b365e5f`). Before that, the browser tests ran only by hand (`npm run
+e2e`) and in the Release workflow.
+
+On the owner's Windows machine WebKit runs one test at a time
+(`playwright.config.ts`, `2196f11`). With several WebKit pages at once,
+Playwright's WebKit for Windows stopped drawing for a minute, twice, and a
+test waiting for a button to hold still timed out. The traces showed no
+frames at all and nothing moving on the page. CI keeps Playwright's
+default.
 
 Not used: Playwright's clock control. The tests are short enough in real
 time, and real time is what they are there to check.
@@ -443,8 +450,8 @@ What 1.0.0 does not have, written down so nobody assumes it does:
 - No note for people with a seizure or photosensitivity condition, and no
   accessibility pass (phase 7). The brief asks for the note. The desktop
   docs have none to copy. The wording is for the owner to see first.
-- No browser tests in the everyday CI run (see the end of the phase 2
-  section above).
+- No browser tests in the everyday CI run at the time. CI has run them on
+  every push since 2026-11-26 (see the end of the phase 2 section above).
 - A web export has not been opened in the real desktop app, and the other
   way round has not been tried either.
 - The 7 `npm audit` findings and Dependabot's first pull request are still
@@ -558,7 +565,8 @@ What it still does not have, besides the lists for 1.0.0 to 1.2.0 above:
 
 ## Version 1.4.0
 
-Prepared on 2026-11-26, the third of the four phase 6 releases:
+Prepared on 2026-11-26 and tagged by the owner on `d021786`, the third of
+the four phase 6 releases:
 `APP_VERSION`, `package.json` and `package-lock.json` at 1.4.0.
 
 What it adds:
@@ -599,7 +607,59 @@ What it still does not have, besides the lists for 1.0.0 to 1.3.0 above:
 - The eye check of the Profiles tab next to the desktop app, in Light and
   Dark.
 - The Firefox and WebKit run of the Update, Rename and Delete tests was not
-  reported when this was written.
+  reported when this was written. The Release workflow's dry run passed in
+  all three browsers before the tag.
+- The French patent note under 1.3.0 is still unchecked.
+
+## Version 1.5.0
+
+Prepared on 2026-11-28, the last of the four phase 6 releases:
+`APP_VERSION`, `package.json` and `package-lock.json` at 1.5.0.
+
+What it adds:
+
+- Speaker cues, off by default, in transcripts with names at the start of
+  their lines, like "Interviewer:". Set in their own window, "Configure
+  speaker cues…" on the Defaults tab of Settings, under Configure chunking.
+  - A name tag with who is speaking, above the word or in the top right
+    corner, also while paused.
+  - A brief flash when the speaker changes, 330 ms. Left out when the
+    browser asks for less motion, which the desktop does not have.
+  - A chime: one for any change, or a pattern of notes for each speaker, in
+    four styles, with a Listen button. The samples are the desktop's, sample
+    for sample. The desktop plays them on Windows only. The web plays them
+    in every browser that has Web Audio, from the first click or key press,
+    since a browser allows no sound before that.
+  - The speaker list of the open transcript: switch a speaker off, rename
+    one, or give two the same name to make them one. Back to automatic puts
+    it back.
+  - Apply saves and closes the window, the owner's choice. The desktop keeps
+    it open and says "Applied.".
+- Importing a web page keeps the text right after a dropped script, style,
+  noscript or template. The desktop loses it, which phase 5 found. A written
+  difference, the owner's choice.
+
+How it was checked: the chime code against fixtures from the desktop at
+`eccfc89`, among them every chime the app plays, compared by SHA-256. All 33
+come out the same in Node, Chromium, Firefox and WebKit. The 132 tests the
+desktop's `test_chime.py` collects are ported under their names, and the
+window's tests where they apply. The tag and flash numbers were copied from
+`reader_display.py` and checked by hand and in the browser tests: where the
+tag lands, the flash's 330 ms, reduced motion, and the chime reaching Web
+Audio after a real click. `npm run check` passed with 2,000 tests at the
+last code commit.
+
+What it still does not have, besides the lists for 1.0.0 to 1.4.0 above:
+
+- The ear check of the chimes next to the desktop, and the eye check of the
+  tag, the flash and the window, in Light and Dark.
+- A chime played in real Safari. Playwright's WebKit for Windows has no Web
+  Audio, so there the browser tests check that the page stays silent without
+  an error, and the sound itself in Chromium and Firefox. The samples were
+  checked in WebKit's maths.
+- Phase 7: offline use and caching the font files, the licence texts in the
+  built site, the accessibility pass and the seizure and photosensitivity
+  note.
 - The French patent note under 1.3.0 is still unchecked.
 
 ## Decisions
@@ -621,6 +681,9 @@ What it still does not have, besides the lists for 1.0.0 to 1.3.0 above:
 | Hidden tab                         | Reading holds, and goes on when the tab is shown. No resume rewind there                                                                                                                        |
 | Who writes files                   | From 2026-11-15 the owner lets the assistant write into the web repo. The owner still commits and pushes                                                                                        |
 | Phase 6 releases                   | Four minor versions, the owner's call on 2026-11-23: 1.2.0 letter spacing, 1.3.0 the OpenDyslexic font and bold word starts, 1.4.0 reading profiles, 1.5.0 speaker cues and the HTML import fix |
+| Speaker cues window                | Apply saves and closes it, the owner's call on 2026-11-28. The desktop keeps it open                                                                                                            |
+| Text after a dropped HTML element  | Kept, a written difference from the desktop. The owner's call on 2026-11-23, built on 2026-11-28                                                                                                |
+| Browser tests in CI                | On every push since 2026-11-26, and the deploy waits for them. WebKit one test at a time on the owner's Windows machine                                                                         |
 
 ## Versions in use
 

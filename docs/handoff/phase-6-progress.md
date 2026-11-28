@@ -4,13 +4,13 @@ Where phase 6 stands, so the work can carry on after a break. The plan is
 [phase-6.md](phase-6.md). Phase 5 was called done by the owner on
 2026-11-22 and released as `v1.1.0`. Phase 6 started on 2026-11-23.
 
-| Step                                   | State                                                                                                       |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| 1. What the desktop app does, and plan | Done, below                                                                                                 |
-| 2. Design notes from the owner         | Done on 2026-11-23, below                                                                                   |
-| 3. Build, one feature at a time        | 4 of 6 built. Letter spacing is in 1.2.0, the font and bold word starts in 1.3.0, reading profiles in 1.4.0 |
-| 4. The owner tries each feature        | The font, bold word starts and profiles are waiting for the owner's eye check                               |
-| 5. The HTML import fix from phase 5    | Not started. Last, in a commit of its own                                                                   |
+| Step                                   | State                                                                                                                           |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1. What the desktop app does, and plan | Done, below                                                                                                                     |
+| 2. Design notes from the owner         | Done on 2026-11-23, below                                                                                                       |
+| 3. Build, one feature at a time        | All built. Letter spacing is in 1.2.0, the font and bold word starts in 1.3.0, reading profiles in 1.4.0, speaker cues in 1.5.0 |
+| 4. The owner tries each feature        | Every feature is waiting for the owner's eye check, and the chimes for the ear check                                            |
+| 5. The HTML import fix from phase 5    | Done on 2026-11-28 in a commit of its own, `0753ac4`. In 1.5.0                                                                  |
 
 ## Step 1: what the desktop app does
 
@@ -620,3 +620,93 @@ Not run: Firefox and WebKit for the Update, Rename and Delete tests (the
 owner's `npm run e2e`), the eye check next to the desktop app in Light and
 Dark, and the desktop's `docs/usage.md` check. The desktop's window tests in
 `test_gui_smoke.py` are covered by page tests, not ported one to one.
+
+### 5. Speaker cues
+
+Built on 2026-11-28, for 1.5.0, in seven commits and a fix: the chime
+fixtures (`b365e5f`), the chime port (`6f14a30`), the player (`f7227f4`), the
+name tag (`9272642`), the wiring while reading (`66cccb9`), the window
+(`f6b80ae`), its speaker list (`429ad36`), and Apply closing the window
+(`5a28358`). The desktop moved on to `bcc4d22` meanwhile, with packaging,
+licences and a privacy policy. None of the speaker cue code or its tests
+changed, so the base stayed `eccfc89`. The design notes were read in the
+desktop's own `reference/desktop-design/`.
+
+What was ported:
+
+- `core/chime.py` into `src/core/chime.ts`, checked against
+  `fixtures/core/chime.json` (280 cases). A chime has tens of thousands of
+  samples, so each is recorded as its length, its peak, a SHA-256 of the
+  samples, the first 64 and every 997th. JavaScript's `sin`, `exp` and `cos`
+  could have differed from Python's in the last bit and moved a rounding,
+  so this was measured first: all 600,642 samples of the 24 chimes the app
+  plays came out the same in Node. The browser test then found the same in
+  Chromium, Firefox and WebKit. `test_chime.py` is ported whole (132 tests
+  as pytest collects them). The chime styles now live in `chime.ts`, as on
+  the desktop, and `settings.ts` passes them on.
+- `gui/chime_player.py` as `src/ui/chimePlayer.ts`. No WAV files and no
+  temporary folder: the samples play from memory through Web Audio. Making
+  the six chimes of a style takes up to about 55 ms, too long at the moment
+  a speaker changes, so they are made ahead of time, one per task, as the
+  desktop makes them on a thread. A chime that is not ready is missed, not
+  waited for. A browser allows sound only after a click or a key press, so
+  `unlock()` is called from one. A chime only starts while sound is running
+  or being unlocked, because Web Audio would keep one started while blocked
+  and play it late.
+- The tag and flash rules of `reader_display.py` into
+  `src/core/speakerCueDisplay.ts`, checked by hand, as the guide marks were.
+  The tag is drawn by `WordDisplay`, the flash and the chime are started by
+  `src/ui/useSpeakerCues.ts`, and the engine got `speakers()` for the chime
+  patterns.
+- The window's words and Listen plan into `src/core/speakerCuesWindow.ts`
+  with the desktop's tests for them, and the window as
+  `src/ui/SpeakerCuesDialog.tsx`. Its Defaults entry uses the desktop's
+  words with one rewording: "and, on Windows, a soft chime" says "and a soft
+  chime", since a browser plays it everywhere.
+
+Differences from the desktop, on purpose:
+
+- The chime plays in every browser with Web Audio, not only on Windows.
+  Where there is none, the sound part of the window is greyed out with a
+  note of its own, and what was saved is kept.
+- No flash when the browser asks for less motion, as the brief says.
+- Listen unlocks sound itself, so it is heard even with the sound saved as
+  Off.
+- Apply saves and closes the window, the owner's choice on 2026-11-28. The
+  desktop keeps it open and says "Applied.".
+- The desktop's switches are tick boxes and its rows of buttons are lists,
+  as the web port does everywhere else.
+
+What was run: `npm run check` (2,000 tests at the last code commit) and the
+browser tests in Chromium by the assistant. The owner ran all three browsers
+up to the wiring (step 5), and CI runs them on every push since. The last
+runs before the tag are the owner's, as RELEASING.md says. 99 deliberate
+breaks over the steps. The few that were not caught first got a test where
+they could matter: the transcript's speaker list after reading again, a
+flash started while switched off, the Windows rewording, and Listen playing
+the saved sound instead of the one on screen. Two could not matter and stay
+noted: `Math.round` against Python's rounding for a chime sample (no real
+sample lands on a half), and the end of a flash on Stop, a line that was
+then taken out. Screenshots found three layout faults in the speaker list
+that no test saw, all fixed.
+
+Found on the way, in the tests and not in the page: Playwright's WebKit for
+Windows has no Web Audio, so `e2e/chime.spec.ts` checks there that the page
+stays silent without an error, and `e2e/speakerCues.spec.ts` plays into a
+stand-in for Web Audio in every browser. The same WebKit stopped drawing
+when several of its pages ran at once, so it runs one test at a time on the
+owner's machine (`2196f11`).
+
+Not run: the ear check of the chimes next to the desktop, the eye check of
+the tag, the flash and the window, and a chime in real Safari.
+
+### 6. The HTML import fix
+
+Done on 2026-11-28 in `0753ac4`, in a commit of its own as the owner asked.
+`importHtml` now drops only the element, and the text right after a
+`<script>`, `<style>`, `<noscript>` or `<template>` stays. The desktop
+drops it with the element, because lxml counts it as part of it. Four of
+the desktop's pages and two of its whole-file cases now differ, each listed
+with the web's text, which is what a browser shows. A browser test imports
+such a page in each browser. Putting the old removal back fails eight
+tests.

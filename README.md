@@ -88,6 +88,12 @@ project.
   under a name, and apply, update, rename or delete them from the Profiles tab
   of Settings. A profile never holds colours, chunking, the theme or the font
   switch
+- Speaker cues for transcripts with names at the start of their lines, like
+  "Interviewer:": a name tag with who is speaking, a brief flash when the
+  speaker changes (left out when your browser asks for less motion), and a
+  soft chime, one for any change or one for each speaker, in four styles.
+  Off by default, and set in their own window, where you can also rename the
+  speakers of the open transcript, switch one off, or merge two
 - An OpenDyslexic font switch for the whole page
 - Optional bold word starts in the text box: one button next to Normalize bolds
   the beginning of every word, and a copy out of the text box (Ctrl+C) carries
@@ -313,7 +319,8 @@ Settings are organized into four tabs, and changes take effect when you press **
   and the reader settings that apply to every transcript straight away: guide
   marks, pacing, skipping, the surrounding-words line, reopening the last
   transcript at launch, and more. A live search filters them by name or by
-  description. **Configure chunking** opens its own window
+  description. **Configure chunking** and **Configure speaker cues** open
+  their own windows
 - **Appearance** - Light / Dark / System theme, letter spacing, and the OpenDyslexic font
 - **Profiles** - save the current reading settings under a name and bring them
   back later: Save, Apply, Update, Rename and Delete. Applying a profile closes
@@ -330,7 +337,7 @@ Settings are organized into four tabs, and changes take effect when you press **
 - ~~Saved data in the browser, with export and import~~
 - ~~The reading experience: guide marks, surrounding words, progress slider, bookmarks, chunking, keyboard shortcuts, themes, fitting wide flashes~~
 - ~~Importing files (PDF, Word, HTML, subtitles and Markdown), read in the browser only~~
-- Comfort features: ~~letter spacing~~, ~~a dyslexia-friendly font~~, ~~bold word starts~~, ~~reading profiles~~, speaker cues
+- Comfort features: ~~letter spacing~~, ~~a dyslexia-friendly font~~, ~~bold word starts~~, ~~reading profiles~~, ~~speaker cues~~
 - Offline use and installing as an app, accessibility, and a help page
 
 ## License
