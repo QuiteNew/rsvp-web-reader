@@ -59,6 +59,12 @@ describe("the words are the desktop's", () => {
     for (const [from] of WEB_WORDING) expect(all).toContain(from);
   });
 
+  test('the chime is not said to be Windows only, as a browser plays it everywhere', () => {
+    const cues = DEFAULTS_ENTRIES.find((entry) => entry.id === 'speakerCues');
+    expect(cues?.description).toContain('a name tag, a brief flash and a soft chime.');
+    expect(DEFAULTS_ENTRIES.some((entry) => entry.description.includes('Windows'))).toBe(false);
+  });
+
   test('every entry left out is still on the desktop', () => {
     for (const name of Object.keys(NOT_YET)) {
       expect(desktop.some((entry) => entry.name === name)).toBe(true);

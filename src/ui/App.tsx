@@ -50,6 +50,7 @@ import {
 import { Scrubber } from './Scrubber';
 import { SettingsDialog } from './SettingsDialog';
 import { Sidebar } from './Sidebar';
+import { SpeakerCuesDialog } from './SpeakerCuesDialog';
 import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { usePointerLetsGoOfFocus } from './usePointerLetsGoOfFocus';
@@ -219,6 +220,8 @@ export function App({ store, settings, health, chimePlayer, ...parts }: AppProps
   );
   // The Chunking window opens over Settings, which stays open under it.
   const [chunkingOpen, setChunkingOpen] = useState(false);
+  // So does the Speaker cues window.
+  const [speakerCuesOpen, setSpeakerCuesOpen] = useState(false);
   const [problem, setProblem] = useState('');
 
   const space = currentSpace(library);
@@ -234,9 +237,10 @@ export function App({ store, settings, health, chimePlayer, ...parts }: AppProps
   }));
   const [engine, snapshot] = useReaderEngine(parts, engineEvents);
   const [player] = useState(() => (chimePlayer === undefined ? new ChimePlayer() : chimePlayer));
+  const clock = parts.clock ?? browserClock;
   const cues = useSpeakerCues({
     engine,
-    clock: parts.clock ?? browserClock,
+    clock,
     player,
     preferences,
     custom: selected?.speakerCustom ?? null,
@@ -1237,6 +1241,9 @@ export function App({ store, settings, health, chimePlayer, ...parts }: AppProps
           onConfigureChunking={() => {
             setChunkingOpen(true);
           }}
+          onConfigureSpeakerCues={() => {
+            setSpeakerCuesOpen(true);
+          }}
           onImported={() => {
             // The open transcript may be gone, or have another id.
             open(null);
@@ -1267,6 +1274,27 @@ export function App({ store, settings, health, chimePlayer, ...parts }: AppProps
           }}
           onClose={() => {
             setChunkingOpen(false);
+          }}
+        />
+      )}
+      {speakerCuesOpen && dialog.kind === 'settings' && (
+        <SpeakerCuesDialog
+          saved={{
+            speakerCuesEnabled: preferences.speakerCuesEnabled,
+            speakerCueNameTagEnabled: preferences.speakerCueNameTagEnabled,
+            speakerCueTagPosition: preferences.speakerCueTagPosition,
+            speakerCueFlashEnabled: preferences.speakerCueFlashEnabled,
+            speakerCueSound: preferences.speakerCueSound,
+            speakerCueStyle: preferences.speakerCueStyle,
+          }}
+          player={player}
+          clock={clock}
+          // Saved at once, and the reader on screen follows (useSpeakerCues).
+          onApply={(choice) => {
+            settings.update(choice);
+          }}
+          onClose={() => {
+            setSpeakerCuesOpen(false);
           }}
         />
       )}

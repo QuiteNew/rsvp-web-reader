@@ -47,6 +47,7 @@ interface SettingsDialogProps {
   // reading profile.
   readonly themeGuideMarkColor: string;
   readonly onConfigureChunking: () => void;
+  readonly onConfigureSpeakerCues: () => void;
   readonly onImported: () => void;
   readonly onClose: () => void;
 }
@@ -68,6 +69,7 @@ export function SettingsDialog({
   store,
   themeGuideMarkColor,
   onConfigureChunking,
+  onConfigureSpeakerCues,
   onImported,
   onClose,
 }: SettingsDialogProps) {
@@ -247,6 +249,12 @@ export function SettingsDialog({
         return (
           <button type="button" className={styles.action} onClick={onConfigureChunking}>
             Configure chunking…
+          </button>
+        );
+      case 'speakerCues':
+        return (
+          <button type="button" className={styles.action} onClick={onConfigureSpeakerCues}>
+            Configure speaker cues…
           </button>
         );
       case 'fontSizeStep':

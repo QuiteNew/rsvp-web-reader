@@ -47,12 +47,12 @@ export const WEB_WORDING: readonly (readonly [desktop: string, web: string])[] =
   ['When the app starts, it opens', 'When the page opens, it opens'],
   ['when you last closed it', 'when you last left it'],
   ['Takes effect the next time you launch the app.', 'Takes effect the next time the page opens.'],
+  // A browser plays the chime everywhere, not only on Windows.
+  ['a brief flash and, on Windows, a soft chime', 'a brief flash and a soft chime'],
 ];
 
 /** Desktop entries the web does not have yet, and why. */
-export const NOT_YET: Readonly<Record<string, string>> = {
-  'Configure speaker cues': 'Speaker cues are phase 6.',
-};
+export const NOT_YET: Readonly<Record<string, string>> = {};
 
 function webWords(text: string): string {
   return WEB_WORDING.reduce((words, [desktop, web]) => words.split(desktop).join(web), text);
@@ -107,6 +107,16 @@ const ENTRIES: readonly DefaultsEntry[] = [
       'chunk chunks chunking group grouping words at a time several multiple phrase adaptive fixed',
     description:
       'Flash several words at once instead of one at a time, so your eyes move less across each flash. Opens a window where you can turn this on for the transcript open now or for new transcripts, pick a fixed number of words or an adaptive width, and set the size.',
+    searchable: true,
+  },
+  {
+    id: 'speakerCues',
+    name: 'Configure speaker cues',
+    keywords:
+      'speaker speakers cue cues who is talking voice interview dialogue conversation name tag flash chime sound bell',
+    description: webWords(
+      'In transcripts with names at the start of their lines, like "Interviewer:", show who is speaking and give a cue when the speaker changes: a name tag, a brief flash and, on Windows, a soft chime. Opens a window where you can turn this on, pick the cues and the sound, and check the speakers found in the transcript open now.',
+    ),
     searchable: true,
   },
   {

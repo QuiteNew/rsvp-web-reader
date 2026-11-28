@@ -160,3 +160,34 @@ test('with the sound off, nothing is played and no sound device is made', async 
   expect(await page.evaluate('window.chimesPlayed')).toEqual([]);
   expect(await page.evaluate('window.audioContextsMade')).toBe(0);
 });
+
+test('switched on in the Speaker cues window, the reader shows who is speaking', async ({
+  page,
+}) => {
+  await readTalk(page, { speaker_cues_enabled: false });
+  await expect(tag(page)).toHaveCount(0);
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Configure speaker cues…' }).click();
+  const cues = page.getByRole('dialog', { name: 'Speaker cues' });
+  await cues.getByRole('checkbox', { name: 'Speaker cues' }).check();
+  await cues.getByRole('button', { name: 'Apply' }).click();
+  await expect(cues.getByRole('status')).toHaveText('Applied.');
+  await cues.getByRole('button', { name: 'Close' }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(tag(page)).toHaveText('Alice');
+});
+
+test('Listen plays the chosen style, even with the sound saved as Off', async ({ page }) => {
+  await readTalk(page, { speaker_cue_sound: 'off' });
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Configure speaker cues…' }).click();
+  const cues = page.getByRole('dialog', { name: 'Speaker cues' });
+  await cues.getByRole('combobox', { name: 'Style' }).selectOption('glass');
+  // With the sound off nothing asked for a sound device before this click.
+  expect(await page.evaluate('window.audioContextsMade')).toBe(0);
+  await cues.getByRole('button', { name: '▶ Listen' }).click();
+  // Off plays the change chime once: one glass note, 700 ms at 44100 a second.
+  expect(await page.evaluate('window.chimesPlayed')).toEqual([{ length: 30870, rate: 44100 }]);
+  expect(await page.evaluate('window.audioContextsMade')).toBe(1);
+});

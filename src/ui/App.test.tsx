@@ -3311,6 +3311,41 @@ describe('speaker cues', () => {
     expect(tag()?.textContent).toBe('Robert');
   });
 
+  test('Settings opens the Speaker cues window, and Apply reaches the reader at once', () => {
+    const { store } = readTalk({ speaker_cues_enabled: false });
+    expect(tag()).toBeNull();
+    openSettings();
+    press('Configure speaker cues…');
+    const cues = within(screen.getByRole('dialog', { name: 'Speaker cues' }));
+    fireEvent.click(cues.getByRole('checkbox', { name: 'Speaker cues' }));
+    fireEvent.change(cues.getByRole('combobox', { name: 'Where it goes' }), {
+      target: { value: 'top_right' },
+    });
+    fireEvent.click(cues.getByRole('button', { name: 'Apply' }));
+    expect(cues.getByRole('status')).toHaveTextContent('Applied.');
+    expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
+      speaker_cues_enabled: true,
+      speaker_cue_tag_position: 'top_right',
+    });
+    // Closing the window leaves Settings open under it, as Chunking does.
+    fireEvent.click(cues.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog', { name: 'Speaker cues' })).toBeNull();
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
+    expect(tag()?.textContent).toBe('Alice');
+    expect(tag()?.dataset.position).toBe('top_right');
+    expect(store.getSnapshot().transcripts).toHaveLength(1);
+  });
+
+  test('the Settings search finds Speaker cues by its words', () => {
+    readTalk();
+    openSettings();
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search settings' }), {
+      target: { value: 'chime' },
+    });
+    expect(screen.getByRole('button', { name: 'Configure speaker cues…' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Configure chunking…' })).toBeNull();
+  });
+
   test('the speaker list stays with the transcript when it is read again', () => {
     const { store } = readTalk();
     act(() => {

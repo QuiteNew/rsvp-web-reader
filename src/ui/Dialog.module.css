@@ -181,6 +181,17 @@
   opacity: 0.8;
 }
 
+/* The rows of a group, evenly apart. */
+.stack {
+  display: grid;
+  gap: 0.5rem;
+}
+
+/* A choice that belongs to the tick box above it, pushed in under its text. */
+.indented {
+  padding-left: 1.6rem;
+}
+
 /* A group of settings with a title, and a row with a slider in it. */
 .group {
   margin: 0.75rem 0;
