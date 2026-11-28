@@ -116,6 +116,16 @@ test('a web page, with and without a named encoding', async ({ page }) => {
   expect(await add(page, { name: 'two.htm', buffer: page2 })).toBe('Café “q”');
 });
 
+test('a web page keeps the text right after a dropped script or style', async ({ page }) => {
+  // The desktop loses that text with the script. The web keeps it, the
+  // owner's choice, and the browser's own parser has to agree.
+  const loose = Buffer.from(
+    '<body><script>x</script>Loose text<p>a<style>s</style> and <b>b</b></p></body>',
+    'utf8',
+  );
+  expect(await add(page, { name: 'loose.html', buffer: loose })).toBe('Loose text\na and b');
+});
+
 test('Word: the desktop text, with the table, the text box and the footnote', async ({ page }) => {
   const text = await add(page, 'rich.docx');
   const desktop = (desktopAnswer('rich.docx').text as string).split('\n');

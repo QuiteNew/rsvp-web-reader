@@ -32,6 +32,17 @@ const DIFFERENCES = new Map<string, string>([
   ],
   // An encoding the browser does not know counts as none named, so the UTF-8 bytes are read as UTF-8.
   ['<meta charset="no-such-encoding"><p>Caf\u00c3\u00a9</p>', 'Caf\u00e9'],
+  // The text right after a dropped element is kept, the owner's choice. lxml counts it as part of the element, so the desktop drops it too.
+  ['<p>a<script>x</script>b</p>', 'ab'],
+  // The same, after a <noscript> and a <style>. The desktop even loses " d " in the middle of the second line.
+  ['<div>a<noscript>n</noscript>tail</div><p>c<style>s</style> d <b>e</b></p>', 'atail\nc d e'],
+  // The same, after a <template>.
+  ['<p>a<template>t</template>after</p>', 'aafter'],
+  // A page whose body starts with a <script> and then loose text: the desktop loses that text entirely.
+  [
+    '<body><script>x</script>Loose text after a script<p>p</p></body>',
+    'Loose text after a script\np',
+  ],
   // The desktop crashes on a control character inside a block (lxml refuses it in the line marks the desktop adds) and shows no message. Python counts these as spaces.
   ['<p>a\u001cb\u001fc</p>', 'a b c'],
   // The same crash, for a form feed.
@@ -120,9 +131,9 @@ describe('importHtml, in short', () => {
     );
   });
 
-  test('scripts, styles and the head are dropped, and so is the text right after them', () => {
+  test('scripts, styles and the head are dropped, and the text right after them is kept', () => {
     expect(importHtml(bytesOf('<head><title>T</title></head><p>a<script>x</script>b</p>'))).toBe(
-      'a',
+      'ab',
     );
   });
 });

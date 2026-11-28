@@ -8,8 +8,9 @@
 // and squeeze the spaces inside each line, the source file's own indents
 // and line wrapping included.
 //
-// Two written differences from the desktop, both about turning the file's
-// bytes into text (see decodeHtml below). The parsers themselves can build
+// Three written differences from the desktop. Two are about turning the
+// file's bytes into text (see decodeHtml below). The third keeps the text
+// right after a dropped element, which the desktop loses (see importHtml). The parsers themselves can build
 // a different tree for badly nested markup. The cases tried came out the
 // same, and phase-5-progress.md lists them.
 
@@ -101,21 +102,13 @@ export function decodeHtml(bytes: Uint8Array): string {
   return named === null ? decodeText(bytes) : named.decode(bytes);
 }
 
-/**
- * Remove an element the way lxml does. To lxml, the text right after an
- * element (up to the next tag or comment) belongs to that element, so it
- * goes too: "<p>a<script>x</script>b</p>" keeps only "a". That loses text,
- * and it is reported to the owner, but it is the desktop's behaviour, so
- * the port copies it until the desktop changes.
- */
-function removeLikeLxml(element: Element): void {
-  while (element.nextSibling?.nodeType === Node.TEXT_NODE) element.nextSibling.remove();
-  element.remove();
-}
-
 export function importHtml(bytes: Uint8Array): string {
   const page = new DOMParser().parseFromString(decodeHtml(bytes), 'text/html');
-  for (const element of page.querySelectorAll(DROPPED)) removeLikeLxml(element);
+  // Only the element goes. The text right after it stays, which is the
+  // third written difference: to lxml that text belongs to the element, so
+  // the desktop drops it too, and "<p>a<script>x</script>b</p>" gives only
+  // "a" there. The owner chose to keep it here (phase 5, question 2).
+  for (const element of page.querySelectorAll(DROPPED)) element.remove();
 
   const root = page.documentElement;
   for (const element of root.querySelectorAll('*')) {
