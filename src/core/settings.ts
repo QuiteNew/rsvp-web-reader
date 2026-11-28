@@ -12,6 +12,7 @@
 //
 // data_directory is the one desktop setting that is not here. It is a
 // folder on one computer, and the desktop leaves it out of an export too.
+import { CHIME_STYLES } from './chime';
 import type { Settings } from './models';
 import { cleanProfileList } from './profiles';
 import type { SavedSettings } from './savedShapes';
@@ -37,7 +38,9 @@ export const LETTER_SPACING_LEVEL_RANGE: Range = [0, 3];
 // The first of each is the default.
 export const SPEAKER_CUE_SOUNDS = ['off', 'change', 'per_speaker'] as const;
 export const SPEAKER_CUE_TAG_POSITIONS = ['above', 'top_right'] as const;
-export const CHIME_STYLES = ['bell', 'soft', 'glass', 'wood'] as const;
+// The chime styles live with the chime, as on the desktop, and are passed on
+// here with the other choices.
+export { CHIME_STYLES };
 export const APPEARANCE_MODES = ['light', 'dark', 'system'] as const;
 export const CHUNK_MODES = ['fixed', 'adaptive'] as const;
 
