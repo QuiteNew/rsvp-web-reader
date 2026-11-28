@@ -2,7 +2,7 @@ name: CI
 
 # Runs on every push to main and on every pull request. Docs-only changes
 # run it too, on purpose: Prettier checks the Markdown files, so they can
-# change the result, and the whole run takes about a minute.
+# change the result, and the whole run takes a few minutes.
 on:
   push:
     branches: [main]
@@ -43,9 +43,38 @@ jobs:
         with:
           path: dist
 
+  e2e:
+    name: Browser tests on the built site
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # Chromium, Firefox and WebKit, and the system libraries they need.
+      - run: npx playwright install --with-deps
+
+      # Builds the site, serves it as GitHub Pages will, and reads with it.
+      - run: npm run e2e
+
+      # When a test fails, keep the report, with a recording of what the
+      # browser did. Download it from the run's page on GitHub.
+      - if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
   deploy:
     name: Publish to GitHub Pages
-    needs: check
+    needs: [check, e2e]
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:

@@ -3509,6 +3509,193 @@ def build_profiles(core):
     return functions
 
 
+
+# ---------------------------------------------------------------------------
+# Phase 6: speaker cues. core/chime.py is pure: which notes each speaker
+# gets, how long a chime lasts, how close two chimes may be, and the samples
+# of each chime. The desktop writes the samples into a WAV file for winsound;
+# the web puts the same samples into an AudioBuffer, so only the samples are
+# recorded, not the WAV header. A chime has tens of thousands of samples, so
+# each one is recorded as its length, its peak, a SHA-256 of the samples as
+# little-endian 16-bit numbers (a browser can work that out too), the first
+# 64 samples and every 997th one, which say where a difference is.
+# ---------------------------------------------------------------------------
+
+CHIME_START_SAMPLES = 64
+CHIME_SPACING = 997
+
+
+def chime_samples(wav):
+    """The samples of a WAV file chime_wav() made, checked to be the mono
+    16-bit file at the sample rate it promises."""
+    import hashlib
+    import io
+    import wave
+    from array import array
+
+    with wave.open(io.BytesIO(wav)) as file:
+        shape = (file.getnchannels(), file.getsampwidth(), file.getframerate())
+        if shape != (1, 2, 44100):
+            raise SystemExit(f"chime_wav made a file of another shape: {shape}")
+        data = file.readframes(file.getnframes())
+    samples = array("h", data)
+    if array("h", [1]).tobytes() != b"\x01\x00":
+        samples.byteswap()
+    return {
+        "frames": len(samples),
+        "peak": max(abs(value) for value in samples),
+        "sha256": hashlib.sha256(data).hexdigest(),
+        "start": list(samples[:CHIME_START_SAMPLES]),
+        "spaced": list(samples[::CHIME_SPACING]),
+    }
+
+
+def chime_wav_case(chime, notes, style, volume=None):
+    """One chime_wav() case. The volume is left out of the arguments when
+    the call leaves it out, so the default is what is checked."""
+    arguments = [list(notes), style] + ([] if volume is None else [volume])
+    try:
+        wav = chime.chime_wav(*arguments)
+    except ValueError:
+        return [arguments, None, "ValueError"]
+    return [arguments, chime_samples(wav)]
+
+
+def gap_script(chime, steps, min_gap_ms=None):
+    """A run of ChimeGap.allow() calls on one new ChimeGap. A step is
+    [now_ms, length_ms], or [now_ms] to use the default length."""
+    gap = chime.ChimeGap() if min_gap_ms is None else chime.ChimeGap(min_gap_ms)
+    answers = [gap.allow(*step) for step in steps]
+    return [[min_gap_ms, steps], answers]
+
+
+def build_chime(core):
+    import core.chime as chime
+
+    styles = list(chime.CHIME_STYLES)
+    patterns = [list(notes) for notes in chime.SPEAKER_PATTERNS]
+    every_pattern = patterns + [list(chime.CHANGE_PATTERN)]
+
+    style_table = [
+        [name, [[list(partial) for partial in style.partials], style.decay_ms, style.attack_ms, style.note_ms]]
+        for name, style in chime._STYLES.items()
+    ]
+    if [name for name, _ in style_table] != styles:
+        raise SystemExit("The chime styles are not listed in the order of CHIME_STYLES.")
+
+    lengths = []
+    for style in styles + ["Bell", "", "chime"]:
+        for count in range(7):
+            notes = [523.25] * count
+            try:
+                lengths.append([[notes, style], chime.chime_length_ms(notes, style)])
+            except KeyError:
+                lengths.append([[notes, style], None, "KeyError"])
+    lengths.append([[[523.25, 783.99]], chime.chime_length_ms([523.25, 783.99])])
+
+    wavs = [chime_wav_case(chime, notes, style) for style in styles for notes in every_pattern]
+    wavs.append([[[523.25]], chime_samples(chime.chime_wav([523.25]))])
+    for volume in [0, 1, 0.5, 0.123, 0.0001]:
+        wavs.append(chime_wav_case(chime, [523.25], "bell", volume))
+    wavs.append(chime_wav_case(chime, [523.25, 659.25, 783.99], "glass", 1))
+    others = [
+        ([440], "wood"),
+        ([100, 200, 300, 400, 500, 600], "soft"),
+        ([20], "bell"),
+        ([261.63, 261.63], "bell"),
+        ([7349.99], "bell"),
+        ([2204.99], "wood"),
+        ([4083.33], "glass"),
+        ([22049.99], "soft"),
+    ]
+    wavs += [chime_wav_case(chime, notes, style) for notes, style in others]
+    problems = [
+        ([523.25], "Bell", None),
+        ([523.25], "", None),
+        ([523.25], "chime", None),
+        ([], "bell", None),
+        ([523.25], "bell", -0.01),
+        ([523.25], "bell", 1.01),
+        ([523.25], "bell", 2),
+        ([0], "bell", None),
+        ([-440], "soft", None),
+        ([523.25, 0], "bell", None),
+        ([7350], "bell", None),
+        ([2205], "wood", None),
+        ([4083.34], "glass", None),
+        ([22050], "soft", None),
+    ]
+    wavs += [chime_wav_case(chime, notes, style, volume) for notes, style, volume in problems]
+    for case in wavs:
+        if len(case) == 3 and case[2] != "ValueError":
+            raise SystemExit(f"chime_wav raised something else: {case}")
+
+    speaker_lists = [
+        [],
+        ["Ann"],
+        ["Ann", "Bob", "Ann"],
+        [">>"],
+        [">>", "Ann", ">>", "Bob", ">>"],
+        ["Ann", "Bob", "Cy", "Di", "Ed"],
+        ["Ann", "Bob", "Cy", "Di", "Ed", "Fay"],
+        ["Ann", "Bob", "Cy", "Di", "Ed", "Fay", "Gus", "Hal", "Ivy", "Jo", "Kim", "Lu"],
+        ["ann", "Ann", "ANN"],
+        ["Dr. Smith", "Interviewer", "Dr. Smith", "\u00c9lodie", "\U0001F600 Smile"],
+        ["", "Ann"],
+    ]
+    speaker_pattern_cases = [
+        [[speakers], [[name, list(notes)] for name, notes in chime.speaker_patterns(speakers).items()]]
+        for speakers in speaker_lists
+    ]
+
+    note_cases = []
+    pattern_sets = [[], ["Ann", ">>", "Bob"], ["Ann", "Bob", "Cy", "Di", "Ed", "Fay"]]
+    for speakers in pattern_sets:
+        found = chime.speaker_patterns(speakers)
+        pairs = [[name, list(notes)] for name, notes in found.items()]
+        for sound in ["off", "change", "per_speaker", "", "Change", "per-speaker", None]:
+            for speaker in [None, "Ann", "Bob", "Fay", "Zed", ">>", ""]:
+                notes = chime.chime_notes(sound, speaker, found)
+                note_cases.append([[sound, speaker, pairs], None if notes is None else list(notes)])
+
+    rng = random.Random(1755)
+    chime_lengths = [chime.chime_length_ms(notes, style) for style in styles for notes in every_pattern]
+    wander = []
+    now = 0
+    for _ in range(300):
+        now += rng.choice([0, 1, 50, 120, 250, 399, 400, 401, 450, 600, 699, 700, 1000, 2500])
+        wander.append([now, rng.choice(chime_lengths + [0])])
+    gaps = [
+        gap_script(chime, [[0, 450], [100, 450], [399, 450], [449, 450], [450, 450], [500, 0],
+                           [850, 0], [899, 0], [900, 0], [1300, 300]]),
+        gap_script(chime, [[0], [399], [400], [799.5], [800]]),
+        gap_script(chime, [[0, 700], [400, 0], [699.9, 0], [700, 0], [1100, 0]]),
+        gap_script(chime, [[1000, 450], [900, 450], [1000, 450], [1349, 0], [1350, 0]]),
+        gap_script(chime, [[0.5, 450], [450.4, 450], [450.5, 450]]),
+        gap_script(chime, [[0, 0], [0, 0], [0, 10], [5, 0], [10, 0]], 0),
+        gap_script(chime, [[0, 450], [450, 0], [999, 0], [1000, 0]], 1000),
+        gap_script(chime, [[-500, 450], [-100, 0], [-50, 0]]),
+        gap_script(chime, wander),
+    ]
+
+    return {
+        "sample_rate": [[[], chime.SAMPLE_RATE]],
+        "chime_volume": [[[], chime.CHIME_VOLUME]],
+        "note_step_ms": [[[], chime.NOTE_STEP_MS]],
+        "speaker_patterns_table": [[[], patterns]],
+        "change_pattern": [[[], list(chime.CHANGE_PATTERN)]],
+        "min_chime_gap_ms": [[[], chime.MIN_CHIME_GAP_MS]],
+        "chime_styles": [[[], styles]],
+        "styles": [[[], style_table]],
+        "end_fade_ms": [[[], chime._END_FADE_MS]],
+        "full_scale": [[[], chime._FULL_SCALE]],
+        "chime_length_ms": lengths,
+        "chime_wav": wavs,
+        "speaker_patterns": speaker_pattern_cases,
+        "chime_notes": note_cases,
+        "chime_gap": gaps,
+    }
+
 MODULES = {
     "charsets": build_charsets,
     "tokenizer": build_tokenizer,
@@ -3539,6 +3726,7 @@ MODULES = {
     "bold_starts": build_bold_starts,
     "rich_copy": build_rich_copy,
     "profiles": build_profiles,
+    "chime": build_chime,
 }
 
 
