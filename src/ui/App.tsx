@@ -19,10 +19,13 @@ import { blendColors } from '../core/colors';
 import { fitCandidates } from '../core/fit';
 import { PERIPHERAL_CONTEXT_DIM } from '../core/guideMarks';
 import { letterGapEm } from '../core/letterSpacing';
+import { flashBackground, speakerTagColor, speakerTagName } from '../core/speakerCueDisplay';
 import { themeGuideMarkColor, themeReadingColors } from '../core/theme';
 import { CHUNK_SIZE_RANGE, FONT_SIZE_RANGE, WPM_RANGE } from '../core/settings';
 import { formatDuration } from '../core/timing';
 import { WPM_KEY_STEP } from '../core/wpmStep';
+import { browserClock } from '../engine/browserClock';
+import type { ReaderEvents } from '../engine/contract';
 import type { ChunkingChoice, StorageHealth } from '../store/contract';
 import type { SavedLibraryStore } from '../store/libraryStore';
 import type { SavedSettingsStore } from '../store/settingsStore';
@@ -31,6 +34,7 @@ import { Dialog, MessageDialog, NameDialog } from './Dialog';
 import dialogStyles from './Dialog.module.css';
 import { BoldText } from './BoldText';
 import { BookmarksDialog } from './BookmarksDialog';
+import { ChimePlayer } from './chimePlayer';
 import { ChunkingDialog } from './ChunkingDialog';
 import { IMPORT_ACCEPT, largeImportWarning, readPickedFile } from './fileImport';
 import {
@@ -50,6 +54,7 @@ import { SpacesDialog } from './SpacesDialog';
 import { useReaderEngine, type ReaderEngineParts } from './useReaderEngine';
 import { usePointerLetsGoOfFocus } from './usePointerLetsGoOfFocus';
 import { useShortcuts } from './useShortcuts';
+import { useSpeakerCues } from './useSpeakerCues';
 import { useFontSet } from './useFontSet';
 import { useTheme } from './useTheme';
 import { WordDisplay } from './WordDisplay';
@@ -136,13 +141,16 @@ function timeLeft(remainingMs: number): string {
 
 // A session for this transcript, at the word it was left on, or null when
 // its text has no words. One that was read to the end starts again from
-// the first word. Length pacing and the warm-up are settings for every
-// transcript, so they come from the settings, as on the desktop.
+// the first word. Length pacing, the warm-up and Speaker cues are settings
+// for every transcript, so they come from the settings, as on the desktop.
+// The speaker list is the transcript's own.
 function sessionFor(transcript: Transcript, preferences: Settings): ReaderSession | null {
   const session = new ReaderSession(transcript.rawText, {
     wpm: transcript.wpm,
     lengthPacingEnabled: preferences.lengthPacingEnabled,
     warmUpEnabled: preferences.warmUpEnabled,
+    speakerCuesEnabled: preferences.speakerCuesEnabled,
+    speakerCustom: transcript.speakerCustom,
     chunkEnabled: transcript.chunkingEnabled,
     chunkSize: transcript.chunkSize,
     chunkMode: transcript.chunkMode,
@@ -172,6 +180,9 @@ export interface AppProps extends ReaderEngineParts {
   readonly settings: SavedSettingsStore;
   // Asked to keep the data once there is something worth keeping.
   readonly health?: StorageHealth;
+  // Plays the speaker cue chimes. Tests hand in one with a stand-in for
+  // Web Audio. Left out, the page makes its own. null is no sound at all.
+  readonly chimePlayer?: ChimePlayer | null;
 }
 
 // The whole page: the transcripts on the left, and on the right the open
@@ -179,7 +190,7 @@ export interface AppProps extends ReaderEngineParts {
 //
 // The library is saved in the browser by the store. Until the store has
 // read what was saved, the page shows nothing that could be changed.
-export function App({ store, settings, health, ...parts }: AppProps) {
+export function App({ store, settings, health, chimePlayer, ...parts }: AppProps) {
   const ready = useSyncExternalStore(store.subscribe, store.isReady);
   const damagedNotice = useSyncExternalStore(store.subscribe, store.damagedNotice);
   const saveProblem = useSyncExternalStore(store.subscribe, store.saveProblem);
@@ -214,7 +225,23 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   const inSpace = library.transcripts.filter((transcript) => transcript.space === space);
   const selected = inSpace.find((transcript) => transcript.id === selectedId) ?? null;
 
-  const [engine, snapshot] = useReaderEngine(parts);
+  // Reading moving on into a new speaker's turn is passed to Speaker cues
+  // (useSpeakerCues below), which needs the engine, so the engine is given a
+  // way through to it.
+  const newSpeakerRef = useRef<((speaker: string) => void) | null>(null);
+  const [engineEvents] = useState<ReaderEvents>(() => ({
+    onNewSpeaker: (speaker) => newSpeakerRef.current?.(speaker),
+  }));
+  const [engine, snapshot] = useReaderEngine(parts, engineEvents);
+  const [player] = useState(() => (chimePlayer === undefined ? new ChimePlayer() : chimePlayer));
+  const cues = useSpeakerCues({
+    engine,
+    clock: parts.clock ?? browserClock,
+    player,
+    preferences,
+    custom: selected?.speakerCustom ?? null,
+    newSpeakerRef,
+  });
   const skipWords = preferences.skipWordCount;
 
   // Light, Dark or System, put on the page. The colours that follow the theme
@@ -403,6 +430,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
   // as text comes back as text.
   function open(id: number | null) {
     engine.unload();
+    cues.endFlash();
     // The position is saved at most once a second while reading. Leaving
     // is the moment to write the last one.
     void store.flush();
@@ -454,6 +482,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     // Starting to read ends Normalize's way back, as on the desktop, where
     // Start reading saves the text and an empty draft.
     if (transcript.preNormalizeText !== '') store.setNormalization(transcript.id, '', '');
+    cues.endFlash();
     engine.load(session);
   }
 
@@ -498,6 +527,25 @@ export function App({ store, settings, health, ...parts }: AppProps) {
     } else {
       store.addBookmark(selected.id, bookmarkHere.index, bookmarkHere.snippet);
     }
+  }
+
+  // The speaker name tag for the word on screen, or null for none.
+  function speakerTagFor(transcript: Transcript) {
+    const name = speakerTagName(
+      snapshot.speaker,
+      preferences.speakerCuesEnabled && preferences.speakerCueNameTagEnabled,
+    );
+    if (name === null) return null;
+    return {
+      name,
+      position: preferences.speakerCueTagPosition,
+      color: speakerTagColor(
+        transcript.fontColor,
+        transcript.backgroundColor,
+        transcript.highlightColor,
+        cues.flashing,
+      ),
+    };
   }
 
   // The reading shortcuts: only while the reader is on screen and no dialog
@@ -740,7 +788,10 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                   : ({
                       '--reading-font': selected.fontColor,
                       '--reading-highlight': selected.highlightColor,
-                      '--reading-background': selected.backgroundColor,
+                      // Warmed toward the highlight while a new speaker flashes.
+                      '--reading-background': cues.flashing
+                        ? flashBackground(selected.backgroundColor, selected.highlightColor)
+                        : selected.backgroundColor,
                     } as CSSProperties)
               }
             >
@@ -754,6 +805,7 @@ export function App({ store, settings, health, ...parts }: AppProps) {
                 pan={pan}
                 onPanChange={setPan}
                 letterGap={letterGapEm(preferences.letterSpacingLevel)}
+                speakerTag={speakerTagFor(selected)}
                 marks={{
                   visible: snapshot.status === 'playing',
                   horizontal: preferences.guideMarkHorizontalEnabled,

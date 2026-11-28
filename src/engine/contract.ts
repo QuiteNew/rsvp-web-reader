@@ -166,6 +166,11 @@ export interface ReaderEngine {
   // to the widest one. Empty with no session. It changes only on a load or
   // when the words are grouped again.
   chunkTexts(): ChunkText[];
+  // The speaker of each turn of the session, in reading order, for the
+  // chime each speaker gets. Empty with no session, with no speakers, or
+  // while Speaker cues is off. It changes only on a load or a change to
+  // Speaker cues.
+  speakers(): readonly string[];
 
   // Changes that reach into the session. Each one makes a new snapshot.
   // A new speed or pacing choice starts with the next word, and the word

@@ -6,6 +6,8 @@ import { APP_VERSION } from '../core/appInfo';
 import { FakeClock, FakeVisibility } from '../testing/fakeClock';
 import { buildBundle, bundleText } from '../core/bundle';
 import { blendColors } from '../core/colors';
+import { CHANGE_PATTERN, SPEAKER_PATTERNS } from '../core/chime';
+import { flashBackground } from '../core/speakerCueDisplay';
 import { EMPTY_LIBRARY, TRANSCRIPT_DEFAULTS, type Library } from '../core/models';
 import { DEFAULT_SAVED_SETTINGS } from '../core/settings';
 import { SavedLibraryStore } from '../store/libraryStore';
@@ -13,6 +15,7 @@ import { MemoryPersistence } from '../store/memoryPersistence';
 import { SETTINGS_KEY } from '../store/schema';
 import { SavedSettingsStore } from '../store/settingsStore';
 import { App } from './App';
+import { ChimePlayer, chimeFloats, type ChimeBackend } from './chimePlayer';
 import { DataSettings } from './DataSettings';
 
 // The page remembers the open transcript in localStorage. Each test starts
@@ -3058,3 +3061,269 @@ describe('reading profiles', () => {
     expect(profileButton('Mine')).toHaveAttribute('aria-pressed', 'false');
   });
 });
+
+describe('speaker cues', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Two speakers taking turns. At 300 words a minute Alice's first turn lasts
+  // 300 + 200 + 200 ms and 700 ms for its last word, the speaker pause.
+  const TALK = [
+    'Alice: hello there friend',
+    'Bob: hi again you',
+    'Alice: fine thanks much',
+    'Bob: good then bye',
+  ].join('\n');
+  const FIRST_TURN_MS = 1400;
+
+  // Stands in for Web Audio: keeps what it was asked to play.
+  class Speakers implements ChimeBackend {
+    canPlayNow = true;
+    unlocked = 0;
+    readonly played: Float32Array[] = [];
+    unlock(): void {
+      this.unlocked += 1;
+    }
+    play(samples: Float32Array): void {
+      this.played.push(samples);
+    }
+    stop(): void {}
+    close(): void {}
+  }
+
+  // Opens the page with these settings, Speaker cues on unless they say
+  // otherwise, and starts reading the text. The chimes are made at once.
+  function readTalk(saved: object = {}, text = TALK) {
+    window.localStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ speaker_cues_enabled: true, ...saved }),
+    );
+    const clock = new FakeClock();
+    const visibility = new FakeVisibility();
+    const store = SavedLibraryStore.ready(new MemoryPersistence<Library>(), EMPTY_LIBRARY);
+    const settings = savedSettings();
+    const speakers = new Speakers();
+    const player = new ChimePlayer(speakers, (task) => {
+      task();
+    });
+    render(
+      <App
+        store={store}
+        settings={settings}
+        clock={clock}
+        visibility={visibility}
+        chimePlayer={player}
+      />,
+    );
+    addTranscript('Talk');
+    paste(text);
+    press('Start reading');
+    const page: Page = { clock, visibility, store, persistence: new MemoryPersistence<Library>() };
+    return { page, store, settings, speakers };
+  }
+
+  const tag = () => screen.queryByTestId('speaker-tag');
+  // The reading area: the box the transcript's reading colours are set on.
+  const stage = () => screen.getByTestId('word').parentElement!.parentElement!;
+  const background = () => stage().style.getPropertyValue('--reading-background');
+
+  // The default light reading colours a new transcript gets.
+  function colours(store: SavedLibraryStore) {
+    const { backgroundColor, highlightColor } = store.getSnapshot().transcripts[0]!;
+    return {
+      plain: backgroundColor,
+      warm: flashBackground(backgroundColor, highlightColor),
+      highlightColor,
+    };
+  }
+
+  test('off, as by default: no tag, no flash, no chime, and no sound device', () => {
+    const { page, store, speakers } = readTalk({
+      speaker_cues_enabled: false,
+      speaker_cue_sound: 'per_speaker',
+    });
+    expect(tag()).toBeNull();
+    wait(page, FIRST_TURN_MS);
+    expect(background()).toBe(colours(store).plain);
+    press('Pause');
+    expect(speakers.played).toEqual([]);
+    expect(speakers.unlocked).toBe(0);
+  });
+
+  test('the tag names who is speaking, above the word, also while paused', () => {
+    const { page } = readTalk();
+    expect(tag()?.textContent).toBe('Alice');
+    expect(tag()?.dataset.position).toBe('above');
+    wait(page, FIRST_TURN_MS - 1);
+    expect(tag()?.textContent).toBe('Alice');
+    wait(page, 1);
+    expect(tag()?.textContent).toBe('Bob');
+    press('Pause');
+    expect(tag()?.textContent).toBe('Bob');
+  });
+
+  test('the tag can sit in the top right corner, or be switched off', () => {
+    readTalk({ speaker_cue_tag_position: 'top_right' });
+    expect(tag()?.dataset.position).toBe('top_right');
+    cleanup();
+    readTalk({ speaker_cue_name_tag_enabled: false });
+    expect(screen.getByTestId('word')).toBeInTheDocument();
+    expect(tag()).toBeNull();
+  });
+
+  test('a new speaker warms the reading area and lights the tag for 330 ms', () => {
+    const { page, store } = readTalk();
+    const { plain, warm, highlightColor } = colours(store);
+    expect(background()).toBe(plain);
+    wait(page, FIRST_TURN_MS);
+    expect(background()).toBe(warm);
+    expect(tag()?.style.color).toBe(highlightColorAsRgb(highlightColor));
+    wait(page, 329);
+    expect(background()).toBe(warm);
+    wait(page, 1);
+    expect(background()).toBe(plain);
+    expect(tag()?.style.color).not.toBe(highlightColorAsRgb(highlightColor));
+  });
+
+  test('no flash with the flash switched off, or when the browser asks for less motion', () => {
+    const first = readTalk({ speaker_cue_flash_enabled: false });
+    wait(first.page, FIRST_TURN_MS);
+    expect(background()).toBe(colours(first.store).plain);
+    expect(tag()?.textContent).toBe('Bob');
+    cleanup();
+
+    vi.stubGlobal('matchMedia', (query: string) => ({
+      matches: query === '(prefers-reduced-motion: reduce)',
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    }));
+    const second = readTalk({ speaker_cue_sound: 'change' });
+    wait(second.page, FIRST_TURN_MS);
+    expect(background()).toBe(colours(second.store).plain);
+    // The tag and the chime still say who is speaking.
+    expect(tag()?.textContent).toBe('Bob');
+    expect(second.speakers.played).toHaveLength(1);
+  });
+
+  test('a new speaker while the flash is off starts no flash, even if it is switched on at once', () => {
+    const { page, store, settings } = readTalk({ speaker_cue_flash_enabled: false });
+    wait(page, FIRST_TURN_MS);
+    act(() => {
+      settings.set('speakerCueFlashEnabled', true);
+    });
+    expect(background()).toBe(colours(store).plain);
+  });
+
+  test('switching the flash off ends one under way at once', () => {
+    const { page, store, settings } = readTalk();
+    wait(page, FIRST_TURN_MS);
+    expect(background()).toBe(colours(store).warm);
+    act(() => {
+      settings.set('speakerCueFlashEnabled', false);
+    });
+    expect(background()).toBe(colours(store).plain);
+  });
+
+  test('reading again after a stop starts without the flash', () => {
+    const { page, store } = readTalk();
+    wait(page, FIRST_TURN_MS);
+    expect(background()).toBe(colours(store).warm);
+    press('Stop reading');
+    press('Start reading');
+    expect(background()).toBe(colours(store).plain);
+  });
+
+  test('a chime for each speaker plays their own pattern, in the chosen style', () => {
+    const { page, speakers } = readTalk({
+      speaker_cue_sound: 'per_speaker',
+      speaker_cue_style: 'glass',
+    });
+    wait(page, FIRST_TURN_MS);
+    // Alice came first, so Bob has the second pattern.
+    expect(speakers.played).toEqual([chimeFloats(SPEAKER_PATTERNS[1]!, 'glass')]);
+    wait(page, 1400);
+    expect(speakers.played).toHaveLength(2);
+    expect(speakers.played[1]).toEqual(chimeFloats(SPEAKER_PATTERNS[0]!, 'glass'));
+  });
+
+  test('one chime for any change plays the change chime', () => {
+    const { page, speakers } = readTalk({ speaker_cue_sound: 'change', speaker_cue_style: 'wood' });
+    wait(page, FIRST_TURN_MS);
+    expect(speakers.played).toEqual([chimeFloats(CHANGE_PATTERN, 'wood')]);
+  });
+
+  test('with the sound off there is no chime and no sound device is asked for', () => {
+    const { page, speakers } = readTalk({ speaker_cue_sound: 'off' });
+    press('Pause');
+    press('Play');
+    wait(page, FIRST_TURN_MS);
+    expect(speakers.played).toEqual([]);
+    expect(speakers.unlocked).toBe(0);
+  });
+
+  test('with a sound chosen, a click or a key press unlocks sound', () => {
+    const { speakers } = readTalk({ speaker_cue_sound: 'change' });
+    const before = speakers.unlocked;
+    press('Pause');
+    expect(speakers.unlocked).toBe(before + 1);
+    fireEvent.keyDown(document.body, { key: 'x' });
+    expect(speakers.unlocked).toBe(before + 2);
+  });
+
+  test('chimes closer than the last one lasts are left out, as on the desktop', () => {
+    // The labels are read as words too. At 1000 words a minute "Alice:" shows
+    // for 90 ms and the one word after it for 210 ms with the speaker pause,
+    // so a new turn starts every 300 ms. Bob's chime is two notes, 570 ms
+    // long: Bob at 300 ms plays, Alice at 600 ms is too soon, and Bob at
+    // 900 ms plays again.
+    const talk = ['Alice: a', 'Bob: b', 'Alice: c', 'Bob: d', 'Alice: e', 'Bob: f'].join('\n');
+    const { page, speakers } = readTalk(
+      { speaker_cue_sound: 'per_speaker', default_wpm: 1000 },
+      talk,
+    );
+    wait(page, 600);
+    expect(speakers.played).toHaveLength(1);
+    wait(page, 299);
+    expect(speakers.played).toHaveLength(1);
+    wait(page, 1);
+    expect(speakers.played).toHaveLength(2);
+    expect(speakers.played[1]).toBe(speakers.played[0]);
+    expect(speakers.played[0]).toEqual(chimeFloats(SPEAKER_PATTERNS[1]!, 'bell'));
+  });
+
+  test('turning Speaker cues on while reading shows the tag at once', () => {
+    const { settings } = readTalk({ speaker_cues_enabled: false });
+    expect(tag()).toBeNull();
+    act(() => {
+      settings.set('speakerCuesEnabled', true);
+    });
+    expect(tag()?.textContent).toBe('Alice');
+  });
+
+  test("the transcript's own speaker list names the speakers", () => {
+    const { page, store } = readTalk();
+    act(() => {
+      store.setSpeakers(store.getSnapshot().transcripts[0]!.id, { alice: 'Ann', bob: 'Robert' });
+    });
+    expect(tag()?.textContent).toBe('Ann');
+    wait(page, FIRST_TURN_MS);
+    expect(tag()?.textContent).toBe('Robert');
+  });
+
+  test('the speaker list stays with the transcript when it is read again', () => {
+    const { store } = readTalk();
+    act(() => {
+      store.setSpeakers(store.getSnapshot().transcripts[0]!.id, { alice: 'Ann', bob: 'Robert' });
+    });
+    press('Stop reading');
+    press('Start reading');
+    expect(tag()?.textContent).toBe('Ann');
+  });
+});
+
+// jsdom gives an element's colour back as rgb().
+function highlightColorAsRgb(hex: string): string {
+  const [r, g, b] = [1, 3, 5].map((at) => Number.parseInt(hex.slice(at, at + 2), 16));
+  return `rgb(${r}, ${g}, ${b})`;
+}

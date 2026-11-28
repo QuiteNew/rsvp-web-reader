@@ -1,7 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
 import { browserClock, browserVisibility } from '../engine/browserClock';
-import type { Clock, PageVisibility, ReaderEngine, ReaderSnapshot } from '../engine/contract';
+import type {
+  Clock,
+  PageVisibility,
+  ReaderEngine,
+  ReaderEvents,
+  ReaderSnapshot,
+} from '../engine/contract';
 import { ReaderLoop } from '../engine/readerEngine';
 
 export interface ReaderEngineParts {
@@ -18,12 +24,19 @@ export interface ReaderEngineParts {
 // hears "something changed" and reads the new snapshot. That is what
 // useSyncExternalStore is for, and it keeps the timing out of the
 // component's own render cycle.
-export function useReaderEngine(parts: ReaderEngineParts = {}): [ReaderEngine, ReaderSnapshot] {
+//
+// The events are read once, when the loop is made. To react with the latest
+// state, pass functions that look it up when they are called.
+export function useReaderEngine(
+  parts: ReaderEngineParts = {},
+  events: ReaderEvents = {},
+): [ReaderEngine, ReaderSnapshot] {
   const [engine] = useState(
     () =>
       new ReaderLoop({
         clock: parts.clock ?? browserClock,
         visibility: parts.visibility ?? browserVisibility,
+        events,
       }),
   );
   const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot);

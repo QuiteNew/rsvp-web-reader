@@ -264,6 +264,10 @@ export class ReaderLoop implements ReaderEngine {
     this.regrouped();
   }
 
+  speakers(): readonly string[] {
+    return this.session?.speakerTurns.speakers ?? [];
+  }
+
   setSpeakerCues(enabled: boolean, custom: ReadonlyMap<string, string> | null = null): void {
     if (this.session === null) return;
     this.session.setSpeakerCues(enabled, custom);

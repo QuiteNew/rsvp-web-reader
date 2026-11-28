@@ -719,6 +719,25 @@ describe('speakers', () => {
     expect(rig.speakers).toEqual([]);
   });
 
+  test('speakers() lists the speaker of each turn, for the chimes', () => {
+    expect(makeRig().engine.speakers()).toEqual([]);
+    const rig = loaded(TWO_SPEAKERS, { speakerCuesEnabled: true });
+    expect(rig.engine.speakers()).toEqual(['Alice', 'Bob', 'Alice', 'Bob']);
+    rig.engine.setSpeakerCues(false);
+    expect(rig.engine.speakers()).toEqual([]);
+    // The keys of a custom list are label keys, as labelKey() makes them.
+    rig.engine.setSpeakerCues(
+      true,
+      new Map([
+        ['alice', 'Alice'],
+        ['bob', 'Robert'],
+      ]),
+    );
+    expect(rig.engine.speakers()).toEqual(['Alice', 'Robert', 'Alice', 'Robert']);
+    rig.engine.unload();
+    expect(rig.engine.speakers()).toEqual([]);
+  });
+
   test('turning cues on mid-read takes effect from the next turn', () => {
     const rig = loaded(TWO_SPEAKERS);
     rig.engine.setSpeakerCues(true);
