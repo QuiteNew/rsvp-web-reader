@@ -35,7 +35,17 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
     { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+      // One WebKit test at a time on the owner's machine. Playwright's WebKit
+      // for Windows stopped drawing altogether for a minute when several of
+      // its pages ran at once, even with no other browser running, and a
+      // test waiting for a button to hold still then timed out. Its traces
+      // show no frames at all after that moment and nothing on the page
+      // moving. CI runs on Linux and keeps Playwright's default.
+      workers: isCI ? undefined : 1,
+    },
   ],
   webServer: {
     command: `npm run preview -- --port ${PORT} --strictPort`,
