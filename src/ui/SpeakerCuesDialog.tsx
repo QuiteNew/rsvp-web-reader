@@ -80,10 +80,11 @@ interface SpeakerCuesDialogProps {
 // makes them one speaker, and Back to automatic puts every row back the way
 // Automatic has it.
 //
-// Nothing changes until Apply, which keeps the window open and says so, as
-// the Chunking window does. Escape and the close button leave without
-// applying. There is no Enter, as on the desktop, so a key press cannot
-// apply anything by accident.
+// Nothing changes until Apply, which saves and closes the window. The
+// desktop keeps it open and says "Applied."; closing it was the owner's
+// choice for the web. Settings stays open under it either way. Escape and
+// the close button leave without applying. There is no Enter, as on the
+// desktop, so a key press cannot apply anything by accident.
 //
 // Where the browser cannot play sound the sound part is greyed out and what
 // was saved there is kept as it is, as on the desktop without winsound.
@@ -113,16 +114,13 @@ export function SpeakerCuesDialog({
 
   function changeRow(index: number, changes: Partial<SpeakerRow>): void {
     setRows(rows.map((row, at) => (at === index ? { ...row, ...changes } : row)));
-    setStatus('');
   }
-  const [status, setStatus] = useState('');
   const soundAvailable = player !== null && player.available;
   // Listen's chimes still to come, so a second click or closing can stop them.
   const waiting = useRef<TimerHandle[]>([]);
 
   function change(changes: Partial<SpeakerCueChoice>): void {
     setDraft({ ...draft, ...changes });
-    setStatus('');
   }
 
   function cancelListen(): void {
@@ -318,7 +316,6 @@ export function SpeakerCuesDialog({
                   className={styles.action}
                   onClick={() => {
                     setRows(autoRows);
-                    setStatus('');
                   }}
                 >
                   Back to automatic
@@ -341,14 +338,11 @@ export function SpeakerCuesDialog({
               const list = speakersToSave(rows);
               onApplySpeakers(transcript.id, list === null ? null : Object.fromEntries(list));
             }
-            setStatus('Applied.');
+            onClose();
           }}
         >
           Apply
         </button>
-        <span role="status" className={styles.note}>
-          {status}
-        </span>
       </div>
     </Dialog>
   );

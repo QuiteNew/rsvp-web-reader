@@ -3322,13 +3322,11 @@ describe('speaker cues', () => {
       target: { value: 'top_right' },
     });
     fireEvent.click(cues.getByRole('button', { name: 'Apply' }));
-    expect(cues.getByRole('status')).toHaveTextContent('Applied.');
     expect(JSON.parse(window.localStorage.getItem(SETTINGS_KEY) ?? '')).toMatchObject({
       speaker_cues_enabled: true,
       speaker_cue_tag_position: 'top_right',
     });
-    // Closing the window leaves Settings open under it, as Chunking does.
-    fireEvent.click(cues.getByRole('button', { name: 'Close' }));
+    // Apply closes the window and leaves Settings open under it.
     expect(screen.queryByRole('dialog', { name: 'Speaker cues' })).toBeNull();
     expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument();
     expect(tag()?.textContent).toBe('Alice');
@@ -3347,7 +3345,6 @@ describe('speaker cues', () => {
     });
     fireEvent.click(cues.getByRole('button', { name: 'Apply' }));
     expect(store.getSnapshot().transcripts[0]?.speakerCustom).toEqual({ alice: 'Ann', bob: 'Bob' });
-    fireEvent.click(cues.getByRole('button', { name: 'Close' }));
     expect(tag()?.textContent).toBe('Ann');
     wait(page, FIRST_TURN_MS);
     expect(tag()?.textContent).toBe('Bob');

@@ -236,13 +236,6 @@ describe('the speaker list', () => {
     press('Apply');
     expect(onApplySpeakers).toHaveBeenCalledWith(7, null);
   });
-
-  test('a change in the list takes the "Applied." away', () => {
-    open();
-    press('Apply');
-    fireEvent.click(rowTick('Cat'));
-    expect(screen.getByRole('status')).toHaveTextContent('');
-  });
 });
 
 describe('Apply', () => {
@@ -265,9 +258,11 @@ describe('Apply', () => {
     });
     // The list as it was loaded is Automatic, saved as null.
     expect(onApplySpeakers).toHaveBeenCalledWith(7, null);
-    expect(screen.getByRole('status')).toHaveTextContent('Applied.');
-    // The window stays open after Apply.
-    expect(onClose).not.toHaveBeenCalled();
+    // Apply closes the window, the owner's choice for the web. The desktop
+    // keeps it open and says "Applied.".
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onApply.mock.invocationCallOrder[0]).toBeLessThan(onClose.mock.invocationCallOrder[0]!);
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   test('a_greyed_choice_is_kept_and_handed_back', () => {
@@ -292,13 +287,6 @@ describe('Apply', () => {
     expect(choice('Where it goes').value).toBe('top_right');
     press('Apply');
     expect(onApply.mock.calls[0]?.[0]).toMatchObject({ speakerCueTagPosition: 'top_right' });
-  });
-
-  test('a change after Apply takes the "Applied." away', () => {
-    open();
-    press('Apply');
-    fireEvent.click(box('Speaker cues'));
-    expect(screen.getByRole('status')).toHaveTextContent('');
   });
 
   test('close_and_esc_leave_without_applying', () => {

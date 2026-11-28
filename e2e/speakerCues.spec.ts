@@ -171,8 +171,8 @@ test('switched on in the Speaker cues window, the reader shows who is speaking',
   const cues = page.getByRole('dialog', { name: 'Speaker cues' });
   await cues.getByRole('checkbox', { name: 'Speaker cues' }).check();
   await cues.getByRole('button', { name: 'Apply' }).click();
-  await expect(cues.getByRole('status')).toHaveText('Applied.');
-  await cues.getByRole('button', { name: 'Close' }).click();
+  // Apply closes the window. Settings is still open under it.
+  await expect(cues).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(tag(page)).toHaveText('Alice');
@@ -202,7 +202,7 @@ test("a speaker renamed in the window's list is shown by that name at once", asy
   await cues.getByRole('textbox', { name: 'Name shown for Alice' }).fill('Ann');
   await expect(cues.getByTestId('list-mode')).toHaveText('Custom');
   await cues.getByRole('button', { name: 'Apply' }).click();
-  await cues.getByRole('button', { name: 'Close' }).click();
+  await expect(cues).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(tag(page)).toHaveText('Ann');
 });
