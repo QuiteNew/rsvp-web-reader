@@ -143,6 +143,18 @@
   text-align: left;
 }
 
+/* The speaker name tag, placed in the reading area by WordDisplay: above
+   the word, or in the top right corner. In the word's font, like the
+   surrounding words. */
+.speakerTag {
+  position: absolute;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: pre;
+  pointer-events: none;
+}
+
 /* Used only to measure text. Never seen, and takes no room. */
 .ruler {
   position: absolute;

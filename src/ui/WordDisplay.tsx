@@ -5,6 +5,12 @@ import { FIT_SIDE_MARGIN_PX, fitRenderSize, requiredWidth } from '../core/fit';
 import { guideMarkLength, peripheralContextSize } from '../core/guideMarks';
 import { wordSpacingEm } from '../core/letterSpacing';
 import { clampPan, panFromFraction, scrollbarFractions } from '../core/scroll';
+import {
+  SPEAKER_TAG_CORNER_MARGIN_PX,
+  SPEAKER_TAG_MIN_TOP_PX,
+  speakerTagRise,
+  speakerTagSize,
+} from '../core/speakerCueDisplay';
 import { HorizontalScrollbar } from './HorizontalScrollbar';
 import styles from './WordDisplay.module.css';
 
@@ -14,6 +20,15 @@ export interface GuideMarks {
   readonly horizontal: boolean;
   readonly thicknessPx: number;
   readonly lengthPercent: number;
+  readonly color: string;
+}
+
+// The name of the speaker now reading, for Speaker cues. Above the word it
+// is centred on the focus letter and slides with the flash. In the top right
+// corner it holds still.
+export interface SpeakerTag {
+  readonly name: string;
+  readonly position: 'above' | 'top_right';
   readonly color: string;
 }
 
@@ -41,7 +56,12 @@ interface WordDisplayProps {
   // The room between letters, as a part of the word size (em), from the
   // letter spacing level. 0 is Off. The surrounding words are not spaced.
   readonly letterGap?: number;
+  // The speaker name tag. null or left out shows none.
+  readonly speakerTag?: SpeakerTag | null;
 }
+
+// The tag's line is this many times its font size, as for the word.
+const TAG_LINE_HEIGHT = 1.2;
 
 // How far one step of the scrollbar slides the flash (an arrow key or a
 // wheel notch), as on the desktop. A click on the track moves a whole row.
@@ -84,6 +104,7 @@ export function WordDisplay({
   pan,
   onPanChange,
   letterGap = 0,
+  speakerTag = null,
 }: WordDisplayProps) {
   const display = useRef<HTMLDivElement>(null);
   const ruler = useRef<HTMLSpanElement>(null);
@@ -227,6 +248,34 @@ export function WordDisplay({
     '--letter-gap': `${letterGap}em`,
     '--word-gap': `${wordGap}em`,
   } as CSSProperties;
+  // The tag above the word sits over the highest point a guide mark can
+  // reach, worked out in px from the fitted size, so that CSS can keep it
+  // inside the reading area as the desktop does. The reading area centres
+  // this display, so its middle is the middle of the focus letter.
+  let tagStyle: CSSProperties | undefined;
+  if (speakerTag !== null) {
+    const tagSize = speakerTagSize(fontSize);
+    const markLength = guideMarkLength(fontSize, marks.lengthPercent);
+    const rise = speakerTagRise(hasFocus ? 0.6 * fontSize : 0, offsetPx, markLength);
+    const tagTop = rise + TAG_LINE_HEIGHT * tagSize;
+    tagStyle =
+      speakerTag.position === 'top_right'
+        ? {
+            fontSize: `${tagSize}px`,
+            color: speakerTag.color,
+            top: `${SPEAKER_TAG_CORNER_MARGIN_PX}px`,
+            right: `${SPEAKER_TAG_CORNER_MARGIN_PX}px`,
+          }
+        : {
+            fontSize: `${tagSize}px`,
+            color: speakerTag.color,
+            left: 0,
+            right: 0,
+            textAlign: 'center',
+            top: `max(${SPEAKER_TAG_MIN_TOP_PX}px, 50% - ${tagTop}px)`,
+            transform: `translateX(${shownPan}px)`,
+          };
+  }
   const before = chunk?.before ?? '';
   const after = chunk?.after ?? '';
   return (
@@ -267,6 +316,17 @@ export function WordDisplay({
           </div>
         )}
       </div>
+      {speakerTag !== null && (
+        <div
+          className={styles.speakerTag}
+          style={tagStyle}
+          data-testid="speaker-tag"
+          data-position={speakerTag.position}
+          aria-hidden="true"
+        >
+          {speakerTag.name}
+        </div>
+      )}
       {scrolls && (
         <div className={styles.scrollArea}>
           <button
